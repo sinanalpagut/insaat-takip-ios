@@ -113,6 +113,7 @@ struct SaleFormSheet: View {
         let selected = apartment.id == (selectedApartmentId ?? apartmentId)
         return Button {
             selectedApartmentId = apartment.id
+            prefillListPrice(apartment)
         } label: {
             Text("No \(apartment.apartmentNumber)")
                 .font(.manrope(12.5, .bold))
@@ -169,11 +170,21 @@ struct SaleFormSheet: View {
         guard !didPrefill else { return }
         didPrefill = true
         selectedApartmentId = apartmentId ?? selectableApartments.first?.id
-        guard let apartment = selectedApartment, apartment.isSold else { return }
+        guard let apartment = selectedApartment else { return }
+        guard apartment.isSold else {
+            prefillListPrice(apartment)
+            return
+        }
         buyerName = apartment.buyerName ?? ""
         priceText = Fmt.qty(apartment.price)
         paidText = Fmt.qty(apartment.paidAmount)
         payment = apartment.paymentStatus ?? .tamamlandi
+    }
+
+    /// Boş dairede tanımlı liste fiyatı varsa (TOKİ gerçek verisi) forma hazır getirir.
+    private func prefillListPrice(_ apartment: Apartment) {
+        guard !apartment.isSold, apartment.price > 0 else { return }
+        priceText = Fmt.qty(apartment.price)
     }
 
     private func save() {

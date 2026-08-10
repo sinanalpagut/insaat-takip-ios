@@ -32,6 +32,11 @@ struct Apartment: Codable, Identifiable, Equatable {
 
     var isSold: Bool { status == .sold }
 
+    /// Kat etiketi: 0 = "Zemin" (TOKİ projelerindeki zemin katlar), diğerleri "N. Kat".
+    var floorLabel: String {
+        floor == 0 ? "Zemin" : "\(floor). Kat"
+    }
+
     /// Kalan alacak.
     var remainingAmount: Double { max(0, price - paidAmount) }
 

@@ -123,7 +123,7 @@ struct ApartmentCellView: View {
                     .font(.sora(15, .bold))
                     .foregroundColor(Palette.ink)
                 Spacer()
-                Text("\(apartment.floor). Kat")
+                Text(apartment.floorLabel)
                     .font(.manrope(10.5, .semiBold))
                     .foregroundColor(Palette.textSecondary)
             }
@@ -179,7 +179,7 @@ struct ApartmentCellView: View {
                     .font(.sora(15, .bold))
                     .foregroundColor(Palette.ink)
                 Spacer()
-                Text("\(apartment.floor). Kat")
+                Text(apartment.floorLabel)
                     .font(.manrope(10.5, .semiBold))
                     .foregroundColor(Palette.textSecondary)
             }

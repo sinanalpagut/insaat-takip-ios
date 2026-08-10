@@ -28,3 +28,6 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Gerçek veri referansları (TOKİ fiyat listesi vb.) — repoya girmez, yerelde kalır
+DemoAssets/

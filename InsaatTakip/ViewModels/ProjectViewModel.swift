@@ -59,15 +59,35 @@ final class ProjectViewModel: ObservableObject {
         documents.filter { $0.projectId == projectId && (role == .admin || $0.partnerVisible) }
     }
 
+    /// Belge tarihlerinden ("12 Oca 2026") en yenisini bulur; başlıktaki "son yükleme" için.
+    /// İçinde bulunulan yıla aitse yıl gösterilmez ("14 Tem"), değilse tam tarih döner.
+    func lastUploadText(for projectId: String, role: UserRole) -> String? {
+        let currentYear = Calendar.current.component(.year, from: Date())
+        let parsed: [(Int, Int, Int, String)] = documents(for: projectId, role: role).compactMap { doc in
+            let parts = doc.dateText.split(separator: " ")
+            guard parts.count >= 2,
+                  let day = Int(parts[0]),
+                  let monthIndex = Self.monthNames.firstIndex(of: String(parts[1])) else { return nil }
+            let year = parts.count > 2 ? (Int(parts[2]) ?? currentYear) : currentYear
+            return (year, monthIndex + 1, day, doc.dateText)
+        }
+        guard let newest = parsed.max(by: { ($0.0, $0.1, $0.2) < ($1.0, $1.1, $1.2) }) else { return nil }
+        if newest.0 == currentYear {
+            return "\(newest.2) \(Self.monthNames[newest.1 - 1])"
+        }
+        return newest.3
+    }
+
     func photos(for projectId: String) -> [SitePhoto] {
         sitePhotos.filter { $0.projectId == projectId }
     }
 
     // MARK: - Özet rakamlar
 
-    /// Toplam satış cirosu (satılan dairelerin bedelleri).
+    /// Toplam satış cirosu (yalnızca satılan dairelerin bedelleri).
+    /// Not: Boş daireler liste fiyatı taşıyabilir (TOKİ gerçek verisi) — ciroya girmez.
     func totalSales(for projectId: String) -> Double {
-        apartments(for: projectId).reduce(0) { $0 + $1.price }
+        apartments(for: projectId).filter(\.isSold).reduce(0) { $0 + $1.price }
     }
 
     /// Toplam malzeme gideri (giren × birim fiyat).
@@ -438,6 +458,10 @@ extension ProjectViewModel {
 
     private func loadMockData() {
         // ---- Projeler --------------------------------------------------------
+        // "kars309": GERÇEK proje — TOKİ Kars Karacaören 309 Konut, Ada 1224 / Parsel 1,
+        // SF-1 Blok 1 (Zemin+2 kat, 12 daire, tamamı 3+1 · 111,55 m² brüt / 88,5 m² net).
+        // Kaynak: TOKİ resmî fiyat listesi (29 Ağu 2024) — DemoAssets/ içinde yerel kopyası var.
+        // İlerleme %88 tahminidir (kura 19 Ara 2024, sözleşmeler Oca 2025; teslim öncesi ince işler).
         projects = [
             Project(id: "p1", blockNumber: "145", parcelNumber: "2", district: "Çayırova", city: "Kocaeli",
                     floors: 5, totalApartments: 20, phase: .kabaInsaat, progress: 68, inviteCode: nil, photoCount: 48),
@@ -445,6 +469,8 @@ extension ProjectViewModel {
                     floors: 4, totalApartments: 12, phase: .temel, progress: 34, inviteCode: nil, photoCount: 12),
             Project(id: "p3", blockNumber: "908", parcelNumber: "7", district: "Kepez", city: "Antalya",
                     floors: 3, totalApartments: 8, phase: .teslim, progress: 96, inviteCode: nil, photoCount: 64),
+            Project(id: "kars309", blockNumber: "1224", parcelNumber: "1", district: "Karacaören", city: "Kars",
+                    floors: 3, totalApartments: 12, phase: .inceIsler, progress: 88, inviteCode: nil, photoCount: 0),
         ]
 
         // ---- Malzemeler (9 kalem × 3 proje) ---------------------------------
@@ -463,7 +489,7 @@ extension ProjectViewModel {
         // p2 ve p3 daha küçük projeler: miktarlar ölçeklenir, fiyatlar aynı kalır.
         let scales: [String: Double] = ["p1": 1.0, "p2": 0.52, "p3": 0.44]
         for project in projects {
-            let factor = scales[project.id] ?? 1
+            guard let factor = scales[project.id] else { continue }   // kars309 aşağıda ayrı
             for (code, name, subtitle, unit, price, totalIn, totalOut, step) in baseMaterials {
                 materials.append(Material(id: "\(project.id)-\(code)", projectId: project.id,
                                           code: code, name: name, subtitle: subtitle, unit: unit,
@@ -472,6 +498,28 @@ extension ProjectViewModel {
                                           totalOut: (totalOut * factor).rounded(),
                                           step: step))
             }
+        }
+
+        // kars309 malzemeleri — MÜHENDİSLİK TAHMİNİ (proje bazlı malzeme verisi kamuya açık değildir).
+        // Taban: 12 daire × 111,55 m² brüt × 1,15 ortak alan payı ≈ 1.540 m² inşaat alanı.
+        // Katsayılar (betonarme konut için yaygın değerler): demir 40 kg/m², beton 0,35 m³/m²,
+        // çimento 0,7 torba/m², tuğla 45 adet/m², alçı 0,45 torba/m²; cephe ≈ 810 m² (mantolama),
+        // doğrama 12 daire × 7 adet. Kullanım (çıkan), %88 fiziki ilerlemeyle uyumlu tutuldu.
+        let karsMaterials: [(String, String, String, String, Double, Double, Double, Double)] = [
+            ("Ø12", "Demir", "Nervürlü inşaat demiri", "kg", 28.5, 61_500, 58_000, 500),
+            ("C30", "Hazır Beton", "C30/37 pompalı", "m³", 2_450, 540, 540, 50),
+            ("ÇMT", "Çimento", "CEM II 42,5 R", "torba", 165, 1_080, 940, 50),
+            ("TĞL", "Tuğla", "19luk yatay delikli", "adet", 22, 69_500, 66_000, 1_000),
+            ("EPS", "Strafor", "5 cm mantolama levhası", "m²", 96, 810, 690, 100),
+            ("PVC", "Pimapen", "PVC doğrama · ısıcam", "adet", 6_800, 84, 78, 10),
+            ("KUM", "Kum", "Yıkanmış dere kumu", "ton", 950, 340, 305, 20),
+            ("TEL", "Bağ Teli", "1,5 mm galvaniz", "kg", 42, 750, 700, 25),
+            ("ALÇ", "Alçı", "Saten perdah alçısı", "torba", 210, 690, 560, 25),
+        ]
+        for (code, name, subtitle, unit, price, totalIn, totalOut, step) in karsMaterials {
+            materials.append(Material(id: "kars309-\(code)", projectId: "kars309",
+                                      code: code, name: name, subtitle: subtitle, unit: unit,
+                                      unitPrice: price, totalIn: totalIn, totalOut: totalOut, step: step))
         }
 
         // ---- Malzeme hareket geçmişi ----------------------------------------
@@ -512,6 +560,18 @@ extension ProjectViewModel {
             }
         }
 
+        // kars309 hareketleri — son teslimat/kullanım kayıtları (temsilî akış).
+        materialLogs.append(contentsOf: [
+            MaterialLog(id: UUID(), materialId: "kars309-Ø12", type: .exit, amount: 4_200,
+                        dateText: "29 Tem 2026", note: "Çatı parapet donatısı", user: admin),
+            MaterialLog(id: UUID(), materialId: "kars309-Ø12", type: .entry, amount: 9_500,
+                        dateText: "15 Tem 2026", note: "İrsaliye #2087 · Kars Demir Çelik", user: admin),
+            MaterialLog(id: UUID(), materialId: "kars309-ALÇ", type: .exit, amount: 120,
+                        dateText: "05 Ağu 2026", note: "2. kat saten perdah", user: admin),
+            MaterialLog(id: UUID(), materialId: "kars309-EPS", type: .exit, amount: 90,
+                        dateText: "01 Ağu 2026", note: "Kuzey cephe mantolama", user: admin),
+        ])
+
         // ---- Daireler --------------------------------------------------------
         // 145 Ada / 2 Parsel: 12 satış — alıcı, bedel, ödeme ve tahsilat değerleri
         // ekran 04'teki kartların birebir aynısı. (Tahsilat 28,12 M · Kalan 14,53 M)
@@ -550,7 +610,7 @@ extension ProjectViewModel {
         ]
         let salesByProject = ["p1": p1Sales, "p2": p2Sales, "p3": p3Sales]
 
-        for project in projects {
+        for project in projects where project.id != "kars309" {
             let sales = salesByProject[project.id] ?? []
             let perFloor = max(1, project.totalApartments / project.floors)
             for n in 1...project.totalApartments {
@@ -572,6 +632,42 @@ extension ProjectViewModel {
                                             deliveryNote: project.phase == .teslim ? "Teslim edildi" : "Anahtar teslim bekliyor",
                                             imageLabels: labels))
             }
+        }
+
+        // kars309 daireleri — GERÇEK VERİ (TOKİ fiyat listesi, 29 Ağu 2024):
+        // Kat ve daire bazlı satış bedelleri (KDV hariç) listedeki birebir değerlerdir.
+        // Zemin: No 1-4 · 1. Kat: No 5-8 · 2. Kat: No 9-12; tamamı 3+1, 111,55 m² brüt.
+        // Satış kurgusu: kura 19 Ara 2024 → sözleşmeler Oca 2025'te imzalandı (9 daire);
+        // tahsilat = %10 peşinat + Şub 2025–Ağu 2026 arası 19 aylık taksit (TOKİ planı,
+        // MMA artışı ihmal edilmiştir). ALICI ADLARI KURGUDUR (gerçek alıcılar gizlidir).
+        // No 1, 5, 9 satışta boş; liste fiyatları satış formunda hazır gelir.
+        // (daireNo, kat, alıcı?, bedel, tahsil edilen, sözleşme tarihi?)
+        let karsUnits: [(Int, Int, String?, Double, Double, String?)] = [
+            (1, 0, nil, 1_805_613, 0, nil),
+            (2, 0, "Meryem Karaca", 1_902_563, 371_003, "09 Oca 2025"),
+            (3, 0, "Hasan Demirtaş", 1_902_563, 371_003, "14 Oca 2025"),
+            (4, 0, "Elif Doğan", 1_805_613, 352_093, "16 Oca 2025"),
+            (5, 1, nil, 2_051_221, 0, nil),
+            (6, 1, "Yusuf Aslan", 2_193_416, 427_715, "07 Oca 2025"),
+            (7, 1, "Zehra Çetin", 2_193_416, 427_715, "21 Oca 2025"),
+            (8, 1, "Osman Kaya", 2_051_221, 399_986, "23 Oca 2025"),
+            (9, 2, nil, 2_025_368, 0, nil),
+            (10, 2, "İbrahim Güneş", 2_167_562, 422_678, "28 Oca 2025"),
+            (11, 2, "Hatice Yavuz", 2_167_562, 422_678, "30 Oca 2025"),
+            (12, 2, "Ali Yıldırım", 2_025_368, 394_950, "31 Oca 2025"),
+        ]
+        for (no, floor, buyer, price, paid, date) in karsUnits {
+            apartments.append(Apartment(id: "kars309-\(no)", projectId: "kars309",
+                                        apartmentNumber: no, floor: floor,
+                                        type: "3+1", area: "111,55 m²",
+                                        status: buyer == nil ? .available : .sold,
+                                        buyerName: buyer,
+                                        price: price,
+                                        paidAmount: paid,
+                                        paymentStatus: buyer == nil ? nil : .taksitli,
+                                        saleDateText: date,
+                                        deliveryNote: "İnce işler sürüyor · teslim bekleniyor",
+                                        imageLabels: []))
         }
 
         // ---- Ortaklar (ekran 05) --------------------------------------------
@@ -615,6 +711,19 @@ extension ProjectViewModel {
             ])
         }
 
+        // kars309 belgeleri — TOKİ'nin kamuya açık gerçek evrakları (toki.gov.tr/satis).
+        documents.append(contentsOf: [
+            ProjectDocument(id: UUID(), projectId: "kars309", group: .ruhsat, fileType: .pdf,
+                            name: "TOKİ 83 Konut Fiyat Listesi", versionText: "resmî", sizeMB: 0.2,
+                            dateText: "29 Ağu 2024", partnerVisible: true),
+            ProjectDocument(id: UUID(), projectId: "kars309", group: .ruhsat, fileType: .pdf,
+                            name: "Satış-Kura Duyurusu", versionText: "resmî", sizeMB: 0.1,
+                            dateText: "16 Ara 2024", partnerVisible: true),
+            ProjectDocument(id: UUID(), projectId: "kars309", group: .sozlesme, fileType: .pdf,
+                            name: "Sözleşme Dönemi Bilgilendirmesi", versionText: "resmî", sizeMB: 0.1,
+                            dateText: "02 Oca 2025", partnerVisible: true),
+        ])
+
         // ---- Hareket akışı (ekran 07) ---------------------------------------
         activities = [
             ActivityItem(id: UUID(), kind: .materialIn, title: "Demir · 12.500 kg giriş",
@@ -629,6 +738,8 @@ extension ProjectViewModel {
                          meta: "908 Ada / 7 Parsel · İrsaliye #2210", timeText: "Sal", section: .buHafta),
             ActivityItem(id: UUID(), kind: .materialOut, title: "Kum · 24 ton çıkış",
                          meta: "145 Ada / 2 Parsel · Cephe sıva", timeText: "Pzt", section: .buHafta),
+            ActivityItem(id: UUID(), kind: .materialOut, title: "Alçı · 120 torba çıkış",
+                         meta: "1224 Ada / 1 Parsel · 2. kat saten perdah", timeText: "Çar", section: .buHafta),
         ]
 
         // ---- Şantiye fotoğraf yuvaları (ekran 09) ---------------------------

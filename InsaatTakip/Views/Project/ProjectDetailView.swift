@@ -268,9 +268,14 @@ struct ProjectDetailView: View {
         case .ortaklar:
             return "\(viewModel.partners(for: projectId).count) ortak · hisse dağılımı tanımlı"
         case .belgeler:
-            let docs = viewModel.documents(for: projectId, role: appState.currentUser?.role ?? .partner)
+            let role = appState.currentUser?.role ?? .partner
+            let docs = viewModel.documents(for: projectId, role: role)
             let totalMB = docs.reduce(0) { $0 + $1.sizeMB }
-            return "\(docs.count) dosya · \(Fmt.megabytes(totalMB)) · son yükleme 14 Tem"
+            var text = "\(docs.count) dosya · \(Fmt.megabytes(totalMB))"
+            if let lastUpload = viewModel.lastUploadText(for: projectId, role: role) {
+                text += " · son yükleme \(lastUpload)"
+            }
+            return text
         }
     }
 

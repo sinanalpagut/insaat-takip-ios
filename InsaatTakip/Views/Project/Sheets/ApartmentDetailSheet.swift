@@ -79,7 +79,7 @@ struct ApartmentDetailSheet: View {
     }
 
     private func subtitle(_ apartment: Apartment) -> String {
-        var parts = ["\(apartment.floor). Kat"]
+        var parts = [apartment.floorLabel]
         if let buyer = apartment.buyerName { parts.append(buyer) }
         if let date = apartment.saleDateText { parts.append(date) }
         return parts.joined(separator: " · ")

@@ -37,25 +37,32 @@ struct SitePhotosView: View {
                     let currentWeek = photos.filter(\.isCurrentWeek)
                     let archive = photos.filter { !$0.isCurrentWeek }
 
-                    weekHeader("Bu hafta", count: max(currentWeek.count, 9))
-                        .padding(.top, 18)
+                    if photos.isEmpty {
+                        emptyState
+                            .padding(.top, 18)
+                    } else {
+                        weekHeader("Bu hafta", count: currentWeek.count)
+                            .padding(.top, 18)
 
-                    LazyVGrid(columns: columns, spacing: 7) {
-                        ForEach(currentWeek) { photo in
-                            currentWeekTile(photo)
+                        LazyVGrid(columns: columns, spacing: 7) {
+                            ForEach(currentWeek) { photo in
+                                currentWeekTile(photo)
+                            }
+                        }
+                        .padding(.top, 10)
+
+                        if !archive.isEmpty {
+                            weekHeader("Geçen hafta", count: archive.count)
+                                .padding(.top, 24)
+
+                            LazyVGrid(columns: columns, spacing: 7) {
+                                ForEach(archive) { photo in
+                                    archiveTile(photo)
+                                }
+                            }
+                            .padding(.top, 10)
                         }
                     }
-                    .padding(.top, 10)
-
-                    weekHeader("Geçen hafta", count: max(archive.count, 14))
-                        .padding(.top, 24)
-
-                    LazyVGrid(columns: columns, spacing: 7) {
-                        ForEach(archive) { photo in
-                            archiveTile(photo)
-                        }
-                    }
-                    .padding(.top, 10)
 
                     Spacer().frame(height: 90)
                 }
@@ -95,6 +102,28 @@ struct SitePhotosView: View {
         .padding(.bottom, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Palette.ink.ignoresSafeArea(edges: .top))
+    }
+
+    /// Hiç fotoğraf yokken gösterilen kesikli davet kartı.
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "camera")
+                .font(.system(size: 24, weight: .light))
+                .foregroundColor(Palette.textTertiary)
+            Text("Henüz şantiye fotoğrafı yok")
+                .font(.manrope(13.5, .bold))
+                .foregroundColor(Palette.ink)
+            Text(isAdmin ? "Haftalık ilerlemeyi \"＋ Fotoğraf Ekle\" ile kaydetmeye başla"
+                         : "Yönetici fotoğraf ekledikçe burada görünecek")
+                .font(.manrope(11.5, .medium))
+                .foregroundColor(Palette.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 170)
+        .background(Palette.fillSubtle)
+        .cornerRadius(16)
+        .dashedBorder(Palette.dashed, radius: 16)
     }
 
     private func weekHeader(_ title: String, count: Int) -> some View {
