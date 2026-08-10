@@ -1,0 +1,239 @@
+import SwiftUI
+
+// MARK: - Dönem Raporu / PDF (Ekran 10)
+// Dönem çipleri (Bu ay / Çeyrek / Tümü), özet kart (son satır "Dönem net" yeşil),
+// AYLIK SATIŞ çubuk grafiği (≥7 M ₺ koyu bakır, altı açık) ve PDF paylaşımı.
+
+struct ReportView: View {
+    @EnvironmentObject private var viewModel: ProjectViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    let projectId: String
+
+    @State private var period: ProjectViewModel.ReportPeriod = .ceyrek
+    @State private var pdfURL: URL?
+    @State private var showShare = false
+
+    private var project: Project? {
+        viewModel.projects.first { $0.id == projectId }
+    }
+
+    private var summary: ProjectViewModel.ReportSummary {
+        viewModel.reportSummary(for: projectId, period: period)
+    }
+
+    private var bars: [ProjectViewModel.MonthBar] {
+        viewModel.monthlySales(for: projectId)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 14) {
+                    summaryCard
+                        .padding(.top, 16)
+                    chartCard
+
+                    PrimaryButton(title: "PDF Olarak İndir", icon: "doc.text") {
+                        exportPDF()
+                    }
+                    .padding(.top, 6)
+
+                    Text("Rapor tüm ortaklara otomatik olarak da gönderilebilir.")
+                        .font(.manrope(11.5, .medium))
+                        .foregroundColor(Palette.textTertiary)
+
+                    Spacer().frame(height: 40)
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .background(Palette.page.ignoresSafeArea())
+        .navigationBarHidden(true)
+        .sheet(isPresented: $showShare) {
+            if let pdfURL {
+                ShareSheet(items: [pdfURL])
+            }
+        }
+    }
+
+    // MARK: Başlık
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                DarkHeaderButton(systemName: "chevron.left") { dismiss() }
+                Spacer()
+            }
+            .padding(.top, 6)
+
+            Text("Dönem Raporu")
+                .font(.sora(26, .bold))
+                .foregroundColor(.white)
+                .padding(.top, 14)
+
+            Text(project?.title ?? "")
+                .font(.manrope(12.5, .medium))
+                .foregroundColor(.white.opacity(0.55))
+                .padding(.top, 5)
+
+            HStack(spacing: 8) {
+                ForEach(ProjectViewModel.ReportPeriod.allCases, id: \.self) { option in
+                    Button {
+                        period = option
+                    } label: {
+                        Text(option.rawValue)
+                            .font(.manrope(12.5, .bold))
+                            .foregroundColor(period == option ? Palette.ink : .white.opacity(0.7))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 9)
+                            .background(period == option ? Color.white : Color.white.opacity(0.08))
+                            .cornerRadius(11)
+                    }
+                }
+            }
+            .padding(.top, 16)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Palette.ink
+                .clipShape(RoundedCorners(radius: 22, corners: [.bottomLeft, .bottomRight]))
+                .ignoresSafeArea(edges: .top)
+        )
+    }
+
+    // MARK: Özet kart
+
+    private var summaryCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(summary.title)
+                .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                .padding(.bottom, 6)
+
+            summaryRow("Satılan daire", "\(summary.soldCount) adet")
+            Divider().overlay(Palette.divider)
+            summaryRow("Satış geliri", Fmt.compactMoney(summary.salesTotal))
+            Divider().overlay(Palette.divider)
+            summaryRow("Tahsil edilen", Fmt.compactMoney(summary.collectedTotal))
+            Divider().overlay(Palette.divider)
+            summaryRow("Malzeme gideri", Fmt.compactMoney(summary.materialCost))
+            Divider().overlay(Palette.divider)
+            // Negatif dönem sonucu uyarı rengiyle gösterilir
+            summaryRow("Dönem net", Fmt.compactMoney(summary.net),
+                       valueColor: summary.net >= 0 ? Palette.success : Palette.alertInk)
+        }
+        .padding(16)
+        .background(Palette.surface)
+        .cornerRadius(18)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Palette.border, lineWidth: 1))
+        .shadow(color: Color(hex: 0x22262E, alpha: 0.05), radius: 3, x: 0, y: 1)
+    }
+
+    private func summaryRow(_ label: String, _ value: String, valueColor: Color = Palette.ink) -> some View {
+        HStack {
+            Text(label)
+                .font(.manrope(13.5, .medium))
+                .foregroundColor(Palette.textMuted)
+            Spacer()
+            Text(value)
+                .font(.sora(15, .bold))
+                .foregroundColor(valueColor)
+        }
+        .padding(.vertical, 13)
+    }
+
+    // MARK: Grafik kartı
+
+    private var chartCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Aylık Satış (M ₺)")
+                .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+
+            HStack(alignment: .bottom, spacing: 14) {
+                let maxValue = max(bars.map(\.value).max() ?? 1, 1)
+                ForEach(bars) { bar in
+                    VStack(spacing: 7) {
+                        Text(Fmt.millionsShort(bar.value))
+                            .font(.sora(11, .bold))
+                            .foregroundColor(Palette.textMuted)
+                        // ≥7 M ₺ aylar koyu bakır, diğerleri açık ton
+                        RoundedCorners(radius: 5, corners: [.topLeft, .topRight])
+                            .fill(bar.value >= 7_000_000 ? Palette.accent : Palette.barSoft)
+                            .frame(height: max(10, bar.value / maxValue * 62))
+                        Text(bar.label)
+                            .font(.manrope(11, .semiBold))
+                            .foregroundColor(Palette.textTertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.top, 16)
+        }
+        .padding(16)
+        .background(Palette.surface)
+        .cornerRadius(18)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Palette.border, lineWidth: 1))
+        .shadow(color: Color(hex: 0x22262E, alpha: 0.05), radius: 3, x: 0, y: 1)
+    }
+
+    // MARK: PDF üretimi
+
+    /// Özet ve grafiği tek sayfalık PDF'e çevirip paylaşım sayfası açar.
+    private func exportPDF() {
+        let content = VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("İNŞAAT TAKİP — DÖNEM RAPORU")
+                    .font(.manrope(11, .extraBold))
+                    .tracking(1.4)
+                    .foregroundColor(Palette.accent)
+                Text(project?.title ?? "")
+                    .font(.sora(24, .bold))
+                    .foregroundColor(Palette.ink)
+                Text("\(project?.meta ?? "") · \(Fmt.shortDate())")
+                    .font(.manrope(12, .medium))
+                    .foregroundColor(Palette.textSecondary)
+            }
+            summaryCard
+            chartCard
+            Text("Bu rapor İnşaat Takip uygulamasından oluşturulmuştur. Ortaklar salt okunur erişime sahiptir.")
+                .font(.manrope(10.5, .medium))
+                .foregroundColor(Palette.textTertiary)
+        }
+        .padding(28)
+        .frame(width: 560)
+        .background(Color.white)
+
+        let renderer = ImageRenderer(content: content)
+        renderer.proposedSize = ProposedViewSize(width: 560, height: nil)
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Donem-Raporu-\(project?.blockNumber ?? "")-\(project?.parcelNumber ?? "").pdf")
+
+        renderer.render { size, draw in
+            var box = CGRect(origin: .zero, size: size)
+            guard let context = CGContext(url as CFURL, mediaBox: &box, nil) else { return }
+            context.beginPDFPage(nil)
+            draw(context)
+            context.endPDFPage()
+            context.closePDF()
+        }
+
+        pdfURL = url
+        showShare = true
+    }
+}
+
+/// UIKit paylaşım sayfası köprüsü (PDF çıktısı için).
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
