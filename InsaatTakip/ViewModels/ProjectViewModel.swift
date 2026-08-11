@@ -194,7 +194,8 @@ final class ProjectViewModel: ObservableObject {
         apartments[index] = apartment
 
         if isNewSale {
-            let project = projects.first { $0.id == apartment.projectId }
+            // Akışta hangi projenin dairesi olduğu görünmeli — malzeme kayıtlarıyla aynı düzen.
+            let projectTitle = projects.first { $0.id == apartment.projectId }?.title ?? ""
             let payNote: String
             switch payment {
             case .tamamlandi: payNote = "Tahsil edildi"
@@ -203,7 +204,7 @@ final class ProjectViewModel: ObservableObject {
             }
             activities.insert(ActivityItem(id: UUID(), kind: .sale,
                                            title: "Daire No \(apartment.apartmentNumber) satıldı — \(Fmt.compactMoney(price))",
-                                           meta: "\(trimmedBuyer) · \(payNote)",
+                                           meta: "\(projectTitle) · \(trimmedBuyer) · \(payNote)",
                                            timeText: Fmt.clock(),
                                            section: .bugun), at: 0)
             hasUnreadActivity = true
@@ -400,20 +401,29 @@ final class ProjectViewModel: ObservableObject {
                              salesTotal: sales, collectedTotal: collected, materialCost: cost)
     }
 
-    /// Son 6 tamamlanmış ayın satış çubukları (Şub…Tem) — yalnızca içinde bulunulan yıl.
+    /// Son 6 tamamlanmış ayın satış çubukları — yıl sınırını aşar.
+    /// (Ocak'ta önceki yılın Tem–Ara'sını gösterir; grafik hiçbir ayda boş kalmaz.)
     func monthlySales(for projectId: String) -> [MonthBar] {
         let now = Date()
         let currentMonth = Calendar.current.component(.month, from: now)
         let currentYear = Calendar.current.component(.year, from: now)
-        let range = (max(1, currentMonth - 6))..<currentMonth
         let sold = apartments(for: projectId).filter(\.isSold)
-        return range.map { m in
+
+        // 6 ay geriden başlayıp bir önceki aya kadar: (yıl, ay) çiftleri.
+        let window: [(year: Int, month: Int)] = (1...6).map { offset in
+            let shifted = currentMonth - (7 - offset)   // -6 … -1 ay
+            return shifted <= 0
+                ? (currentYear - 1, shifted + 12)
+                : (currentYear, shifted)
+        }
+
+        return window.map { slot in
             let total = sold.reduce(0.0) { sum, apt in
                 guard let date = Self.yearMonth(of: apt.saleDateText),
-                      date.year == currentYear, date.month == m else { return sum }
+                      date.year == slot.year, date.month == slot.month else { return sum }
                 return sum + apt.price
             }
-            return MonthBar(label: Self.monthNames[m - 1], value: total)
+            return MonthBar(label: Self.monthNames[slot.month - 1], value: total)
         }
     }
 
@@ -440,13 +450,15 @@ final class ProjectViewModel: ObservableObject {
     // MARK: - Toast
 
     /// 2,6 saniye görünen onay bildirimi.
+    /// Kapatma işi doğrudan ana aktörde çalışır; @Published güncellemesi
+    /// hiçbir zaman arka plandan yapılmaz (Swift 6 uyumlu).
     func flash(_ message: String) {
         toastTask?.cancel()
         withAnimation { toast = message }
-        toastTask = Task { [weak self] in
+        toastTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 2_600_000_000)
             guard !Task.isCancelled else { return }
-            await MainActor.run { withAnimation { self?.toast = nil } }
+            withAnimation { self?.toast = nil }
         }
     }
 
@@ -820,11 +832,11 @@ extension ProjectViewModel {
             ActivityItem(id: UUID(), kind: .materialIn, title: "Demir · 12.500 kg giriş",
                          meta: "145 Ada / 2 Parsel · İrsaliye #4471", timeText: "09:24", section: .bugun),
             ActivityItem(id: UUID(), kind: .sale, title: "Daire No 17 satıldı — 3,75 M ₺",
-                         meta: "Gizem Polat · Kapora alındı", timeText: "08:10", section: .bugun),
+                         meta: "145 Ada / 2 Parsel · Gizem Polat · Kapora alındı", timeText: "08:10", section: .bugun),
             ActivityItem(id: UUID(), kind: .materialOut, title: "Çimento · 180 torba çıkış",
                          meta: "145 Ada / 2 Parsel · 5. kat şap", timeText: "16:40", section: .dun),
             ActivityItem(id: UUID(), kind: .partnerJoined, title: "Burak Erdoğan projeye katıldı",
-                         meta: "Davet kodu ile · salt okunur", timeText: "11:02", section: .dun),
+                         meta: "145 Ada / 2 Parsel · davet kodu ile · salt okunur", timeText: "11:02", section: .dun),
             ActivityItem(id: UUID(), kind: .materialIn, title: "Pimapen · 42 adet giriş",
                          meta: "908 Ada / 7 Parsel · İrsaliye #2210", timeText: "Sal", section: .buHafta),
             ActivityItem(id: UUID(), kind: .materialOut, title: "Kum · 24 ton çıkış",

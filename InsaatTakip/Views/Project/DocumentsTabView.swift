@@ -10,7 +10,8 @@ struct DocumentsTabView: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
 
     let projectId: String
-    var filter: Filter
+    /// Filtre çipleri bu görünümün içinde; koyu başlık sekmeye göre yükseklik değiştirmesin diye.
+    @Binding var filter: Filter
 
     enum Filter: String, CaseIterable {
         case tumu = "Tümü"
@@ -42,6 +43,28 @@ struct DocumentsTabView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
+                // Tümü / Mimari / Statik / Ruhsat filtresi
+                HStack(spacing: 8) {
+                    ForEach(Filter.allCases, id: \.self) { option in
+                        Button {
+                            filter = option
+                        } label: {
+                            Text(option.rawValue)
+                                .font(.manrope(12.5, .bold))
+                                .foregroundColor(filter == option ? Palette.accent : Palette.textMuted)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(filter == option ? Palette.accentTint : Palette.surface)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(filter == option ? Palette.accent : Palette.border, lineWidth: 1)
+                                )
+                                .cornerRadius(10)
+                        }
+                    }
+                }
+                .padding(.top, 16)
+
                 ForEach(groupedDocuments, id: \.0) { group, docs in
                     HStack {
                         Text(group.sectionTitle)

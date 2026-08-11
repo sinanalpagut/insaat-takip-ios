@@ -82,7 +82,7 @@ struct ProjectDetailView: View {
                 case .ortaklar:
                     PartnersTabView(projectId: projectId)
                 case .belgeler:
-                    DocumentsTabView(projectId: projectId, filter: documentFilter)
+                    DocumentsTabView(projectId: projectId, filter: $documentFilter)
                 }
             }
         }
@@ -203,55 +203,33 @@ struct ProjectDetailView: View {
                     darkHeaderIcon("ellipsis")
                 }
 
-                if tab == .malzemeler {
-                    Text(appState.currentUser?.role.chipText ?? "")
-                        .font(.manrope(9.5, .extraBold))
-                        .tracking(0.5)
-                        .textCase(.uppercase)
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.1))
-                        .cornerRadius(7)
-                }
+                Text(appState.currentUser?.role.chipText ?? "")
+                    .font(.manrope(9.5, .extraBold))
+                    .tracking(0.5)
+                    .textCase(.uppercase)
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(7)
             }
             .padding(.top, 6)
 
-            // Malzemeler sekmesi: SATIŞ / MALZEME / NET finans şeridi
-            if tab == .malzemeler {
-                HStack(spacing: 9) {
-                    financeTile("Satış", Fmt.compactMoney(viewModel.totalSales(for: projectId)),
-                                background: Color.white.opacity(0.07), valueColor: .white)
-                    financeTile("Malzeme", Fmt.compactMoney(viewModel.totalMaterialCost(for: projectId)),
-                                background: Color.white.opacity(0.07), valueColor: .white)
-                    financeTile("Net", Fmt.compactMoney(viewModel.netAmount(for: projectId)),
-                                background: Palette.accent.opacity(0.22), valueColor: Palette.accentLight)
-                }
-                .padding(.top, 16)
+            // SATIŞ / MALZEME / NET finans şeridi — dört sekmede de görünür.
+            // Sabit başlık yüksekliği, sekme çubuğunun yerinden oynamasını önler
+            // (sekme değiştirirken ikinci dokunuş kaymasın diye).
+            HStack(spacing: 9) {
+                financeTile("Satış", Fmt.compactMoney(viewModel.totalSales(for: projectId)),
+                            background: Color.white.opacity(0.07), valueColor: .white)
+                financeTile("Malzeme", Fmt.compactMoney(viewModel.totalMaterialCost(for: projectId)),
+                            background: Color.white.opacity(0.07), valueColor: .white)
+                financeTile("Net", Fmt.compactMoney(viewModel.netAmount(for: projectId)),
+                            background: Palette.accent.opacity(0.22), valueColor: Palette.accentLight)
             }
-
-            // Belgeler sekmesi: Tümü / Mimari / Statik / Ruhsat filtre çipleri
-            if tab == .belgeler {
-                HStack(spacing: 8) {
-                    ForEach(DocumentsTabView.Filter.allCases, id: \.self) { option in
-                        Button {
-                            documentFilter = option
-                        } label: {
-                            Text(option.rawValue)
-                                .font(.manrope(12.5, .bold))
-                                .foregroundColor(documentFilter == option ? Palette.ink : .white.opacity(0.7))
-                                .padding(.horizontal, 15)
-                                .padding(.vertical, 9)
-                                .background(documentFilter == option ? Color.white : Color.white.opacity(0.08))
-                                .cornerRadius(11)
-                        }
-                    }
-                }
-                .padding(.top, 16)
-            }
+            .padding(.top, 16)
         }
         .padding(.horizontal, 16)
-        .padding(.bottom, tab == .malzemeler || tab == .belgeler ? 16 : 12)
+        .padding(.bottom, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Palette.ink.ignoresSafeArea(edges: .top))
     }
