@@ -83,13 +83,16 @@ struct ApartmentDetailSheet: View {
             if let apartment { importPickedPhotos(for: apartment.id) }
         }
         .fullScreenCover(isPresented: $showCamera) {
-            CameraPicker { image in
-                if let apartment {
-                    viewModel.addApartmentPhotos(role: appState.currentUser?.role ?? .partner,
-                                                 apartmentId: apartment.id, images: [image])
-                }
-                showCamera = false
-            }
+            CameraPicker(
+                onCapture: { image in
+                    if let apartment {
+                        viewModel.addApartmentPhotos(role: appState.currentUser?.role ?? .partner,
+                                                     apartmentId: apartment.id, images: [image])
+                    }
+                    showCamera = false
+                },
+                onCancel: { showCamera = false }
+            )
             .ignoresSafeArea()
         }
     }

@@ -163,10 +163,13 @@ struct ReceiptSheet: View {
             syncUnitPrice()
         }
         .fullScreenCover(isPresented: $showCamera) {
-            CameraPicker { image in
-                receiptImage = image
-                showCamera = false
-            }
+            CameraPicker(
+                onCapture: { image in
+                    receiptImage = image
+                    showCamera = false
+                },
+                onCancel: { showCamera = false }
+            )
             .ignoresSafeArea()
         }
         .sheet(isPresented: $showNewMaterial) {

@@ -86,12 +86,15 @@ struct MaterialLogSheet: View {
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
         .fullScreenCover(item: $previewedReceipt) { payload in
-            ZStack(alignment: .topTrailing) {
+            // ZStack hizası tüm çocuklara uygulandığı için görsel üste yapışıyordu;
+            // görsel ortalanır, kapat butonu ayrı bir overlay olarak üste konur.
+            ZStack {
                 Color.black.ignoresSafeArea()
                 Image(uiImage: payload.image)
                     .resizable()
                     .scaledToFit()
-                    .ignoresSafeArea()
+            }
+            .overlay(alignment: .topTrailing) {
                 Button {
                     previewedReceipt = nil
                 } label: {
@@ -99,7 +102,7 @@ struct MaterialLogSheet: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 40, height: 40)
-                        .background(Color.white.opacity(0.18))
+                        .background(Color.black.opacity(0.45))
                         .clipShape(Circle())
                 }
                 .padding(20)
