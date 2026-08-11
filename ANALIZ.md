@@ -15,6 +15,59 @@ Efor: **S** = birkaç saat · **M** = 1-3 gün · **L** = 1 hafta+
 
 ---
 
+## 📋 İlerleme
+
+Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edilir.
+**Hedef: listenin tamamı.** Sıradaki iş her zaman en üstteki işaretsiz maddedir.
+
+### Faz 0 — Hızlı kazanımlar
+
+- [ ] 1. "Net" etiketini dürüstleştir (satış − malzeme olduğu görünsün)
+- [ ] 2. Rol değiştirmeyi DEBUG'a al (ortak kendini yönetici yapamasın)
+- [ ] 3. Satış iptali (yanlış girilen satış geri alınabilsin)
+- [ ] 4. Uygulama ikonundaki alfa kanalını kaldır (ITMS-90717)
+- [ ] 5. Türkçe büyük harf (YÖNETİCİ, AKTİF, FİŞ — i/İ sorunu)
+- [ ] 6. Klavye "Bitti" butonu + sheet'lere `.large` detent
+- [ ] 7. Çift sürükleme tutamacı + kritik stok görünürlüğü
+- [ ] 8. İnşaat ilerlemesi/aşaması düzenlenebilsin
+
+### Faz 1 — Firebase'den ÖNCE (sonraya kalırsa veri göçü gerektirir)
+
+- [ ] 9. Kimlik ve üyelik modeli (userId/ownerId, davet kodu ↔ proje bağı, dashboard filtresi)
+- [ ] 10. Tip düzeltmeleri (tarih → `Date`, para → kuruş `Int64`, kimlikler → UUID, `ActivityItem.section`)
+- [ ] 11. Gider defteri (işçilik, taşeron, arsa, harç, makine, yakıt)
+- [ ] 12. Tahsilat ve taksit defteri (ödeme geçmişi, vade, dekont)
+- [ ] 13. Silme / düzenleme / geçmiş tarihli kayıt + denetim izi
+- [ ] 14. Daire durum modeli (kat karşılığı, rezerve, iptal) + daire bilgisi düzenleme
+- [ ] 15. Repository katmanı (ProjectViewModel'i protokol arkasına al)
+
+### Faz 2 — Kilometre taşı: kalıcılık
+
+- [ ] 16. Firestore + Auth + güvenlik kuralları
+- [ ] 17. Storage (fiş/daire/belge görselleri, `storagePath`, `uploadState`)
+- [ ] 18. Gizliliğin sorgu düzeyinde uygulanması
+- [ ] 19. Stok toplamlarında atomik güncelleme (`FieldValue.increment`)
+
+### Faz 3 — Ürün değeri
+
+- [ ] 20. Ortak cari hesabı (`sharePercent` ile pay hesabı)
+- [ ] 21. Vade hatırlatıcı + gecikmiş tahsilat listesi
+- [ ] 22. Daire/alıcı arama ve filtreleme
+- [ ] 23. Belgelerin gerçekten açılabilmesi/indirilmesi
+- [x] 24. ~~Fiş OCR'ı~~ — **tamamlandı** (commit `92f1554`, cihaz üstü Vision)
+- [ ] 25. m² maliyeti ve malzeme fiyat geçmişi
+- [ ] 26. CSV/JSON dışa aktarma + portföy özeti
+
+### Faz 4 — Yayın paketi
+
+- [ ] 27. KVKK aydınlatma + gizlilik politikası URL'i
+- [ ] 28. Hesap silme akışı (App Store 5.1.1v)
+- [ ] 29. Davet deep link'i (WhatsApp bağlantısı çalışsın)
+- [ ] 30. `PrivacyInfo.xcprivacy` + Crashlytics + build numarası otomasyonu
+- [ ] 31. Erişilebilirlik paketi (kontrast, 44pt hedefler, VoiceOver, Dynamic Type)
+
+---
+
 # İnşaat Takip — Öncelikli Yol Haritası
 
 86 bulgu birleştirildiğinde geriye **5 kümede toplanan gerçek iş** kalıyor. Kilometre taşı olarak **Firebase / kalıcı veri** alınmış; her şey ona göre "öncesi" ve "sonrası" diye konumlandırıldı.
