@@ -90,7 +90,7 @@ struct SitePhotosView: View {
                     Text("Şantiye Kaydı")
                         .font(.sora(17, .bold))
                         .foregroundColor(.white)
-                    Text("\(project?.title ?? "") · \(project?.photoCount ?? 0) fotoğraf")
+                    Text("\(project?.title ?? "") · \(viewModel.photos(for: projectId).count) fotoğraf")
                         .font(.manrope(11.5, .medium))
                         .foregroundColor(.white.opacity(0.55))
                 }
@@ -142,7 +142,8 @@ struct SitePhotosView: View {
     /// Color.clear + aspectRatio: hücre, ızgara sütununu kare olarak doldurur.
     @ViewBuilder
     private func currentWeekTile(_ photo: SitePhoto) -> some View {
-        if let data = photo.imageData, let image = UIImage(data: data) {
+        // Görsel içe aktarımda bir kez küçültülüp saklanır; burada yalnızca çizilir.
+        if let image = photo.image {
             Color.clear
                 .aspectRatio(1, contentMode: .fit)
                 .overlay(
@@ -188,21 +189,24 @@ struct SitePhotosView: View {
             .cornerRadius(12)
     }
 
-    /// Galeriden seçilen görselleri bu haftanın kaydına ekler.
+    /// Galeriden seçilen görselleri küçültüp bu haftanın kaydına ekler.
+    /// Küçültme arka planda yapılır; ham galeri verisi hiçbir zaman saklanmaz.
     private func importPickedPhotos() {
         guard !pickedItems.isEmpty else { return }
         let items = pickedItems
         pickedItems = []
-        Task {
-            var images: [Data] = []
+        let role = appState.currentUser?.role ?? .partner
+
+        Task.detached(priority: .userInitiated) {
+            var images: [UIImage] = []
             for item in items {
-                if let data = try? await item.loadTransferable(type: Data.self) {
-                    images.append(data)
-                }
+                guard let data = try? await item.loadTransferable(type: Data.self),
+                      let thumbnail = SitePhoto.downsample(data) else { continue }
+                images.append(thumbnail)
             }
+            let ready = images
             await MainActor.run {
-                viewModel.addSitePhotos(role: appState.currentUser?.role ?? .partner,
-                                        projectId: projectId, images: images)
+                viewModel.addSitePhotos(role: role, projectId: projectId, images: ready)
             }
         }
     }

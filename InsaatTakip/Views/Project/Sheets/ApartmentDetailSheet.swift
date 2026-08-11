@@ -34,14 +34,16 @@ struct ApartmentDetailSheet: View {
                         priceBlock(apartment)
                             .padding(.top, 16)
 
-                        // Görseller şeridi
+                        // Görseller şeridi — sayaç gerçek görsel adedini gösterir
                         HStack {
                             Text("Görseller")
                                 .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
                             Spacer()
-                            Text("Tümü (\(max(apartment.imageLabels.count, 6)))")
-                                .font(.manrope(12, .bold))
-                                .foregroundColor(Palette.accent)
+                            if !apartment.imageLabels.isEmpty {
+                                Text("Tümü (\(apartment.imageLabels.count))")
+                                    .font(.manrope(12, .bold))
+                                    .foregroundColor(Palette.accent)
+                            }
                         }
                         .padding(.top, 20)
 
@@ -56,11 +58,10 @@ struct ApartmentDetailSheet: View {
 
                         if isAdmin {
                             PrimaryButton(title: "Satış Kaydını Düzenle") {
+                                // Üst görünüm sheet kapanınca satış formunu açar;
+                                // sabit gecikmeye dayanan zincirleme kaldırıldı.
+                                onEdit(apartment.id)
                                 dismiss()
-                                // Sheet kapanışıyla çakışmaması için kısa gecikme
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                                    onEdit(apartment.id)
-                                }
                             }
                             .padding(.top, 16)
                         }
@@ -145,8 +146,10 @@ struct ApartmentDetailSheet: View {
                     .dashedBorder(Palette.dashed, radius: 13, lineWidth: 1.2)
                 }
                 .onChange(of: pickedItem) { _ in
+                    // Daire görselleri henüz kalıcı olarak saklanmıyor (veri katmanı
+                    // eklenince açılacak); kullanıcıya yanlış onay verilmez.
                     if pickedItem != nil {
-                        viewModel.flash("Görsel eklendi")
+                        viewModel.flash("Daire görselleri bu sürümde kaydedilmiyor")
                         pickedItem = nil
                     }
                 }

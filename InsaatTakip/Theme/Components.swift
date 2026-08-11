@@ -281,7 +281,8 @@ struct FlowLayout: Layout {
     var spacing: CGFloat = 9
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
+        // Belirsiz öneride .infinity dönmek yerleşimi bozar; sistem varsayılanına düş.
+        let width = proposal.width ?? proposal.replacingUnspecifiedDimensions().width
         var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)

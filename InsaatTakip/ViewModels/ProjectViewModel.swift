@@ -9,6 +9,9 @@ import SwiftUI
 //   · 908 Ada / 7 Parsel (Kepez) — teslim aşamasında, tamamı satılmış
 // View'lar "dumb" kalır; filtreleme, toplama ve yetki kuralları buradadır.
 
+// Tüm durum güncellemeleri ana aktörde yapılır; @Published alanların arka
+// plandan yazılması (SwiftUI'da kararsız davranış) derleyici tarafından engellenir.
+@MainActor
 final class ProjectViewModel: ObservableObject {
 
     // MARK: Yayınlanan durum
@@ -128,7 +131,10 @@ final class ProjectViewModel: ObservableObject {
     func addReceipt(role: UserRole, materialId: String, type: MaterialLog.LogType,
                     amountText: String, unitPriceText: String, reference: String) -> Bool {
         guard role == .admin else { return false }   // Ortak veri giremez
-        guard let index = materials.firstIndex(where: { $0.id == materialId }) else { return false }
+        guard let index = materials.firstIndex(where: { $0.id == materialId }) else {
+            flash("Malzeme seçilmedi")
+            return false
+        }
 
         let amount = Self.parseNumber(amountText)
         guard amount > 0 else {
@@ -137,13 +143,24 @@ final class ProjectViewModel: ObservableObject {
         }
 
         var material = materials[index]
+        // Kayda geçen miktar, stoğa uygulanan miktarla daima aynıdır:
+        // çıkışta stok yetmiyorsa sessizce kırpmak yerine işlemi reddederiz.
+        let effectivePrice: Double
+
         if type == .entry {
-            material.totalIn += amount
-            // Birim fiyat girildiyse son alış fiyatı olarak güncellenir.
             let newPrice = Self.parseNumber(unitPriceText)
-            if newPrice > 0 { material.unitPrice = newPrice }
+            // Fiyat yalnızca bu girişe uygulanır; geçmiş stok yeniden fiyatlanmaz.
+            effectivePrice = newPrice > 0 ? newPrice : material.unitPrice
+            material.totalIn += amount
+            material.accruedCost += amount * effectivePrice
+            if newPrice > 0 { material.unitPrice = newPrice }   // sonraki fişlere ön dolum
         } else {
-            material.totalOut = min(material.totalIn, material.totalOut + amount)
+            guard material.currentStock >= amount else {
+                flash("Stok yetersiz · kalan \(Fmt.qty(material.currentStock, unit: material.unit))")
+                return false
+            }
+            effectivePrice = material.unitPrice
+            material.totalOut += amount
         }
         materials[index] = material
 
@@ -151,7 +168,8 @@ final class ProjectViewModel: ObservableObject {
             ? (type == .entry ? "İrsaliye kaydı" : "Saha kullanımı")
             : reference
         let log = MaterialLog(id: UUID(), materialId: materialId, type: type,
-                              amount: amount, dateText: Fmt.shortDate(),
+                              amount: amount, unitPrice: effectivePrice,
+                              dateText: Fmt.shortDate(),
                               note: note, user: User.admin.name)
         materialLogs.insert(log, at: 0)
 
@@ -245,9 +263,38 @@ final class ProjectViewModel: ObservableObject {
                                         paymentStatus: nil, saleDateText: nil,
                                         deliveryNote: "Yapım sürüyor", imageLabels: []))
         }
+
+        // Standart malzeme kataloğu sıfır stokla açılır — aksi halde "Fiş Ekle"
+        // formunda seçilecek malzeme olmaz ve kaydetme sessizce başarısız olurdu.
+        for item in Self.materialCatalog {
+            materials.append(Material(id: "\(project.id)-\(item.code)", projectId: project.id,
+                                      code: item.code, name: item.name, subtitle: item.subtitle,
+                                      unit: item.unit, unitPrice: item.price,
+                                      totalIn: 0, totalOut: 0, step: item.step, accruedCost: 0))
+        }
+
+        // Projeyi kuran yönetici, hisse dağılımının tamamıyla ilk ortak olur.
+        partners.append(Partner(id: UUID(), projectId: project.id, name: User.admin.name,
+                                isFounder: true,
+                                joinedText: "Proje kurucusu · \(Fmt.shortDate())",
+                                sharePercent: 100))
+
         flash("Proje oluşturuldu")
         return project
     }
+
+    /// Yeni projelerde açılan standart malzeme kalemleri (mock verideki katalogla aynı).
+    static let materialCatalog: [(code: String, name: String, subtitle: String, unit: String, price: Double, step: Double)] = [
+        ("Ø12", "Demir", "Nervürlü inşaat demiri", "kg", 28.5, 500),
+        ("C30", "Hazır Beton", "C30/37 pompalı", "m³", 2_450, 50),
+        ("ÇMT", "Çimento", "CEM II 42,5 R", "torba", 165, 50),
+        ("TĞL", "Tuğla", "19luk yatay delikli", "adet", 22, 1_000),
+        ("EPS", "Strafor", "5 cm cephe levhası", "m²", 96, 100),
+        ("PVC", "Pimapen", "PVC doğrama · ısıcam", "adet", 6_800, 10),
+        ("KUM", "Kum", "Yıkanmış dere kumu", "ton", 950, 20),
+        ("TEL", "Bağ Teli", "1,5 mm galvaniz", "kg", 42, 25),
+        ("ALÇ", "Alçı", "Saten perdah alçısı", "torba", 210, 25),
+    ]
 
     // MARK: Davet kodu
 
@@ -305,16 +352,14 @@ final class ProjectViewModel: ObservableObject {
         flash("Dosya yüklendi")
     }
 
-    /// Galeriden seçilen şantiye fotoğraflarını bu haftaya ekler.
-    func addSitePhotos(role: UserRole, projectId: String, images: [Data]) {
+    /// Galeriden seçilen (küçültülmüş) şantiye fotoğraflarını bu haftaya ekler.
+    /// Küçültme çağıran tarafta, arka planda yapılır — burada yalnızca hazır görseller beklenir.
+    func addSitePhotos(role: UserRole, projectId: String, images: [UIImage]) {
         guard role == .admin, !images.isEmpty else { return }
-        for data in images {
+        for image in images {
             sitePhotos.insert(SitePhoto(id: UUID(), projectId: projectId,
                                         dateText: String(Fmt.shortDate().dropLast(5)),
-                                        isCurrentWeek: true, imageData: data), at: 0)
-        }
-        if let index = projects.firstIndex(where: { $0.id == projectId }) {
-            projects[index].photoCount += images.count
+                                        isCurrentWeek: true, image: image), at: 0)
         }
         flash(images.count == 1 ? "Fotoğraf eklendi" : "\(images.count) fotoğraf eklendi")
     }
@@ -381,19 +426,20 @@ final class ProjectViewModel: ObservableObject {
         let sales = sold.reduce(0) { $0 + $1.price }
         let collected = sold.reduce(0) { $0 + $1.paidAmount }
 
-        // Malzeme gideri: dönem içindeki giriş kayıtları × birim fiyat.
-        // "Tümü" seçiliyken toplam malzeme maliyeti kullanılır.
+        // Malzeme gideri:
+        //  · "Tümü" → projenin birikmiş toplam maliyeti (kayıt öncesi alımlar dahil)
+        //  · ay/çeyrek → yalnızca o dönemde KAYITLI giriş fişleri, her biri
+        //    kendi tarihindeki dondurulmuş fiyatıyla (sonraki zamlar geçmişi değiştirmez)
         let cost: Double
+        let materialIds = Set(materials(for: projectId).map(\.id))
         if period == .tumu {
             cost = totalMaterialCost(for: projectId)
         } else {
-            let projectMaterials = materials(for: projectId)
             cost = materialLogs.reduce(0) { sum, log in
-                guard log.type == .entry,
-                      let material = projectMaterials.first(where: { $0.id == log.materialId }),
+                guard log.type == .entry, materialIds.contains(log.materialId),
                       let date = Self.yearMonth(of: log.dateText),
                       date.year == currentYear, months.contains(date.month) else { return sum }
-                return sum + log.amount * material.unitPrice
+                return sum + log.amount * log.unitPrice
             }
         }
 
@@ -463,13 +509,19 @@ final class ProjectViewModel: ObservableObject {
     }
 
     /// "12.500" / "28,50" gibi tr-TR girdilerini sayıya çevirir.
+    /// Çok uzun rakam dizileri Double'da `inf`e taşar ve modele NaN sokar
+    /// ("Ciro +∞ ₺", "Kalan NaN"); bu yüzden sonuç sonlu bir aralığa sıkıştırılır.
     static func parseNumber(_ text: String) -> Double {
         let normalized = text
             .replacingOccurrences(of: ".", with: "")
             .replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: ",", with: ".")
-        return Double(normalized) ?? 0
+        guard let value = Double(normalized), value.isFinite, value >= 0 else { return 0 }
+        return min(value, maxAmount)
     }
+
+    /// Tek bir tutarın / miktarın kabul edilen üst sınırı (1 trilyon).
+    static let maxAmount: Double = 1e12
 }
 
 // MARK: - Mock Veri
@@ -517,12 +569,14 @@ extension ProjectViewModel {
         for project in projects {
             guard let factor = scales[project.id] else { continue }   // kars309 aşağıda ayrı
             for (code, name, subtitle, unit, price, totalIn, totalOut, step) in baseMaterials {
+                let scaledIn = (totalIn * factor).rounded()
                 materials.append(Material(id: "\(project.id)-\(code)", projectId: project.id,
                                           code: code, name: name, subtitle: subtitle, unit: unit,
                                           unitPrice: price,
-                                          totalIn: (totalIn * factor).rounded(),
+                                          totalIn: scaledIn,
                                           totalOut: (totalOut * factor).rounded(),
-                                          step: step))
+                                          step: step,
+                                          accruedCost: scaledIn * price))
             }
         }
 
@@ -545,7 +599,8 @@ extension ProjectViewModel {
         for (code, name, subtitle, unit, price, totalIn, totalOut, step) in karsMaterials {
             materials.append(Material(id: "kars309-\(code)", projectId: "kars309",
                                       code: code, name: name, subtitle: subtitle, unit: unit,
-                                      unitPrice: price, totalIn: totalIn, totalOut: totalOut, step: step))
+                                      unitPrice: price, totalIn: totalIn, totalOut: totalOut,
+                                      step: step, accruedCost: totalIn * price))
         }
 
         // kars327 GB Blok 1 malzemeleri — aynı katsayılarla tahmin:
@@ -564,7 +619,8 @@ extension ProjectViewModel {
         for (code, name, subtitle, unit, price, totalIn, totalOut, step) in kars327Materials {
             materials.append(Material(id: "kars327-\(code)", projectId: "kars327",
                                       code: code, name: name, subtitle: subtitle, unit: unit,
-                                      unitPrice: price, totalIn: totalIn, totalOut: totalOut, step: step))
+                                      unitPrice: price, totalIn: totalIn, totalOut: totalOut,
+                                      step: step, accruedCost: totalIn * price))
         }
 
         // ---- Malzeme hareket geçmişi ----------------------------------------
@@ -575,15 +631,15 @@ extension ProjectViewModel {
             if material.code == "Ø12" {
                 materialLogs.append(contentsOf: [
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: 6_800,
-                                dateText: "02 Ağu 2026", note: "5. kat perde donatısı", user: admin),
+                                unitPrice: material.unitPrice, dateText: "02 Ağu 2026", note: "5. kat perde donatısı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: 12_500,
-                                dateText: "28 Tem 2026", note: "İrsaliye #4471 · Yılmaz Yapı", user: admin),
+                                unitPrice: material.unitPrice, dateText: "28 Tem 2026", note: "İrsaliye #4471 · Yılmaz Yapı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: 4_600,
-                                dateText: "21 Tem 2026", note: "4. kat döşeme imalatı", user: admin),
+                                unitPrice: material.unitPrice, dateText: "21 Tem 2026", note: "4. kat döşeme imalatı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: 14_000,
-                                dateText: "14 Tem 2026", note: "İrsaliye #4398 · Ege Yapı", user: admin),
+                                unitPrice: material.unitPrice, dateText: "14 Tem 2026", note: "İrsaliye #4398 · Ege Yapı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: 3_900,
-                                dateText: "06 Tem 2026", note: "3. kat kolon donatısı", user: admin),
+                                unitPrice: material.unitPrice, dateText: "06 Tem 2026", note: "3. kat kolon donatısı", user: admin),
                 ])
             } else {
                 let round: (Double) -> Double = { value in
@@ -592,35 +648,36 @@ extension ProjectViewModel {
                 }
                 materialLogs.append(contentsOf: [
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: round(material.totalOut * 0.16),
-                                dateText: "02 Ağu 2026", note: "5. kat imalatı", user: admin),
+                                unitPrice: material.unitPrice, dateText: "02 Ağu 2026", note: "5. kat imalatı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: round(material.totalIn * 0.21),
-                                dateText: "28 Tem 2026", note: "İrsaliye #4471 · Yılmaz Yapı", user: admin),
+                                unitPrice: material.unitPrice, dateText: "28 Tem 2026", note: "İrsaliye #4471 · Yılmaz Yapı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: round(material.totalOut * 0.11),
-                                dateText: "21 Tem 2026", note: "4. kat imalatı", user: admin),
+                                unitPrice: material.unitPrice, dateText: "21 Tem 2026", note: "4. kat imalatı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: round(material.totalIn * 0.28),
-                                dateText: "14 Tem 2026", note: "İrsaliye #4398 · Ege Yapı", user: admin),
+                                unitPrice: material.unitPrice, dateText: "14 Tem 2026", note: "İrsaliye #4398 · Ege Yapı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: round(material.totalOut * 0.09),
-                                dateText: "06 Tem 2026", note: "3. kat imalatı", user: admin),
+                                unitPrice: material.unitPrice, dateText: "06 Tem 2026", note: "3. kat imalatı", user: admin),
                 ])
             }
         }
 
         // Kars hareketleri — teslim (May 2025) öncesi son imalat kayıtları (temsilî akış).
+        // Fiyatlar kayıt anındaki değerlerdir; sonraki zamlar bu kayıtları etkilemez.
         materialLogs.append(contentsOf: [
             MaterialLog(id: UUID(), materialId: "kars309-ALÇ", type: .exit, amount: 120,
-                        dateText: "18 Mar 2025", note: "Saten perdah tamamlandı", user: admin),
+                        unitPrice: 210, dateText: "18 Mar 2025", note: "Saten perdah tamamlandı", user: admin),
             MaterialLog(id: UUID(), materialId: "kars309-EPS", type: .exit, amount: 90,
-                        dateText: "04 Mar 2025", note: "Cephe mantolama kapanışı", user: admin),
+                        unitPrice: 96, dateText: "04 Mar 2025", note: "Cephe mantolama kapanışı", user: admin),
             MaterialLog(id: UUID(), materialId: "kars309-Ø12", type: .entry, amount: 9_500,
-                        dateText: "11 Şub 2025", note: "İrsaliye #2087 · Kars Demir Çelik", user: admin),
+                        unitPrice: 28.5, dateText: "11 Şub 2025", note: "İrsaliye #2087 · Kars Demir Çelik", user: admin),
             MaterialLog(id: UUID(), materialId: "kars309-Ø12", type: .exit, amount: 4_200,
-                        dateText: "27 Şub 2025", note: "Çevre duvarı donatısı", user: admin),
+                        unitPrice: 28.5, dateText: "27 Şub 2025", note: "Çevre duvarı donatısı", user: admin),
             MaterialLog(id: UUID(), materialId: "kars327-ALÇ", type: .exit, amount: 150,
-                        dateText: "08 Nis 2025", note: "Son kat saten perdah", user: admin),
+                        unitPrice: 210, dateText: "08 Nis 2025", note: "Son kat saten perdah", user: admin),
             MaterialLog(id: UUID(), materialId: "kars327-PVC", type: .entry, amount: 30,
-                        dateText: "21 Mar 2025", note: "İrsaliye #3141 · Serhat PVC", user: admin),
+                        unitPrice: 6_800, dateText: "21 Mar 2025", note: "İrsaliye #3141 · Serhat PVC", user: admin),
             MaterialLog(id: UUID(), materialId: "kars327-EPS", type: .exit, amount: 160,
-                        dateText: "14 Nis 2025", note: "Güney cephe mantolama kapanışı", user: admin),
+                        unitPrice: 96, dateText: "14 Nis 2025", note: "Güney cephe mantolama kapanışı", user: admin),
         ])
 
         // ---- Daireler --------------------------------------------------------
@@ -848,11 +905,11 @@ extension ProjectViewModel {
         let lastWeek = ["29 Tem", "28 Tem", "27 Tem", "26 Tem", "25 Tem", "24 Tem"]
         for date in currentWeek {
             sitePhotos.append(SitePhoto(id: UUID(), projectId: "p1", dateText: date,
-                                        isCurrentWeek: true, imageData: nil))
+                                        isCurrentWeek: true, image: nil))
         }
         for date in lastWeek {
             sitePhotos.append(SitePhoto(id: UUID(), projectId: "p1", dateText: date,
-                                        isCurrentWeek: false, imageData: nil))
+                                        isCurrentWeek: false, image: nil))
         }
     }
 }

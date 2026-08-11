@@ -183,14 +183,34 @@ struct UploadSheet: View {
 
     private func handlePickedFile(_ result: Result<[URL], Error>) {
         guard case .success(let urls) = result, let url = urls.first else { return }
-        fileName = url.lastPathComponent
+
+        // iCloud Drive / başka uygulamalardan gelen URL'ler güvenlik kapsamlıdır;
+        // erişim açılmazsa boyut okuması sessizce 0 döner ve her dosya "0,1 MB" görünürdü.
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+
         let bytes = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-        fileSizeMB = max(0.1, Double(bytes) / 1_048_576)
+        let megabytes = Double(bytes) / 1_048_576
+
+        guard bytes > 0 else {
+            viewModel.flash("Dosya okunamadı")
+            return
+        }
+        guard megabytes <= Self.maxUploadMB else {
+            viewModel.flash("Dosya \(Int(Self.maxUploadMB)) MB sınırını aşıyor")
+            return
+        }
+
+        fileName = url.lastPathComponent
+        fileSizeMB = megabytes
 
         // Yükleme ilerlemesi animasyonu (mock — henüz sunucu yok).
         uploadProgress = 0
         withAnimation(.easeInOut(duration: 0.9)) { uploadProgress = 1 }
     }
+
+    /// Sheet başlığında duyurulan sınır.
+    static let maxUploadMB: Double = 50
 
     private func upload() {
         guard let fileName else {

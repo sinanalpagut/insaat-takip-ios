@@ -14,17 +14,21 @@ struct PartnersTabView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 10) {
+                let partners = viewModel.partners(for: projectId)
+                let shareTotal = partners.reduce(0) { $0 + $1.sharePercent }
+
                 HStack {
                     Text("Hisse Dağılımı")
                         .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
                     Spacer()
-                    Text("%100 tanımlı")
+                    // Gerçek toplam; %100'ü tutmuyorsa uyarı rengiyle belirtilir.
+                    Text("%\(shareTotal) tanımlı")
                         .font(.manrope(12, .semiBold))
-                        .foregroundColor(Palette.textSecondary)
+                        .foregroundColor(shareTotal == 100 ? Palette.textSecondary : Palette.alertInk)
                 }
                 .padding(.top, 16)
 
-                ForEach(viewModel.partners(for: projectId)) { partner in
+                ForEach(partners) { partner in
                     PartnerRowView(partner: partner)
                 }
 

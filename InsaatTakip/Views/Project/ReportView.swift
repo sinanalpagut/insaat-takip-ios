@@ -210,16 +210,31 @@ struct ReportView: View {
         let renderer = ImageRenderer(content: content)
         renderer.proposedSize = ProposedViewSize(width: 560, height: nil)
 
+        // Ada/parsel kullanıcı girdisidir; "/" gibi karakterler var olmayan bir
+        // alt dizin yolu üretip PDF'in sessizce yazılamamasına yol açardı.
+        let safe: (String?) -> String = { raw in
+            (raw ?? "").components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty }.joined(separator: "-")
+        }
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Donem-Raporu-\(project?.blockNumber ?? "")-\(project?.parcelNumber ?? "").pdf")
+            .appendingPathComponent("Donem-Raporu-\(safe(project?.blockNumber))-\(safe(project?.parcelNumber)).pdf")
 
+        var didWrite = false
         renderer.render { size, draw in
             var box = CGRect(origin: .zero, size: size)
-            guard let context = CGContext(url as CFURL, mediaBox: &box, nil) else { return }
+            guard size.width > 0, size.height > 0,
+                  let context = CGContext(url as CFURL, mediaBox: &box, nil) else { return }
             context.beginPDFPage(nil)
             draw(context)
             context.endPDFPage()
             context.closePDF()
+            didWrite = true
+        }
+
+        // Yazma başarısızsa boş bir paylaşım sayfası açmak yerine kullanıcıyı bilgilendir.
+        guard didWrite, FileManager.default.fileExists(atPath: url.path) else {
+            viewModel.flash("PDF oluşturulamadı")
+            return
         }
 
         pdfURL = url

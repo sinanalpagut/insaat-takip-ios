@@ -47,8 +47,8 @@ struct ProjectDetailView: View {
     @State private var activeSheet: ActiveSheet?
     @State private var documentFilter: DocumentsTabView.Filter = .tumu
     @State private var didApplyLaunchConfig = false
-    @State private var showPhotos = false
-    @State private var showReport = false
+    /// Daire detayı kapandıktan sonra açılacak satış düzenleme sheet'i.
+    @State private var pendingSaleEdit: String?
 
     private var isAdmin: Bool { appState.isAdmin }
 
@@ -96,14 +96,15 @@ struct ProjectDetailView: View {
             case .belgeler:   activeSheet = .upload
             }
         }
-        .sheet(item: $activeSheet) { sheet in
+        // Sheet zincirlemesi: daire detayından "Satış Kaydını Düzenle" seçilince
+        // yeni sheet, sabit bir gecikmeyle değil, kapanış olayında açılır.
+        .sheet(item: $activeSheet, onDismiss: {
+            if let id = pendingSaleEdit {
+                pendingSaleEdit = nil
+                activeSheet = .saleForm(apartmentId: id)
+            }
+        }) { sheet in
             sheetContent(sheet)
-        }
-        .navigationDestination(isPresented: $showPhotos) {
-            SitePhotosView(projectId: projectId)
-        }
-        .navigationDestination(isPresented: $showReport) {
-            ReportView(projectId: projectId)
         }
         .onAppear { applyLaunchConfig() }
     }
@@ -136,10 +137,13 @@ struct ProjectDetailView: View {
     }
 
     /// Sekme başına FAB başlığı (yalnızca yönetici).
+    /// Tamamı satılmış projede "Satış Ekle" boş bir form açacağı için gizlenir.
     private var fabTitle: String? {
         switch tab {
         case .malzemeler: return "Fiş Ekle"
-        case .daireler:   return "Satış Ekle"
+        case .daireler:
+            let hasAvailable = viewModel.apartments(for: projectId).contains { !$0.isSold }
+            return hasAvailable ? "Satış Ekle" : nil
         case .ortaklar:   return "Ortak Davet Et"
         case .belgeler:   return "Dosya Ekle"
         }
@@ -156,7 +160,7 @@ struct ProjectDetailView: View {
             InviteSheet(projectId: projectId)
         case .apartmentDetail(let apartmentId):
             ApartmentDetailSheet(apartmentId: apartmentId) { id in
-                activeSheet = .saleForm(apartmentId: id)
+                pendingSaleEdit = id   // kapanışta açılır (onDismiss)
             }
         case .saleForm(let apartmentId):
             SaleFormSheet(projectId: projectId, apartmentId: apartmentId)
@@ -187,16 +191,14 @@ struct ProjectDetailView: View {
 
                 Spacer(minLength: 8)
 
-                // Şantiye fotoğrafları ve dönem raporu kısayolları
+                // Şantiye fotoğrafları ve dönem raporu kısayolları.
+                // NavigationLink(value:) ile kök rota tablosunu kullanır —
+                // iOS 16'da iki ayrı isPresented hedefi üst üste kırılgandı.
                 Menu {
-                    Button {
-                        showPhotos = true
-                    } label: {
+                    NavigationLink(value: Route.photos(projectId)) {
                         Label("Şantiye Fotoğrafları", systemImage: "camera")
                     }
-                    Button {
-                        showReport = true
-                    } label: {
+                    NavigationLink(value: Route.report(projectId)) {
                         Label("Dönem Raporu", systemImage: "chart.bar")
                     }
                 } label: {
@@ -244,7 +246,9 @@ struct ProjectDetailView: View {
             let outstanding = Fmt.compactMoney(viewModel.outstandingAmount(for: projectId))
             return "Tahsilat \(collected) · Kalan alacak \(outstanding)"
         case .ortaklar:
-            return "\(viewModel.partners(for: projectId).count) ortak · hisse dağılımı tanımlı"
+            let partners = viewModel.partners(for: projectId)
+            let shareTotal = partners.reduce(0) { $0 + $1.sharePercent }
+            return "\(partners.count) ortak · hisse %\(shareTotal) tanımlı"
         case .belgeler:
             let role = appState.currentUser?.role ?? .partner
             let docs = viewModel.documents(for: projectId, role: role)

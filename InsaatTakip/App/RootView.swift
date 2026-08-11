@@ -23,6 +23,9 @@ struct RootView: View {
             if appState.currentUser == nil {
                 WelcomeView()
                     .toastOverlay(viewModel.toast)
+                    // Oturum kapanınca gezinme yığını sıfırlanır; yeniden girişte
+                    // kullanıcı eski ekranın üstünde açılmaz.
+                    .onAppear { path = NavigationPath() }
             } else {
                 NavigationStack(path: $path) {
                     DashboardView()

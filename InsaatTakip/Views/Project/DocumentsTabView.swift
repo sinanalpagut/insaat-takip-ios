@@ -65,6 +65,29 @@ struct DocumentsTabView: View {
                 }
                 .padding(.top, 16)
 
+                if groupedDocuments.isEmpty {
+                    VStack(spacing: 10) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 24, weight: .light))
+                            .foregroundColor(Palette.textTertiary)
+                        Text(filter == .tumu ? "Henüz dosya yok" : "Bu kategoride dosya yok")
+                            .font(.manrope(13.5, .bold))
+                            .foregroundColor(Palette.ink)
+                        Text(appState.isAdmin
+                             ? "Plan, ruhsat ve sözleşmeleri \"＋ Dosya Ekle\" ile yükleyebilirsin"
+                             : "Yönetici dosya yükledikçe burada görünecek")
+                            .font(.manrope(11.5, .medium))
+                            .foregroundColor(Palette.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 170)
+                    .background(Palette.fillSubtle)
+                    .cornerRadius(16)
+                    .dashedBorder(Palette.dashed, radius: 16)
+                    .padding(.top, 16)
+                }
+
                 ForEach(groupedDocuments, id: \.0) { group, docs in
                     HStack {
                         Text(group.sectionTitle)

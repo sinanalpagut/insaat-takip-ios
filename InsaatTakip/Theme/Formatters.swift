@@ -24,9 +24,11 @@ enum Fmt {
         return f
     }()
 
-    /// 48000 → "48.000"
+    /// 48000 → "48.000". Sonlu olmayan değerler ekrana "NaN"/"∞" olarak
+    /// sızmasın diye tire ile gösterilir (Int(nan) dönüşümü de çökertirdi).
     static func qty(_ value: Double) -> String {
-        grouped.string(from: NSNumber(value: value.rounded())) ?? "\(Int(value))"
+        guard value.isFinite else { return "—" }
+        return grouped.string(from: NSNumber(value: value.rounded())) ?? "—"
     }
 
     /// 48000 kg → "48.000 kg"
@@ -41,6 +43,7 @@ enum Fmt {
 
     /// 42650000 → "42,65 M ₺" · 204600 → "205 B ₺" · 950 → "950 ₺"
     static func compactMoney(_ value: Double) -> String {
+        guard value.isFinite else { return "—" }
         let v = abs(value)
         let sign = value < 0 ? "−" : ""
         if v >= 1_000_000 {

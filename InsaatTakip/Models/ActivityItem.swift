@@ -32,10 +32,40 @@ struct ActivityItem: Codable, Identifiable, Equatable {
 
 // MARK: - Şantiye Fotoğrafı (Ekran 09)
 
+import UIKit
+
 struct SitePhoto: Identifiable, Equatable {
     let id: UUID
     let projectId: String
     var dateText: String        // "05 Ağu"
     var isCurrentWeek: Bool     // Bu hafta: canlı yuva · Arşiv: dolu kutu
-    var imageData: Data?        // Admin galeriden seçince dolar
+
+    /// Küçültülmüş görsel. Galeriden gelen ham veri ASLA saklanmaz:
+    /// 12 MP bir fotoğrafın çözülmüş hali ~48 MB'tır; birkaç kare bile
+    /// uygulamanın bellekten sonlandırılmasına yeter. İçe aktarımda
+    /// `SitePhoto.thumbnailSide` boyutuna indirgenir ve tek sefer üretilir.
+    var image: UIImage?
+
+    static let thumbnailSide: CGFloat = 1200
+
+    /// Diff maliyeti: görselin baytlarını karşılaştırmak yerine kimlik + tarih.
+    static func == (lhs: SitePhoto, rhs: SitePhoto) -> Bool {
+        lhs.id == rhs.id
+            && lhs.dateText == rhs.dateText
+            && lhs.isCurrentWeek == rhs.isCurrentWeek
+            && (lhs.image === rhs.image)
+    }
+
+    /// Ham galeri verisini ekran için yeterli boyuta indirger.
+    static func downsample(_ data: Data) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: thumbnailSide,
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
 }
