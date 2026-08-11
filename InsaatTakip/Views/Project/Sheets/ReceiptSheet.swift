@@ -16,6 +16,10 @@ struct ReceiptSheet: View {
     @State private var quantityText = ""
     @State private var unitPriceText = ""
     @State private var referenceText = ""
+    /// Kamerayla çekilen fiş görseli (küçültülmüş).
+    @State private var receiptImage: UIImage?
+    @State private var showCamera = false
+    @State private var showNewMaterial = false
 
     private var project: Project? {
         viewModel.projects.first { $0.id == projectId }
@@ -49,10 +53,12 @@ struct ReceiptSheet: View {
                         .padding(.top, 18)
 
                     // Malzeme seçim çipleri (seçili: bakır kenarlık + tint)
+                    // + sonda "Yeni Malzeme": katalog dışı kalemler için.
                     FlowLayout(spacing: 9) {
                         ForEach(materials) { material in
                             materialChip(material)
                         }
+                        newMaterialChip
                     }
                     .padding(.top, 10)
 
@@ -85,14 +91,58 @@ struct ReceiptSheet: View {
                         .smallCapsLabel(size: 10, color: Palette.textControl, tracking: 0.9)
                         .padding(.top, 16)
 
-                    TextField("Örn. İrsaliye #4482 · Yılmaz Yapı", text: $referenceText)
-                        .font(.manrope(13.5, .semiBold))
-                        .foregroundColor(Palette.ink)
-                        .padding(.horizontal, 14)
-                        .frame(height: 52)
-                        .background(Palette.surface)
-                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
-                        .padding(.top, 8)
+                    // Elle not + kamerayla fişi fotoğraflama
+                    HStack(spacing: 10) {
+                        TextField("Örn. İrsaliye #4482 · Yılmaz Yapı", text: $referenceText)
+                            .font(.manrope(13.5, .semiBold))
+                            .foregroundColor(Palette.ink)
+                            .padding(.horizontal, 14)
+                            .frame(height: 52)
+                            .background(Palette.surface)
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
+
+                        Button {
+                            showCamera = true
+                        } label: {
+                            Image(systemName: receiptImage == nil ? "camera.fill" : "checkmark")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(receiptImage == nil ? Palette.accent : .white)
+                                .frame(width: 52, height: 52)
+                                .background(receiptImage == nil ? Palette.accentTint : Palette.success)
+                                .cornerRadius(13)
+                        }
+                    }
+                    .padding(.top, 8)
+
+                    // Çekilen fişin küçük önizlemesi
+                    if let receiptImage {
+                        HStack(spacing: 11) {
+                            Image(uiImage: receiptImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 44, height: 44)
+                                .clipped()
+                                .cornerRadius(10)
+                            Text("Fiş fotoğrafı eklendi")
+                                .font(.manrope(12.5, .semiBold))
+                                .foregroundColor(Palette.textMuted)
+                            Spacer()
+                            Button {
+                                self.receiptImage = nil
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(Palette.textMuted)
+                                    .frame(width: 30, height: 30)
+                                    .background(Palette.fillMuted)
+                                    .cornerRadius(9)
+                            }
+                        }
+                        .padding(10)
+                        .background(Palette.fillSubtle)
+                        .cornerRadius(13)
+                        .padding(.top, 10)
+                    }
 
                     PrimaryButton(title: "Kaydet") { save() }
                         .padding(.top, 20)
@@ -111,6 +161,43 @@ struct ReceiptSheet: View {
             // Tasarımdaki gibi: seçili malzemenin güncel birim fiyatı hazır gelir.
             if selectedMaterialId == nil { selectedMaterialId = materials.first?.id }
             syncUnitPrice()
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker { image in
+                receiptImage = image
+                showCamera = false
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showNewMaterial) {
+            NewMaterialSheet(projectId: projectId) { created in
+                // Yeni kalem hemen seçili gelsin, fiyatı forma dolsun.
+                selectedMaterialId = created.id
+                syncUnitPrice()
+            }
+        }
+    }
+
+    /// Katalog dışı kalem eklemek için kesikli çip.
+    private var newMaterialChip: some View {
+        Button {
+            showNewMaterial = true
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .bold))
+                Text("Yeni Malzeme")
+                    .font(.manrope(12.5, .bold))
+            }
+            .foregroundColor(Palette.accent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(Palette.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 9)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            )
+            .cornerRadius(9)
         }
     }
 
@@ -199,7 +286,8 @@ struct ReceiptSheet: View {
                                          type: direction,
                                          amountText: quantityText,
                                          unitPriceText: unitPriceText,
-                                         reference: referenceText)
+                                         reference: referenceText,
+                                         receiptImage: receiptImage)
         if saved { dismiss() }
     }
 }

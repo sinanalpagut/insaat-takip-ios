@@ -11,8 +11,7 @@ struct ReportView: View {
     let projectId: String
 
     @State private var period: ProjectViewModel.ReportPeriod = .ceyrek
-    @State private var pdfURL: URL?
-    @State private var showShare = false
+    @State private var sharePayload: SharePayload?
 
     private var project: Project? {
         viewModel.projects.first { $0.id == projectId }
@@ -52,10 +51,10 @@ struct ReportView: View {
         }
         .background(Palette.page.ignoresSafeArea())
         .navigationBarHidden(true)
-        .sheet(isPresented: $showShare) {
-            if let pdfURL {
-                ShareSheet(items: [pdfURL])
-            }
+        // sheet(item:) kullanılır: isPresented + "if let" kalıbında sheet içeriği
+        // sunum anında henüz güncellenmemiş değeri yakalayıp boş (beyaz) açılıyordu.
+        .sheet(item: $sharePayload) { payload in
+            ShareSheet(items: [payload.url])
         }
     }
 
@@ -237,9 +236,14 @@ struct ReportView: View {
             return
         }
 
-        pdfURL = url
-        showShare = true
+        sharePayload = SharePayload(url: url)
     }
+}
+
+/// Paylaşılacak dosya — sheet(item:) için kimlikli sarmalayıcı.
+struct SharePayload: Identifiable {
+    let id = UUID()
+    let url: URL
 }
 
 /// UIKit paylaşım sayfası köprüsü (PDF çıktısı için).

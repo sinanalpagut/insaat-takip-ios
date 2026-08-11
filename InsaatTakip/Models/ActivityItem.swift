@@ -69,3 +69,18 @@ struct SitePhoto: Identifiable, Equatable {
         return UIImage(cgImage: cgImage)
     }
 }
+
+// MARK: - Daire Görseli (Ekran 13)
+
+/// Daireye bağlı etiketli görsel. `Apartment` Codable kaldığı için
+/// görseller ayrı koleksiyonda tutulur (UIImage kodlanamaz).
+struct ApartmentPhoto: Identifiable, Equatable {
+    let id: UUID
+    let apartmentId: String
+    var label: String        // "Salon", "Mutfak", "Görsel 3"…
+    var image: UIImage?      // nil = tasarımdaki yer tutucu kare
+
+    static func == (lhs: ApartmentPhoto, rhs: ApartmentPhoto) -> Bool {
+        lhs.id == rhs.id && lhs.label == rhs.label && (lhs.image === rhs.image)
+    }
+}

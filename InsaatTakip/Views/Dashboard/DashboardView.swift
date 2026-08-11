@@ -60,11 +60,8 @@ struct DashboardView: View {
         .fullScreenCover(isPresented: $showJoinSheet) {
             JoinWithCodeView()
         }
-        .confirmationDialog("Görünüm", isPresented: $showRoleMenu, titleVisibility: .visible) {
-            Button("Yönetici görünümü") { appState.switchRole(to: .admin) }
-            Button("Ortak görünümü · salt okunur") { appState.switchRole(to: .partner) }
-            Button("Oturumu kapat", role: .destructive) { appState.signOut() }
-            Button("Vazgeç", role: .cancel) {}
+        .sheet(isPresented: $showRoleMenu) {
+            AccountSheet()
         }
     }
 

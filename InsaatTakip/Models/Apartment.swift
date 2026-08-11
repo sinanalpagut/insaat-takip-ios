@@ -28,7 +28,6 @@ struct Apartment: Codable, Identifiable, Equatable {
     var paymentStatus: PaymentStatus?
     var saleDateText: String?   // "18 Şub 2026"
     var deliveryNote: String    // "Anahtar teslim bekliyor" vb.
-    var imageLabels: [String]   // Daire görsel yuvaları ("Salon", "Mutfak")
 
     var isSold: Bool { status == .sold }
 

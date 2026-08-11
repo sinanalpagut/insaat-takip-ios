@@ -10,6 +10,9 @@ struct MaterialLogSheet: View {
 
     let materialId: String
 
+    /// Dokunulan fiş fotoğrafının tam ekran önizlemesi.
+    @State private var previewedReceipt: SharePayloadImage?
+
     private var material: Material? {
         viewModel.materials.first { $0.id == materialId }
     }
@@ -82,6 +85,26 @@ struct MaterialLogSheet: View {
         .presentationDetents([.fraction(0.62), .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
+        .fullScreenCover(item: $previewedReceipt) { payload in
+            ZStack(alignment: .topTrailing) {
+                Color.black.ignoresSafeArea()
+                Image(uiImage: payload.image)
+                    .resizable()
+                    .scaledToFit()
+                    .ignoresSafeArea()
+                Button {
+                    previewedReceipt = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white.opacity(0.18))
+                        .clipShape(Circle())
+                }
+                .padding(20)
+            }
+        }
     }
 
     private func statTile(_ label: String, _ value: String,
@@ -103,6 +126,7 @@ struct MaterialLogSheet: View {
     }
 
     /// Hareket satırı: 26px yön rozeti, not, "tarih · kullanıcı", işaretli miktar.
+    /// Fiş kamerayla çekildiyse notun yanında küçük bir önizleme çıkar.
     private func logRow(_ log: MaterialLog, unit: String) -> some View {
         HStack(spacing: 11) {
             Image(systemName: log.type == .entry ? "arrow.down" : "arrow.up")
@@ -111,6 +135,16 @@ struct MaterialLogSheet: View {
                 .frame(width: 26, height: 26)
                 .background(log.type == .entry ? Palette.successTint : Palette.fillMuted)
                 .cornerRadius(9)
+
+            if let receipt = viewModel.receiptImages[log.id] {
+                Image(uiImage: receipt)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 34, height: 34)
+                    .clipped()
+                    .cornerRadius(9)
+                    .onTapGesture { previewedReceipt = SharePayloadImage(image: receipt) }
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.note)
@@ -130,4 +164,10 @@ struct MaterialLogSheet: View {
         }
         .padding(.vertical, 12)
     }
+}
+
+/// Tam ekran fiş önizlemesi için kimlikli sarmalayıcı.
+struct SharePayloadImage: Identifiable {
+    let id = UUID()
+    let image: UIImage
 }

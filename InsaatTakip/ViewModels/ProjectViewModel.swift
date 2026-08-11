@@ -24,6 +24,9 @@ final class ProjectViewModel: ObservableObject {
     @Published var documents: [ProjectDocument] = []   // Plan & proje dosyaları
     @Published var activities: [ActivityItem] = []     // Hareket / bildirim akışı
     @Published var sitePhotos: [SitePhoto] = []        // Şantiye fotoğraf yuvaları
+    @Published var apartmentPhotos: [ApartmentPhoto] = []   // Daire görselleri
+    /// Fiş fotoğrafları — hareket kimliğine göre (kamerayla çekilen irsaliye).
+    @Published var receiptImages: [UUID: UIImage] = [:]
 
     /// Ekran altında beliren onay bildirimi.
     @Published var toast: String?
@@ -85,6 +88,11 @@ final class ProjectViewModel: ObservableObject {
         sitePhotos.filter { $0.projectId == projectId }
     }
 
+    /// Bir dairenin görselleri (yer tutucular dahil).
+    func photos(forApartment apartmentId: String) -> [ApartmentPhoto] {
+        apartmentPhotos.filter { $0.apartmentId == apartmentId }
+    }
+
     // MARK: - Özet rakamlar
 
     /// Toplam satış cirosu (yalnızca satılan dairelerin bedelleri).
@@ -129,7 +137,8 @@ final class ProjectViewModel: ObservableObject {
     /// - Returns: Kayıt başarılıysa true.
     @discardableResult
     func addReceipt(role: UserRole, materialId: String, type: MaterialLog.LogType,
-                    amountText: String, unitPriceText: String, reference: String) -> Bool {
+                    amountText: String, unitPriceText: String, reference: String,
+                    receiptImage: UIImage? = nil) -> Bool {
         guard role == .admin else { return false }   // Ortak veri giremez
         guard let index = materials.firstIndex(where: { $0.id == materialId }) else {
             flash("Malzeme seçilmedi")
@@ -172,6 +181,8 @@ final class ProjectViewModel: ObservableObject {
                               dateText: Fmt.shortDate(),
                               note: note, user: User.admin.name)
         materialLogs.insert(log, at: 0)
+        // Kamerayla çekilen fiş görseli hareketle birlikte saklanır.
+        if let receiptImage { receiptImages[log.id] = receiptImage }
 
         // Hareket akışına düşür.
         let verb = type == .entry ? "giriş" : "çıkış"
@@ -185,6 +196,51 @@ final class ProjectViewModel: ObservableObject {
         hasUnreadActivity = true
         flash("Fiş kaydedildi")
         return true
+    }
+
+    /// Projeye yeni malzeme kalemi tanımlar (varsayılan katalog dışındakiler için).
+    /// Rozet kodu verilmezse addan türetilir: "Seramik" → "SER".
+    @discardableResult
+    func addMaterial(role: UserRole, projectId: String, name: String, subtitle: String,
+                     unit: String, unitPriceText: String) -> Material? {
+        guard role == .admin else { return nil }
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let trimmedUnit = unit.trimmingCharacters(in: .whitespaces)
+        guard !trimmedName.isEmpty else {
+            flash("Malzeme adı girilmedi")
+            return nil
+        }
+        guard !trimmedUnit.isEmpty else {
+            flash("Birim girilmedi")
+            return nil
+        }
+
+        let code = Self.badgeCode(from: trimmedName)
+        // Aynı projede aynı kod varsa sonuna sayı eklenir (kimlikler çakışmasın).
+        let existingCodes = Set(materials(for: projectId).map(\.code))
+        var uniqueCode = code
+        var suffix = 2
+        while existingCodes.contains(uniqueCode) {
+            uniqueCode = "\(code)\(suffix)"
+            suffix += 1
+        }
+
+        let material = Material(id: "\(projectId)-\(uniqueCode)", projectId: projectId,
+                                code: uniqueCode, name: trimmedName,
+                                subtitle: subtitle.trimmingCharacters(in: .whitespaces),
+                                unit: trimmedUnit,
+                                unitPrice: Self.parseNumber(unitPriceText),
+                                totalIn: 0, totalOut: 0,
+                                step: 10, accruedCost: 0)
+        materials.append(material)
+        flash("\(trimmedName) eklendi")
+        return material
+    }
+
+    /// "Nervürlü Demir" → "NER" · "Q" → "Q" (en fazla 3 harf, Türkçe büyük harf).
+    static func badgeCode(from name: String) -> String {
+        let letters = name.uppercased(with: Fmt.locale).filter { $0.isLetter || $0.isNumber }
+        return String(letters.prefix(3))
     }
 
     /// Daire satışı ekler veya mevcut satış kaydını günceller.
@@ -261,7 +317,7 @@ final class ProjectViewModel: ObservableObject {
                                         type: t.0, area: t.1, status: .available,
                                         buyerName: nil, price: 0, paidAmount: 0,
                                         paymentStatus: nil, saleDateText: nil,
-                                        deliveryNote: "Yapım sürüyor", imageLabels: []))
+                                        deliveryNote: "Yapım sürüyor"))
         }
 
         // Standart malzeme kataloğu sıfır stokla açılır — aksi halde "Fiş Ekle"
@@ -350,6 +406,25 @@ final class ProjectViewModel: ObservableObject {
                                   partnerVisible: partnerVisible)
         documents.insert(doc, at: 0)
         flash("Dosya yüklendi")
+    }
+
+    /// Daireye (küçültülmüş) görsel ekler — galeriden veya kameradan.
+    func addApartmentPhotos(role: UserRole, apartmentId: String, images: [UIImage]) {
+        guard role == .admin, !images.isEmpty else { return }
+        let existing = photos(forApartment: apartmentId).count
+        for (offset, image) in images.enumerated() {
+            apartmentPhotos.append(ApartmentPhoto(id: UUID(), apartmentId: apartmentId,
+                                                  label: "Görsel \(existing + offset + 1)",
+                                                  image: image))
+        }
+        flash(images.count == 1 ? "Görsel eklendi" : "\(images.count) görsel eklendi")
+    }
+
+    /// Daire görselini siler (yalnızca yönetici).
+    func removeApartmentPhoto(role: UserRole, photoId: UUID) {
+        guard role == .admin else { return }
+        apartmentPhotos.removeAll { $0.id == photoId }
+        flash("Görsel silindi")
     }
 
     /// Galeriden seçilen (küçültülmüş) şantiye fotoğraflarını bu haftaya ekler.
@@ -725,9 +800,6 @@ extension ProjectViewModel {
             for n in 1...project.totalApartments {
                 let t = types[(n - 1) % types.count]
                 let sale = sales.first { $0.0 == n }
-                // Daire No 7 (ekran 13): Salon + Mutfak görsel yuvaları dolu.
-                let labels: [String] = (project.id == "p1" && n == 7) ? ["Salon", "Mutfak"]
-                    : (project.id == "p1" && n == 1) ? ["Salon"] : []
                 apartments.append(Apartment(id: "\(project.id)-\(n)", projectId: project.id,
                                             apartmentNumber: n,
                                             floor: (n - 1) / perFloor + 1,
@@ -738,8 +810,15 @@ extension ProjectViewModel {
                                             paidAmount: sale?.4 ?? 0,
                                             paymentStatus: sale?.3,
                                             saleDateText: sale?.5,
-                                            deliveryNote: project.phase == .teslim ? "Teslim edildi" : "Anahtar teslim bekliyor",
-                                            imageLabels: labels))
+                                            deliveryNote: project.phase == .teslim ? "Teslim edildi" : "Anahtar teslim bekliyor"))
+            }
+        }
+
+        // Daire No 7 (ekran 13): Salon + Mutfak yer tutucu kareleri; No 1: Salon.
+        for (apartmentId, labels) in [("p1-7", ["Salon", "Mutfak"]), ("p1-1", ["Salon"])] {
+            for label in labels {
+                apartmentPhotos.append(ApartmentPhoto(id: UUID(), apartmentId: apartmentId,
+                                                      label: label, image: nil))
             }
         }
 
@@ -776,8 +855,7 @@ extension ProjectViewModel {
                                         paidAmount: paid,
                                         paymentStatus: buyer == nil ? nil : .taksitli,
                                         saleDateText: date,
-                                        deliveryNote: buyer == nil ? "Teslime hazır · satışta" : "Teslim edildi · May 2025",
-                                        imageLabels: []))
+                                        deliveryNote: buyer == nil ? "Teslime hazır · satışta" : "Teslim edildi · May 2025"))
         }
 
         // kars327 GB Blok 1 daireleri — GERÇEK VERİ + EMSAL:
@@ -823,8 +901,7 @@ extension ProjectViewModel {
                                         paidAmount: paid,
                                         paymentStatus: buyer == nil ? nil : .taksitli,
                                         saleDateText: date,
-                                        deliveryNote: buyer == nil ? "Teslime hazır · satışta" : "Teslim edildi · May 2025",
-                                        imageLabels: []))
+                                        deliveryNote: buyer == nil ? "Teslime hazır · satışta" : "Teslim edildi · May 2025"))
         }
 
         // ---- Ortaklar (ekran 05) --------------------------------------------
