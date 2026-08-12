@@ -9,7 +9,7 @@ struct ProgressSheet: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let projectId: String
+    let projectId: UUID
 
     @State private var progress: Double = 0
     @State private var phase: ProjectPhase = .temel

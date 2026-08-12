@@ -8,7 +8,7 @@ struct ReportView: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let projectId: String
+    let projectId: UUID
 
     @State private var period: ProjectViewModel.ReportPeriod = .ceyrek
     @State private var sharePayload: SharePayload?

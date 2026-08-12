@@ -11,7 +11,7 @@ struct UploadSheet: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let projectId: String
+    let projectId: UUID
 
     @State private var category: ProjectDocument.Group = .mimari
     @State private var versionNote = ""

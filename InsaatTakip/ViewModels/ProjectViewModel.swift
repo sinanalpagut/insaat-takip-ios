@@ -59,38 +59,38 @@ final class ProjectViewModel: ObservableObject {
     }
 
     /// Kullanıcı bu projeyi görebiliyor mu? (Derin bağlantı / eski rota koruması)
-    func canAccess(projectId: String, user: User?) -> Bool {
+    func canAccess(projectId: UUID, user: User?) -> Bool {
         visibleProjects(for: user).contains { $0.id == projectId }
     }
 
     // MARK: - Proje bazlı erişim (filtreleme ViewModel'de, View'da değil)
 
-    func materials(for projectId: String) -> [Material] {
+    func materials(for projectId: UUID) -> [Material] {
         materials.filter { $0.projectId == projectId }
     }
 
-    func logs(for materialId: String) -> [MaterialLog] {
+    func logs(for materialId: UUID) -> [MaterialLog] {
         materialLogs.filter { $0.materialId == materialId }
     }
 
-    func apartments(for projectId: String) -> [Apartment] {
+    func apartments(for projectId: UUID) -> [Apartment] {
         apartments
             .filter { $0.projectId == projectId }
             .sorted { $0.apartmentNumber < $1.apartmentNumber }
     }
 
-    func partners(for projectId: String) -> [Partner] {
+    func partners(for projectId: UUID) -> [Partner] {
         partners.filter { $0.projectId == projectId }
     }
 
     /// Belgeler — ortak yalnızca "Ortaklar görebilsin" açık olanları görür.
-    func documents(for projectId: String, role: UserRole) -> [ProjectDocument] {
+    func documents(for projectId: UUID, role: UserRole) -> [ProjectDocument] {
         documents.filter { $0.projectId == projectId && (role == .admin || $0.partnerVisible) }
     }
 
     /// Belge tarihlerinden (Fmt.makeDate(12, 1, 2026)) en yenisini bulur; başlıktaki "son yükleme" için.
     /// İçinde bulunulan yıla aitse yıl gösterilmez ("14 Tem"), değilse tam tarih döner.
-    func lastUploadText(for projectId: String, role: UserRole) -> String? {
+    func lastUploadText(for projectId: UUID, role: UserRole) -> String? {
         let currentYear = Calendar.current.component(.year, from: Date())
         let parsed: [(Int, Int, Int, String)] = documents(for: projectId, role: role).compactMap { doc in
             let parts = doc.dateText.split(separator: " ")
@@ -107,44 +107,54 @@ final class ProjectViewModel: ObservableObject {
         return newest.3
     }
 
-    func photos(for projectId: String) -> [SitePhoto] {
+    func photos(for projectId: UUID) -> [SitePhoto] {
         sitePhotos.filter { $0.projectId == projectId }
     }
 
     /// Bir dairenin görselleri (yer tutucular dahil).
-    func photos(forApartment apartmentId: String) -> [ApartmentPhoto] {
+    func photos(forApartment apartmentId: UUID) -> [ApartmentPhoto] {
         apartmentPhotos.filter { $0.apartmentId == apartmentId }
+    }
+
+    /// Kimlikler artık UUID olduğu için mock veri ve testler kalemi
+    /// insan tarafından okunabilir koddan/numaradan bulur.
+    func material(in projectId: UUID, code: String) -> Material? {
+        materials.first { $0.projectId == projectId && $0.code == code }
+    }
+
+    func apartment(in projectId: UUID, number: Int) -> Apartment? {
+        apartments.first { $0.projectId == projectId && $0.apartmentNumber == number }
     }
 
     // MARK: - Özet rakamlar
 
     /// Toplam satış cirosu (yalnızca satılan dairelerin bedelleri).
     /// Not: Boş daireler liste fiyatı taşıyabilir (TOKİ gerçek verisi) — ciroya girmez.
-    func totalSales(for projectId: String) -> Double {
+    func totalSales(for projectId: UUID) -> Double {
         apartments(for: projectId).filter(\.isSold).reduce(0) { $0 + $1.price }
     }
 
     /// Toplam malzeme gideri (giren × birim fiyat).
-    func totalMaterialCost(for projectId: String) -> Double {
+    func totalMaterialCost(for projectId: UUID) -> Double {
         materials(for: projectId).reduce(0) { $0 + $1.totalCost }
     }
 
     /// Net = satış − malzeme gideri.
-    func netAmount(for projectId: String) -> Double {
+    func netAmount(for projectId: UUID) -> Double {
         totalSales(for: projectId) - totalMaterialCost(for: projectId)
     }
 
-    func soldCount(for projectId: String) -> Int {
+    func soldCount(for projectId: UUID) -> Int {
         apartments(for: projectId).filter(\.isSold).count
     }
 
     /// Tahsil edilen toplam.
-    func collectedAmount(for projectId: String) -> Double {
+    func collectedAmount(for projectId: UUID) -> Double {
         apartments(for: projectId).reduce(0) { $0 + $1.paidAmount }
     }
 
     /// Kalan alacak toplamı.
-    func outstandingAmount(for projectId: String) -> Double {
+    func outstandingAmount(for projectId: UUID) -> Double {
         totalSales(for: projectId) - collectedAmount(for: projectId)
     }
 
@@ -160,7 +170,7 @@ final class ProjectViewModel: ObservableObject {
     /// Fiş / malzeme hareketi kaydeder. Boş miktar tasarım gereği "Miktar girilmedi" uyarısı verir.
     /// - Returns: Kayıt başarılıysa true.
     @discardableResult
-    func addReceipt(role: UserRole, materialId: String, type: MaterialLog.LogType,
+    func addReceipt(role: UserRole, materialId: UUID, type: MaterialLog.LogType,
                     amountText: String, unitPriceText: String, reference: String,
                     receiptImage: UIImage? = nil) -> Bool {
         guard role == .admin else { return false }   // Ortak veri giremez
@@ -224,7 +234,7 @@ final class ProjectViewModel: ObservableObject {
     /// Projenin inşaat ilerlemesini ve yapım aşamasını günceller.
     /// Bu iki alan dashboard kartının en büyük görsel öğesi; düzenlenemediği için
     /// kullanıcının açtığı her proje sonsuza dek "%0 · Temel" görünüyordu.
-    func updateProgress(role: UserRole, projectId: String, progress: Int, phase: ProjectPhase) {
+    func updateProgress(role: UserRole, projectId: UUID, progress: Int, phase: ProjectPhase) {
         guard role == .admin,
               let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
         projects[index].progress = min(100, max(0, progress))
@@ -236,7 +246,7 @@ final class ProjectViewModel: ObservableObject {
     /// Yanlış daireye satış işlemek tek dokunuşla mümkün olduğu için geri dönüş şart.
     /// Liste fiyatı (TOKİ gerçek verisi) korunur — satış formunda yeniden önerilir.
     @discardableResult
-    func cancelSale(role: UserRole, apartmentId: String) -> Bool {
+    func cancelSale(role: UserRole, apartmentId: UUID) -> Bool {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }),
               apartments[index].isSold else { return false }
@@ -266,7 +276,7 @@ final class ProjectViewModel: ObservableObject {
     /// Projeye yeni malzeme kalemi tanımlar (varsayılan katalog dışındakiler için).
     /// Rozet kodu verilmezse addan türetilir: "Seramik" → "SER".
     @discardableResult
-    func addMaterial(role: UserRole, projectId: String, name: String, subtitle: String,
+    func addMaterial(role: UserRole, projectId: UUID, name: String, subtitle: String,
                      unit: String, unitPriceText: String) -> Material? {
         guard role == .admin else { return nil }
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
@@ -290,7 +300,7 @@ final class ProjectViewModel: ObservableObject {
             suffix += 1
         }
 
-        let material = Material(id: "\(projectId)-\(uniqueCode)", projectId: projectId,
+        let material = Material(id: UUID(), projectId: projectId,
                                 code: uniqueCode, name: trimmedName,
                                 subtitle: subtitle.trimmingCharacters(in: .whitespaces),
                                 unit: trimmedUnit,
@@ -310,7 +320,7 @@ final class ProjectViewModel: ObservableObject {
 
     /// Daire satışı ekler veya mevcut satış kaydını günceller.
     @discardableResult
-    func saveSale(role: UserRole, apartmentId: String, buyerName: String,
+    func saveSale(role: UserRole, apartmentId: UUID, buyerName: String,
                   priceText: String, paidText: String, payment: PaymentStatus, saleDate: Date? = nil) -> Bool {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return false }
@@ -363,7 +373,7 @@ final class ProjectViewModel: ObservableObject {
             return nil
         }
 
-        let project = Project(id: UUID().uuidString,
+        let project = Project(id: UUID(),
                               blockNumber: trimmedBlock, parcelNumber: trimmedParcel,
                               district: district.isEmpty ? "—" : district,
                               city: city.isEmpty ? "—" : city,
@@ -376,7 +386,7 @@ final class ProjectViewModel: ObservableObject {
         let types = [("2+1", "95 m²"), ("3+1", "128 m²"), ("3+1", "132 m²"), ("2+1", "98 m²")]
         for n in 1...project.totalApartments {
             let t = types[(n - 1) % types.count]
-            apartments.append(Apartment(id: "\(project.id)-\(n)", projectId: project.id,
+            apartments.append(Apartment(id: UUID(), projectId: project.id,
                                         apartmentNumber: n, floor: (n - 1) / perFloor + 1,
                                         type: t.0, area: t.1, status: .available,
                                         buyerName: nil, price: 0, paidAmount: 0,
@@ -387,7 +397,7 @@ final class ProjectViewModel: ObservableObject {
         // Standart malzeme kataloğu sıfır stokla açılır — aksi halde "Fiş Ekle"
         // formunda seçilecek malzeme olmaz ve kaydetme sessizce başarısız olurdu.
         for item in Self.materialCatalog {
-            materials.append(Material(id: "\(project.id)-\(item.code)", projectId: project.id,
+            materials.append(Material(id: UUID(), projectId: project.id,
                                       code: item.code, name: item.name, subtitle: item.subtitle,
                                       unit: item.unit, unitPrice: item.price,
                                       totalIn: 0, totalOut: 0, step: item.step, accruedCost: 0))
@@ -420,7 +430,7 @@ final class ProjectViewModel: ObservableObject {
 
     /// Projeye 48 saat geçerli, tek kullanımlık davet kodu üretir.
     /// Aynı kod başka bir projede kullanımdaysa yeniden üretilir.
-    func generateInviteCode(role: UserRole, projectId: String) {
+    func generateInviteCode(role: UserRole, projectId: UUID) {
         guard role == .admin,
               let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
 
@@ -503,7 +513,7 @@ final class ProjectViewModel: ObservableObject {
     // MARK: Belge ve fotoğraf
 
     /// Yükleme sayfasından yeni belge ekler.
-    func addDocument(role: UserRole, projectId: String, group: ProjectDocument.Group,
+    func addDocument(role: UserRole, projectId: UUID, group: ProjectDocument.Group,
                      fileName: String, sizeMB: Double, versionNote: String, partnerVisible: Bool) {
         guard role == .admin else { return }
         let ext = (fileName as NSString).pathExtension.lowercased()
@@ -521,7 +531,7 @@ final class ProjectViewModel: ObservableObject {
     }
 
     /// Daireye (küçültülmüş) görsel ekler — galeriden veya kameradan.
-    func addApartmentPhotos(role: UserRole, apartmentId: String, images: [UIImage]) {
+    func addApartmentPhotos(role: UserRole, apartmentId: UUID, images: [UIImage]) {
         guard role == .admin, !images.isEmpty else { return }
         let existing = photos(forApartment: apartmentId).count
         for (offset, image) in images.enumerated() {
@@ -541,7 +551,7 @@ final class ProjectViewModel: ObservableObject {
 
     /// Galeriden seçilen (küçültülmüş) şantiye fotoğraflarını bu haftaya ekler.
     /// Küçültme çağıran tarafta, arka planda yapılır — burada yalnızca hazır görseller beklenir.
-    func addSitePhotos(role: UserRole, projectId: String, images: [UIImage]) {
+    func addSitePhotos(role: UserRole, projectId: UUID, images: [UIImage]) {
         guard role == .admin, !images.isEmpty else { return }
         for image in images {
             sitePhotos.insert(SitePhoto(id: UUID(), projectId: projectId,
@@ -598,7 +608,7 @@ final class ProjectViewModel: ObservableObject {
     }
 
     /// Seçilen dönemin özet tablosu.
-    func reportSummary(for projectId: String, period: ReportPeriod) -> ReportSummary {
+    func reportSummary(for projectId: UUID, period: ReportPeriod) -> ReportSummary {
         let (range, title) = dateRange(for: period)
 
         let sold = apartments(for: projectId).filter { apartment in
@@ -631,7 +641,7 @@ final class ProjectViewModel: ObservableObject {
 
     /// Son 6 tamamlanmış ayın satış çubukları — yıl sınırını takvim aşar.
     /// (Ocak'ta önceki yılın Tem–Ara'sını gösterir; grafik hiçbir ayda boş kalmaz.)
-    func monthlySales(for projectId: String) -> [MonthBar] {
+    func monthlySales(for projectId: UUID) -> [MonthBar] {
         let calendar = Fmt.calendar
         let sold = apartments(for: projectId).compactMap { $0.isSold ? $0 : nil }
 
@@ -700,6 +710,17 @@ final class ProjectViewModel: ObservableObject {
     static let maxAmount: Double = 1e12
 }
 
+// MARK: - Demo kimlikleri
+// Mock veri okunabilir kalsın diye sabit UUID'ler; gerçek projeler UUID() alır.
+
+enum DemoID {
+    static let cayirova = UUID(uuidString: "A1000000-0000-4000-8000-000000000001")!
+    static let nilufer  = UUID(uuidString: "A1000000-0000-4000-8000-000000000002")!
+    static let kepez    = UUID(uuidString: "A1000000-0000-4000-8000-000000000003")!
+    static let kars309  = UUID(uuidString: "A1000000-0000-4000-8000-000000000004")!
+    static let kars327  = UUID(uuidString: "A1000000-0000-4000-8000-000000000005")!
+}
+
 // MARK: - Mock Veri
 // Tasarım dosyasındaki ekranların birebir veri seti.
 
@@ -713,17 +734,17 @@ extension ProjectViewModel {
         // GERÇEK TAKVİM: Karacaören konutlarının teslimatı 5-30 Mayıs 2025'te başladı
         // (toki.gov.tr haberi) — iki blok da Teslim fazında, ilerleme %100.
         projects = [
-            Project(id: "p1", blockNumber: "145", parcelNumber: "2", district: "Çayırova", city: "Kocaeli",
+            Project(id: DemoID.cayirova, blockNumber: "145", parcelNumber: "2", district: "Çayırova", city: "Kocaeli",
                     floors: 5, totalApartments: 20, phase: .kabaInsaat, progress: 68, ownerId: User.admin.id, invite: nil, photoCount: 48),
-            Project(id: "p2", blockNumber: "1287", parcelNumber: "14", district: "Nilüfer", city: "Bursa",
+            Project(id: DemoID.nilufer, blockNumber: "1287", parcelNumber: "14", district: "Nilüfer", city: "Bursa",
                     floors: 4, totalApartments: 12, phase: .temel, progress: 34, ownerId: User.admin.id, invite: nil, photoCount: 12),
-            Project(id: "p3", blockNumber: "908", parcelNumber: "7", district: "Kepez", city: "Antalya",
+            Project(id: DemoID.kepez, blockNumber: "908", parcelNumber: "7", district: "Kepez", city: "Antalya",
                     floors: 3, totalApartments: 8, phase: .teslim, progress: 96, ownerId: User.admin.id, invite: nil, photoCount: 64),
-            Project(id: "kars309", blockNumber: "1224", parcelNumber: "1", district: "Karacaören", city: "Kars",
+            Project(id: DemoID.kars309, blockNumber: "1224", parcelNumber: "1", district: "Karacaören", city: "Kars",
                     floors: 3, totalApartments: 12, phase: .teslim, progress: 100, ownerId: User.admin.id, invite: nil, photoCount: 0),
             // "kars327": GERÇEK proje — TOKİ Kars Karacaören 327 Konut, Ada 1139 / Parsel 3,
             // GB Blok 1 (1 bodrum + zemin + 4 normal kat, 22 daire, 3+1 · 103,8 m² brüt / 83,9 m² net).
-            Project(id: "kars327", blockNumber: "1139", parcelNumber: "3", district: "Karacaören", city: "Kars",
+            Project(id: DemoID.kars327, blockNumber: "1139", parcelNumber: "3", district: "Karacaören", city: "Kars",
                     floors: 6, totalApartments: 22, phase: .teslim, progress: 100, ownerId: User.admin.id, invite: nil, photoCount: 0),
         ]
 
@@ -741,12 +762,12 @@ extension ProjectViewModel {
             ("ALÇ", "Alçı", "Saten perdah alçısı", "torba", 210, 640, 420, 25),
         ]
         // p2 ve p3 daha küçük projeler: miktarlar ölçeklenir, fiyatlar aynı kalır.
-        let scales: [String: Double] = ["p1": 1.0, "p2": 0.52, "p3": 0.44]
+        let scales: [UUID: Double] = [DemoID.cayirova: 1.0, DemoID.nilufer: 0.52, DemoID.kepez: 0.44]
         for project in projects {
             guard let factor = scales[project.id] else { continue }   // kars309 aşağıda ayrı
             for (code, name, subtitle, unit, price, totalIn, totalOut, step) in baseMaterials {
                 let scaledIn = (totalIn * factor).rounded()
-                materials.append(Material(id: "\(project.id)-\(code)", projectId: project.id,
+                materials.append(Material(id: UUID(), projectId: project.id,
                                           code: code, name: name, subtitle: subtitle, unit: unit,
                                           unitPrice: price,
                                           totalIn: scaledIn,
@@ -773,7 +794,7 @@ extension ProjectViewModel {
             ("ALÇ", "Alçı", "Saten perdah alçısı", "torba", 210, 690, 685, 25),
         ]
         for (code, name, subtitle, unit, price, totalIn, totalOut, step) in karsMaterials {
-            materials.append(Material(id: "kars309-\(code)", projectId: "kars309",
+            materials.append(Material(id: UUID(), projectId: DemoID.kars309,
                                       code: code, name: name, subtitle: subtitle, unit: unit,
                                       unitPrice: price, totalIn: totalIn, totalOut: totalOut,
                                       step: step, accruedCost: totalIn * price))
@@ -793,7 +814,7 @@ extension ProjectViewModel {
             ("ALÇ", "Alçı", "Saten perdah alçısı", "torba", 210, 1_180, 1_170, 25),
         ]
         for (code, name, subtitle, unit, price, totalIn, totalOut, step) in kars327Materials {
-            materials.append(Material(id: "kars327-\(code)", projectId: "kars327",
+            materials.append(Material(id: UUID(), projectId: DemoID.kars327,
                                       code: code, name: name, subtitle: subtitle, unit: unit,
                                       unitPrice: price, totalIn: totalIn, totalOut: totalOut,
                                       step: step, accruedCost: totalIn * price))
@@ -803,7 +824,7 @@ extension ProjectViewModel {
         // Demir kayıtları ekran 03'teki değerlerin birebir aynısı; diğer kalemler
         // aynı tarih/irsaliye düzeniyle kendi miktarlarından türetilir.
         let admin = User.admin.name
-        for material in materials where material.projectId == "p1" {
+        for material in materials where material.projectId == DemoID.cayirova {
             if material.code == "Ø12" {
                 materialLogs.append(contentsOf: [
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: 6_800,
@@ -839,22 +860,22 @@ extension ProjectViewModel {
 
         // Kars hareketleri — teslim (May 2025) öncesi son imalat kayıtları (temsilî akış).
         // Fiyatlar kayıt anındaki değerlerdir; sonraki zamlar bu kayıtları etkilemez.
-        materialLogs.append(contentsOf: [
-            MaterialLog(id: UUID(), materialId: "kars309-ALÇ", type: .exit, amount: 120,
-                        unitPrice: 210, date: Fmt.makeDate(18, 3, 2025), note: "Saten perdah tamamlandı", user: admin),
-            MaterialLog(id: UUID(), materialId: "kars309-EPS", type: .exit, amount: 90,
-                        unitPrice: 96, date: Fmt.makeDate(4, 3, 2025), note: "Cephe mantolama kapanışı", user: admin),
-            MaterialLog(id: UUID(), materialId: "kars309-Ø12", type: .entry, amount: 9_500,
-                        unitPrice: 28.5, date: Fmt.makeDate(11, 2, 2025), note: "İrsaliye #2087 · Kars Demir Çelik", user: admin),
-            MaterialLog(id: UUID(), materialId: "kars309-Ø12", type: .exit, amount: 4_200,
-                        unitPrice: 28.5, date: Fmt.makeDate(27, 2, 2025), note: "Çevre duvarı donatısı", user: admin),
-            MaterialLog(id: UUID(), materialId: "kars327-ALÇ", type: .exit, amount: 150,
-                        unitPrice: 210, date: Fmt.makeDate(8, 4, 2025), note: "Son kat saten perdah", user: admin),
-            MaterialLog(id: UUID(), materialId: "kars327-PVC", type: .entry, amount: 30,
-                        unitPrice: 6_800, date: Fmt.makeDate(21, 3, 2025), note: "İrsaliye #3141 · Serhat PVC", user: admin),
-            MaterialLog(id: UUID(), materialId: "kars327-EPS", type: .exit, amount: 160,
-                        unitPrice: 96, date: Fmt.makeDate(14, 4, 2025), note: "Güney cephe mantolama kapanışı", user: admin),
-        ])
+        // Kalem UUID'leri okunabilir koddan bulunur.
+        let karsLogs: [(UUID, String, MaterialLog.LogType, Double, Double, Date, String)] = [
+            (DemoID.kars309, "ALÇ", .exit,  120,   210,  Fmt.makeDate(18, 3, 2025), "Saten perdah tamamlandı"),
+            (DemoID.kars309, "EPS", .exit,  90,    96,   Fmt.makeDate(4, 3, 2025),  "Cephe mantolama kapanışı"),
+            (DemoID.kars309, "Ø12", .entry, 9_500, 28.5, Fmt.makeDate(11, 2, 2025), "İrsaliye #2087 · Kars Demir Çelik"),
+            (DemoID.kars309, "Ø12", .exit,  4_200, 28.5, Fmt.makeDate(27, 2, 2025), "Çevre duvarı donatısı"),
+            (DemoID.kars327, "ALÇ", .exit,  150,   210,  Fmt.makeDate(8, 4, 2025),  "Son kat saten perdah"),
+            (DemoID.kars327, "PVC", .entry, 30,    6_800, Fmt.makeDate(21, 3, 2025), "İrsaliye #3141 · Serhat PVC"),
+            (DemoID.kars327, "EPS", .exit,  160,   96,   Fmt.makeDate(14, 4, 2025), "Güney cephe mantolama kapanışı"),
+        ]
+        for (projectId, code, type, amount, price, date, note) in karsLogs {
+            guard let materialId = material(in: projectId, code: code)?.id else { continue }
+            materialLogs.append(MaterialLog(id: UUID(), materialId: materialId, type: type,
+                                            amount: amount, unitPrice: price, date: date,
+                                            note: note, user: admin))
+        }
 
         // ---- Daireler --------------------------------------------------------
         // 145 Ada / 2 Parsel: 12 satış — alıcı, bedel, ödeme ve tahsilat değerleri
@@ -892,7 +913,7 @@ extension ProjectViewModel {
             (7, "Sinan Ateş", 3_500_000, .tamamlandi, 3_500_000, Fmt.makeDate(16, 4, 2026)),
             (8, "Pelin Erden", 3_200_000, .tamamlandi, 3_200_000, Fmt.makeDate(3, 5, 2026)),
         ]
-        let salesByProject = ["p1": p1Sales, "p2": p2Sales, "p3": p3Sales]
+        let salesByProject = [DemoID.cayirova: p1Sales, DemoID.nilufer: p2Sales, DemoID.kepez: p3Sales]
 
         // Yalnızca kurgu projeler (p1-p3) otomatik üretilir; Kars projeleri aşağıda gerçek veriyle.
         for project in projects where salesByProject[project.id] != nil {
@@ -901,7 +922,7 @@ extension ProjectViewModel {
             for n in 1...project.totalApartments {
                 let t = types[(n - 1) % types.count]
                 let sale = sales.first { $0.0 == n }
-                apartments.append(Apartment(id: "\(project.id)-\(n)", projectId: project.id,
+                apartments.append(Apartment(id: UUID(), projectId: project.id,
                                             apartmentNumber: n,
                                             floor: (n - 1) / perFloor + 1,
                                             type: t.0, area: t.1,
@@ -916,7 +937,8 @@ extension ProjectViewModel {
         }
 
         // Daire No 7 (ekran 13): Salon + Mutfak yer tutucu kareleri; No 1: Salon.
-        for (apartmentId, labels) in [("p1-7", ["Salon", "Mutfak"]), ("p1-1", ["Salon"])] {
+        for (number, labels) in [(7, ["Salon", "Mutfak"]), (1, ["Salon"])] {
+            guard let apartmentId = apartment(in: DemoID.cayirova, number: number)?.id else { continue }
             for label in labels {
                 apartmentPhotos.append(ApartmentPhoto(id: UUID(), apartmentId: apartmentId,
                                                       label: label, image: nil))
@@ -947,7 +969,7 @@ extension ProjectViewModel {
         ]
         // Teslimatlar 5-30 Mayıs 2025'te yapıldı (TOKİ resmî haberi).
         for (no, floor, buyer, price, paid, date) in karsUnits {
-            apartments.append(Apartment(id: "kars309-\(no)", projectId: "kars309",
+            apartments.append(Apartment(id: UUID(), projectId: DemoID.kars309,
                                         apartmentNumber: no, floor: floor,
                                         type: "3+1", area: "111,55 m²",
                                         status: buyer == nil ? .available : .sold,
@@ -993,7 +1015,7 @@ extension ProjectViewModel {
             (22, 4, "Songül Ateş", 1_975_100, 483_900, Fmt.makeDate(28, 3, 2024)),        // emsal
         ]
         for (no, floor, buyer, price, paid, date) in kars327Units {
-            apartments.append(Apartment(id: "kars327-\(no)", projectId: "kars327",
+            apartments.append(Apartment(id: UUID(), projectId: DemoID.kars327,
                                         apartmentNumber: no, floor: floor,
                                         type: "3+1", area: "103,8 m²",
                                         status: buyer == nil ? .available : .sold,
@@ -1009,26 +1031,26 @@ extension ProjectViewModel {
         // Kurucu her projede aynı yöneticidir; diğer ortaklar projeye göre değişir.
         // Uygulamayı kullanan ortak hesabı (User.partner = Serkan Aydın) yalnızca
         // p1 ve kars309'a davetlidir — üyelik filtresinin çalıştığı buradan görülür.
-        let partnerSets: [String: [(String, Bool, Date, Int, UUID?)]] = [
-            "p1": [
+        let partnerSets: [UUID: [(String, Bool, Date, Int, UUID?)]] = [
+            DemoID.cayirova: [
                 ("Mehmet Kılıç", true, Fmt.makeDate(4, 1, 2026), 40, User.admin.id),
                 ("Serkan Aydın", false, Fmt.makeDate(12, 3, 2026), 25, User.partner.id),
                 ("Ayşe Tuna", false, Fmt.makeDate(3, 4, 2026), 20, nil),
                 ("Burak Erdoğan", false, Fmt.makeDate(21, 4, 2026), 15, nil),
             ],
-            "p2": [
+            DemoID.nilufer: [
                 ("Mehmet Kılıç", true, Fmt.makeDate(18, 2, 2026), 60, User.admin.id),
                 ("Hakan Yücel", false, Fmt.makeDate(2, 3, 2026), 40, nil),
             ],
-            "p3": [
+            DemoID.kepez: [
                 ("Mehmet Kılıç", true, Fmt.makeDate(11, 11, 2025), 50, User.admin.id),
                 ("Ayşe Tuna", false, Fmt.makeDate(20, 11, 2025), 50, nil),
             ],
-            "kars309": [
+            DemoID.kars309: [
                 ("Mehmet Kılıç", true, Fmt.makeDate(12, 8, 2024), 55, User.admin.id),
                 ("Serkan Aydın", false, Fmt.makeDate(6, 1, 2025), 45, User.partner.id),
             ],
-            "kars327": [
+            DemoID.kars327: [
                 ("Mehmet Kılıç", true, Fmt.makeDate(12, 8, 2024), 70, User.admin.id),
                 ("Burak Erdoğan", false, Fmt.makeDate(9, 1, 2025), 30, nil),
             ],
@@ -1052,12 +1074,12 @@ extension ProjectViewModel {
             (.ruhsat, .pdf, "İskân Başvurusu", "taslak", 0.8, Fmt.makeDate(14, 7, 2026), false),
         ]
         for (group, type, name, version, size, date, visible) in p1Documents {
-            documents.append(ProjectDocument(id: UUID(), projectId: "p1", group: group, fileType: type,
+            documents.append(ProjectDocument(id: UUID(), projectId: DemoID.cayirova, group: group, fileType: type,
                                              name: name, versionText: version, sizeMB: size,
                                              date: date, partnerVisible: visible))
         }
         // Diğer projelerde küçük birer dosya seti.
-        for pid in ["p2", "p3"] {
+        for pid in [DemoID.nilufer, DemoID.kepez] {
             documents.append(contentsOf: [
                 ProjectDocument(id: UUID(), projectId: pid, group: .mimari, fileType: .pdf,
                                 name: "Vaziyet Planı", versionText: "v1", sizeMB: 3.4,
@@ -1070,7 +1092,7 @@ extension ProjectViewModel {
 
         // kars309 + kars327 belgeleri — TOKİ'nin kamuya açık gerçek evrakları (toki.gov.tr/satis).
         // Fiyat listesi ve duyuru her iki Karacaören projesini de kapsar.
-        for pid in ["kars309", "kars327"] {
+        for pid in [DemoID.kars309, DemoID.kars327] {
             documents.append(contentsOf: [
                 ProjectDocument(id: UUID(), projectId: pid, group: .ruhsat, fileType: .pdf,
                                 name: "TOKİ 83 Konut Fiyat Listesi", versionText: "resmî", sizeMB: 0.2,
@@ -1104,11 +1126,11 @@ extension ProjectViewModel {
         // Gün sayısı bugüne göre verilir; "bu hafta / geçen hafta" ayrımını
         // SitePhoto tarihten hesaplar (sabit bayrak yarın yanlış olurdu).
         for days in [0, 0, 1, 2, 3, 3] {
-            sitePhotos.append(SitePhoto(id: UUID(), projectId: "p1",
+            sitePhotos.append(SitePhoto(id: UUID(), projectId: DemoID.cayirova,
                                         date: Fmt.daysAgo(days), image: nil))
         }
         for days in [8, 9, 10, 11, 12, 13] {
-            sitePhotos.append(SitePhoto(id: UUID(), projectId: "p1",
+            sitePhotos.append(SitePhoto(id: UUID(), projectId: DemoID.cayirova,
                                         date: Fmt.daysAgo(days), image: nil))
         }
     }

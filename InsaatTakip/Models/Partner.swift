@@ -4,7 +4,7 @@ import Foundation
 
 struct Partner: Codable, Identifiable, Equatable {
     let id: UUID
-    let projectId: String
+    let projectId: UUID
     var name: String
     var isFounder: Bool         // Proje kurucusu (yönetici) mi?
     var joinedAt: Date          // Katılım / kuruluş tarihi

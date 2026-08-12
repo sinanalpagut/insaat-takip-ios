@@ -9,10 +9,10 @@ struct ReceiptSheet: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let projectId: String
+    let projectId: UUID
 
     @State private var direction: MaterialLog.LogType = .entry
-    @State private var selectedMaterialId: String?
+    @State private var selectedMaterialId: UUID?
     @State private var quantityText = ""
     @State private var unitPriceText = ""
     @State private var referenceText = ""
@@ -385,8 +385,12 @@ struct ReceiptSheet: View {
     }
 
     private func save() {
+        guard let materialId = selectedMaterial?.id else {
+            viewModel.flash("Malzeme seçilmedi")
+            return
+        }
         let saved = viewModel.addReceipt(role: appState.currentUser?.role ?? .partner,
-                                         materialId: selectedMaterial?.id ?? "",
+                                         materialId: materialId,
                                          type: direction,
                                          amountText: quantityText,
                                          unitPriceText: unitPriceText,

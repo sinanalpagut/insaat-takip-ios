@@ -11,9 +11,9 @@ struct ApartmentDetailSheet: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let apartmentId: String
+    let apartmentId: UUID
     /// "Satış Kaydını Düzenle" — üst görünüm satış formunu açar.
-    var onEdit: (String) -> Void
+    var onEdit: (UUID) -> Void
 
     @State private var pickedItems: [PhotosPickerItem] = []
     @State private var showCamera = false
@@ -235,7 +235,7 @@ struct ApartmentDetailSheet: View {
     }
 
     /// Galeriden seçilenleri küçültüp daireye ekler.
-    private func importPickedPhotos(for apartmentId: String) {
+    private func importPickedPhotos(for apartmentId: UUID) {
         guard !pickedItems.isEmpty else { return }
         let items = pickedItems
         pickedItems = []

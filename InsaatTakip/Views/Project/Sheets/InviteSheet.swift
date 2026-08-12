@@ -10,7 +10,7 @@ struct InviteSheet: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let projectId: String
+    let projectId: UUID
 
     private var project: Project? {
         viewModel.projects.first { $0.id == projectId }

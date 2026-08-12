@@ -31,7 +31,7 @@ struct ProjectDocument: Codable, Identifiable, Equatable {
     }
 
     let id: UUID
-    let projectId: String
+    let projectId: UUID
     var group: Group
     var fileType: FileType
     var name: String            // "Vaziyet Planı"

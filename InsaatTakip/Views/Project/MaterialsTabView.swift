@@ -9,9 +9,9 @@ import SwiftUI
 struct MaterialsTabView: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
 
-    let projectId: String
+    let projectId: UUID
     /// Karta dokununca hareket detayı sayfasını açar.
-    var onSelect: (String) -> Void
+    var onSelect: (UUID) -> Void
 
     private var materials: [Material] {
         viewModel.materials(for: projectId)

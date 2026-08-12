@@ -9,7 +9,7 @@ struct PartnersTabView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ProjectViewModel
 
-    let projectId: String
+    let projectId: UUID
 
     var body: some View {
         ScrollView(showsIndicators: false) {

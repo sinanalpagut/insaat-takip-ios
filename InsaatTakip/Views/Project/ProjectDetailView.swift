@@ -13,7 +13,7 @@ struct ProjectDetailView: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let projectId: String
+    let projectId: UUID
 
     enum Tab: String, CaseIterable {
         case malzemeler = "Malzemeler"
@@ -24,11 +24,11 @@ struct ProjectDetailView: View {
 
     /// Alt sayfalar — tek bir sheet(item:) ile yönetilir.
     enum ActiveSheet: Identifiable {
-        case materialLog(materialId: String)
+        case materialLog(materialId: UUID)
         case receipt
         case invite
-        case apartmentDetail(apartmentId: String)
-        case saleForm(apartmentId: String?)
+        case apartmentDetail(apartmentId: UUID)
+        case saleForm(apartmentId: UUID?)
         case upload
         case progress
 
@@ -38,7 +38,7 @@ struct ProjectDetailView: View {
             case .receipt:                 return "receipt"
             case .invite:                  return "invite"
             case .apartmentDetail(let id): return "apt-\(id)"
-            case .saleForm(let id):        return "sale-\(id ?? "yeni")"
+            case .saleForm(let id):        return "sale-\(id?.uuidString ?? "yeni")"
             case .upload:                  return "upload"
             case .progress:                return "progress"
             }
@@ -50,7 +50,7 @@ struct ProjectDetailView: View {
     @State private var documentFilter: DocumentsTabView.Filter = .tumu
     @State private var didApplyLaunchConfig = false
     /// Daire detayı kapandıktan sonra açılacak satış düzenleme sheet'i.
-    @State private var pendingSaleEdit: String?
+    @State private var pendingSaleEdit: UUID?
 
     private var isAdmin: Bool { appState.isAdmin }
 
@@ -127,10 +127,16 @@ struct ProjectDetailView: View {
         guard let sheet = LaunchConfig.sheet else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             switch sheet {
-            case "log":     activeSheet = .materialLog(materialId: "p1-Ø12")
+            case "log":
+                if let id = viewModel.materials(for: projectId).first?.id {
+                    activeSheet = .materialLog(materialId: id)
+                }
             case "receipt": activeSheet = .receipt
             case "invite":  activeSheet = .invite
-            case "apt":     activeSheet = .apartmentDetail(apartmentId: "p1-7")
+            case "apt":
+                if let id = viewModel.apartments(for: projectId).first(where: \.isSold)?.id {
+                    activeSheet = .apartmentDetail(apartmentId: id)
+                }
             case "sale":    activeSheet = .saleForm(apartmentId: nil)
             case "upload":  activeSheet = .upload
             default: break

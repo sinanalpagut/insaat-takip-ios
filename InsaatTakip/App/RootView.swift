@@ -6,10 +6,10 @@ import SwiftUI
 
 /// Uygulama içi push rotaları.
 enum Route: Hashable {
-    case project(String)     // Proje detay (projectId)
+    case project(UUID)     // Proje detay (projectId)
     case activity            // Hareketler / bildirimler
-    case photos(String)      // Şantiye fotoğrafları
-    case report(String)      // Dönem raporu
+    case photos(UUID)      // Şantiye fotoğrafları
+    case report(UUID)      // Dönem raporu
 }
 
 struct RootView: View {
@@ -45,13 +45,15 @@ struct RootView: View {
     }
 
     /// DEBUG launch argümanlarına göre ilk rotayı kurar (ekran görüntüsü akışı).
+    /// Kimlikler UUID olduğu için sabit dize yerine ilk görünür proje kullanılır.
     private func seedFromLaunchConfig() {
         guard path.isEmpty else { return }
+        guard let projectId = viewModel.visibleProjects(for: appState.currentUser).first?.id else { return }
         switch LaunchConfig.screen {
-        case "project":  path.append(Route.project("p1"))
+        case "project":  path.append(Route.project(projectId))
         case "activity": path.append(Route.activity)
-        case "photos":   path.append(Route.photos("p1"))
-        case "report":   path.append(Route.report("p1"))
+        case "photos":   path.append(Route.photos(projectId))
+        case "report":   path.append(Route.report(projectId))
         default:         break
         }
     }

@@ -8,7 +8,7 @@ struct MaterialLogSheet: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let materialId: String
+    let materialId: UUID
 
     /// Dokunulan fiş fotoğrafının tam ekran önizlemesi.
     @State private var previewedReceipt: SharePayloadImage?

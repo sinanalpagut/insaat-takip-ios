@@ -15,8 +15,8 @@ struct Apartment: Codable, Identifiable, Equatable {
         case available   // Boş (kesikli kenarlıklı kart)
     }
 
-    let id: String
-    let projectId: String
+    let id: UUID
+    let projectId: UUID
     var apartmentNumber: Int
     var floor: Int
     var type: String            // "2+1" / "3+1"

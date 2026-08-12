@@ -3,8 +3,10 @@ import Foundation
 // MARK: - Malzeme ve Stok Hareketi
 
 struct Material: Codable, Identifiable, Equatable {
-    let id: String
-    let projectId: String
+    /// Önceden "p1-Ø12" gibi projeye ve rozet koduna bağlıydı: kod değişince
+    /// kimlik kırılıyordu ve ASCII olmayan karakter içeriyordu.
+    let id: UUID
+    let projectId: UUID
     var code: String          // Rozet kodu: "Ø12", "C30", "ÇMT"…
     var name: String          // "Demir", "Hazır Beton"…
     var subtitle: String      // "Nervürlü inşaat demiri"
@@ -41,7 +43,7 @@ struct MaterialLog: Codable, Identifiable, Equatable {
     }
 
     let id: UUID
-    let materialId: String
+    let materialId: UUID
     var type: LogType
     var amount: Double
     /// Kayıt anındaki birim fiyat — dondurulur; sonraki fiyat değişiklikleri

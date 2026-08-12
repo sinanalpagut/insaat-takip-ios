@@ -10,7 +10,7 @@ struct SitePhotosView: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let projectId: String
+    let projectId: UUID
 
     @State private var pickedItems: [PhotosPickerItem] = []
     @State private var showPicker = false

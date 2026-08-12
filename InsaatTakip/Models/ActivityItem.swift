@@ -48,7 +48,7 @@ import UIKit
 
 struct SitePhoto: Identifiable, Equatable {
     let id: UUID
-    let projectId: String
+    let projectId: UUID
     var date: Date              // Çekim tarihi
 
     var dateText: String { Fmt.dayMonth(date) }
@@ -93,7 +93,7 @@ struct SitePhoto: Identifiable, Equatable {
 /// görseller ayrı koleksiyonda tutulur (UIImage kodlanamaz).
 struct ApartmentPhoto: Identifiable, Equatable {
     let id: UUID
-    let apartmentId: String
+    let apartmentId: UUID
     var label: String        // "Salon", "Mutfak", "Görsel 3"…
     var image: UIImage?      // nil = tasarımdaki yer tutucu kare
 

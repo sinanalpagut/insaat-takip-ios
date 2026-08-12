@@ -7,7 +7,7 @@ import SwiftUI
 struct ApartmentsTabView: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
 
-    let projectId: String
+    let projectId: UUID
     /// Daireye dokununca: satıldıysa detay, boşsa satış formu (yalnızca yönetici).
     var onSelect: (Apartment) -> Void
 

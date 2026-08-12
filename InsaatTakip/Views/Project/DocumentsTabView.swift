@@ -9,7 +9,7 @@ struct DocumentsTabView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ProjectViewModel
 
-    let projectId: String
+    let projectId: UUID
     /// Filtre çipleri bu görünümün içinde; koyu başlık sekmeye göre yükseklik değiştirmesin diye.
     @Binding var filter: Filter
 

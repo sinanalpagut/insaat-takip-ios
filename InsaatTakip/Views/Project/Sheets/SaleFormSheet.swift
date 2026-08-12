@@ -10,11 +10,11 @@ struct SaleFormSheet: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let projectId: String
+    let projectId: UUID
     /// FAB'dan gelindiyse nil — form içinden boş daire seçilir.
-    let apartmentId: String?
+    let apartmentId: UUID?
 
-    @State private var selectedApartmentId: String?
+    @State private var selectedApartmentId: UUID?
     @State private var buyerName = ""
     @State private var priceText = ""
     @State private var paidText = ""

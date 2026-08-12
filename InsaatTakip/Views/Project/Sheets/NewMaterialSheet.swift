@@ -9,7 +9,7 @@ struct NewMaterialSheet: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let projectId: String
+    let projectId: UUID
     /// Kalem oluşturulunca üst forma bildirilir (hemen seçili gelsin diye).
     var onCreate: (Material) -> Void
 

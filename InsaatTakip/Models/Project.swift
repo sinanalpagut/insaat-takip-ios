@@ -11,7 +11,10 @@ enum ProjectPhase: String, Codable, CaseIterable {
 }
 
 struct Project: Codable, Identifiable, Equatable {
-    let id: String
+    /// Kimlik iş verisinden TÜRETİLMEZ. Önceden "p1" / "kars309" gibi elle
+    /// verilen dizelerdi; ada/parsel değişince kimlik de değişir, üstelik
+    /// veritabanında doküman yolu olarak güvenli değildi.
+    let id: UUID
     var blockNumber: String        // Ada
     var parcelNumber: String       // Parsel
     var district: String           // İlçe
