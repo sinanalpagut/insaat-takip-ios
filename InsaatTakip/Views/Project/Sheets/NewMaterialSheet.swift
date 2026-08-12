@@ -76,7 +76,8 @@ struct NewMaterialSheet: View {
         }
         .padding(.horizontal, 20)
         .background(Palette.surface)
-        .presentationDetents([.fraction(0.75)])
+        .keyboardDoneToolbar()
+        .sheetHeight(0.75)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)

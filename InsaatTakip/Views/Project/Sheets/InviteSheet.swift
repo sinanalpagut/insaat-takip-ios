@@ -45,7 +45,7 @@ struct InviteSheet: View {
         }
         .padding(.horizontal, 20)
         .background(Palette.surface)
-        .presentationDetents([.fraction(0.68)])
+        .sheetHeight(0.68)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)

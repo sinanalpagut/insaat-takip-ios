@@ -57,9 +57,19 @@ struct MaterialCardView: View {
                 CodeBadge(code: material.code, critical: material.isCritical)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(material.name)
-                        .font(.manrope(15, .bold))
-                        .foregroundColor(Palette.ink)
+                    HStack(spacing: 7) {
+                        Text(material.name)
+                            .font(.manrope(15, .bold))
+                            .foregroundColor(Palette.ink)
+                        // Uyarı paleti (#F6E3DE) normal tintten (#F5E6DC) sadece
+                        // 1-2 RGB farklı; tek başına renkle uyarmak görünmüyordu.
+                        if material.isCritical {
+                            StatusChip(text: "Kritik",
+                                       background: Palette.alertInk,
+                                       foreground: .white,
+                                       fontSize: 9)
+                        }
+                    }
                     Text("\(material.subtitle) · \(Fmt.unitPriceRounded(material.unitPrice, unit: material.unit))")
                         .font(.manrope(12.5, .medium))
                         .foregroundColor(Palette.textSecondary)

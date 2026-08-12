@@ -173,7 +173,8 @@ struct ReceiptSheet: View {
         }
         .padding(.horizontal, 20)
         .background(Palette.surface)
-        .presentationDetents([.fraction(0.82)])
+        .keyboardDoneToolbar()
+        .sheetHeight(0.82)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)

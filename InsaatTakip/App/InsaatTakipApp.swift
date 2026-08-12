@@ -16,6 +16,10 @@ struct InsaatTakipApp: App {
                 .environmentObject(viewModel)
                 .preferredColorScheme(.light)   // Tasarım açık tema üzerine kurulu
                 .tint(Palette.accent)
+                // Arayüz tamamen Türkçe. Yerel ayar sabitlenmezse SwiftUI'nin
+                // .textCase(.uppercase) dönüşümü cihazın diline uyar ve İngilizce
+                // telefonda "YÖNETİCİ" → "YÖNETICI", "AKTİF" → "AKTIF" olur (i ≠ İ).
+                .environment(\.locale, Fmt.locale)
         }
     }
 }

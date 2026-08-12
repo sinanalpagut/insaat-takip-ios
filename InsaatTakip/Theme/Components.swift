@@ -122,14 +122,8 @@ struct SheetHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Spacer()
-                Capsule()
-                    .fill(Palette.border)
-                    .frame(width: 38, height: 4)
-                Spacer()
-            }
-            .padding(.top, 10)
+            // Tutamaç sistemin `.presentationDragIndicator(.visible)` göstergesinden
+            // gelir. Buraya bir kapsül daha çizilince üst üste iki tutamaç oluyordu.
 
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -271,6 +265,34 @@ extension View {
             }
         }
         .animation(.spring(response: 0.24, dampingFraction: 0.86), value: message)
+    }
+}
+
+// MARK: - Klavye kapatma
+
+extension View {
+    /// Sayısal klavyelerde (decimalPad / numberPad) "return" tuşu yoktur;
+    /// kullanıcı klavyeyi kapatamayıp formun altını göremiyordu. Üstüne
+    /// "Bitti" çubuğu ekler.
+    func keyboardDoneToolbar() -> some View {
+        toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Bitti") {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                                    to: nil, from: nil, for: nil)
+                }
+                .font(.manrope(15, .bold))
+                .foregroundColor(Palette.accent)
+            }
+        }
+    }
+
+    /// Sheet'ler tek sabit yükseklikteydi; küçük ekranda (iPhone SE) alt kısımdaki
+    /// butonlar erişilemez kalıyordu. Tasarımdaki yüksekliği korur, tam ekrana
+    /// çekilebilmesini de sağlar.
+    func sheetHeight(_ fraction: CGFloat) -> some View {
+        presentationDetents([.fraction(fraction), .large])
     }
 }
 

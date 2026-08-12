@@ -30,6 +30,7 @@ struct ProjectDetailView: View {
         case apartmentDetail(apartmentId: String)
         case saleForm(apartmentId: String?)
         case upload
+        case progress
 
         var id: String {
             switch self {
@@ -39,6 +40,7 @@ struct ProjectDetailView: View {
             case .apartmentDetail(let id): return "apt-\(id)"
             case .saleForm(let id):        return "sale-\(id ?? "yeni")"
             case .upload:                  return "upload"
+            case .progress:                return "progress"
             }
         }
     }
@@ -166,6 +168,8 @@ struct ProjectDetailView: View {
             SaleFormSheet(projectId: projectId, apartmentId: apartmentId)
         case .upload:
             UploadSheet(projectId: projectId)
+        case .progress:
+            ProgressSheet(projectId: projectId)
         }
     }
 
@@ -201,6 +205,13 @@ struct ProjectDetailView: View {
                     NavigationLink(value: Route.report(projectId)) {
                         Label("Dönem Raporu", systemImage: "chart.bar")
                     }
+                    if isAdmin {
+                        Button {
+                            activeSheet = .progress
+                        } label: {
+                            Label("İnşaat İlerlemesi", systemImage: "slider.horizontal.3")
+                        }
+                    }
                 } label: {
                     darkHeaderIcon("ellipsis")
                 }
@@ -225,7 +236,10 @@ struct ProjectDetailView: View {
                             background: Color.white.opacity(0.07), valueColor: .white)
                 financeTile("Malzeme", Fmt.compactMoney(viewModel.totalMaterialCost(for: projectId)),
                             background: Color.white.opacity(0.07), valueColor: .white)
-                financeTile("Net", Fmt.compactMoney(viewModel.netAmount(for: projectId)),
+                // "Net" DEĞİL: bu rakam yalnızca satış − malzeme. İşçilik, taşeron,
+                // arsa ve harç henüz modellenmediği için "net kâr" demek ortağı
+                // yanıltırdı. Gider defteri (Faz 1) gelene kadar ne olduğu yazılı durur.
+                financeTile("Satış − Malzeme", Fmt.compactMoney(viewModel.netAmount(for: projectId)),
                             background: Palette.accent.opacity(0.22), valueColor: Palette.accentLight)
             }
             .padding(.top, 16)

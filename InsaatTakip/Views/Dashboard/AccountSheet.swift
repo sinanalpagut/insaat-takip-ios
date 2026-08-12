@@ -44,7 +44,12 @@ struct AccountSheet: View {
             .cornerRadius(16)
             .padding(.top, 18)
 
-            Text("Görünüm")
+            // Rol değiştirme yalnızca GELİŞTİRME derlemesinde. Yayın sürümünde açık
+            // kalsaydı, salt okunur olması gereken ortak kendini iki dokunuşta
+            // yönetici yapabilir; ViewModel'deki tüm yetki kontrolleri anlamsızlaşırdı.
+            // Gerçek rol, oturum açan hesaptan gelecek (Faz 2 — kimlik doğrulama).
+            #if DEBUG
+            Text("Görünüm · geliştirme")
                 .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
                 .padding(.top, 22)
                 .padding(.bottom, 10)
@@ -59,6 +64,7 @@ struct AccountSheet: View {
                     title: "Ortak görünümü",
                     detail: "Salt okunur — ortakların gördüğü ekran")
                 .padding(.top, 9)
+            #endif
 
             Button {
                 dismiss()
@@ -82,7 +88,7 @@ struct AccountSheet: View {
         }
         .padding(.horizontal, 20)
         .background(Palette.surface)
-        .presentationDetents([.fraction(0.62)])
+        .sheetHeight(0.62)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
     }

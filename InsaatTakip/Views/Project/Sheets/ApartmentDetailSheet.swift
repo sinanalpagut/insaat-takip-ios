@@ -17,6 +17,7 @@ struct ApartmentDetailSheet: View {
 
     @State private var pickedItems: [PhotosPickerItem] = []
     @State private var showCamera = false
+    @State private var showCancelConfirm = false
 
     private var apartment: Apartment? {
         viewModel.apartments.first { $0.id == apartmentId }
@@ -66,6 +67,20 @@ struct ApartmentDetailSheet: View {
                                 dismiss()
                             }
                             .padding(.top, 16)
+
+                            // Yanlış daireye satış işlemek tek dokunuş; geri dönüş olmalı.
+                            Button {
+                                showCancelConfirm = true
+                            } label: {
+                                Text("Satışı İptal Et")
+                                    .font(.manrope(13.5, .bold))
+                                    .foregroundColor(Palette.alertInk)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 48)
+                                    .background(Palette.alertTint.opacity(0.6))
+                                    .cornerRadius(13)
+                            }
+                            .padding(.top, 9)
                         }
 
                         Spacer().frame(height: 24)
@@ -75,12 +90,23 @@ struct ApartmentDetailSheet: View {
         }
         .padding(.horizontal, 20)
         .background(Palette.surface)
-        .presentationDetents([.fraction(0.78)])
+        .sheetHeight(0.78)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)
         .onChange(of: pickedItems) { _ in
             if let apartment { importPickedPhotos(for: apartment.id) }
+        }
+        .confirmationDialog("Satışı iptal et", isPresented: $showCancelConfirm, titleVisibility: .visible) {
+            Button("Satışı iptal et", role: .destructive) {
+                guard let apartment else { return }
+                viewModel.cancelSale(role: appState.currentUser?.role ?? .partner,
+                                     apartmentId: apartment.id)
+                dismiss()
+            }
+            Button("Vazgeç", role: .cancel) {}
+        } message: {
+            Text("Daire No \(apartment?.apartmentNumber ?? 0) tekrar boş duruma dönecek; alıcı ve tahsilat bilgisi silinecek. Bu işlem ortakların akışında görünür.")
         }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker(

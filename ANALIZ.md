@@ -20,16 +20,16 @@ Efor: **S** = birkaç saat · **M** = 1-3 gün · **L** = 1 hafta+
 Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edilir.
 **Hedef: listenin tamamı.** Sıradaki iş her zaman en üstteki işaretsiz maddedir.
 
-### Faz 0 — Hızlı kazanımlar
+### Faz 0 — Hızlı kazanımlar ✅ **tamamlandı**
 
-- [ ] 1. "Net" etiketini dürüstleştir (satış − malzeme olduğu görünsün)
-- [ ] 2. Rol değiştirmeyi DEBUG'a al (ortak kendini yönetici yapamasın)
-- [ ] 3. Satış iptali (yanlış girilen satış geri alınabilsin)
-- [ ] 4. Uygulama ikonundaki alfa kanalını kaldır (ITMS-90717)
-- [ ] 5. Türkçe büyük harf (YÖNETİCİ, AKTİF, FİŞ — i/İ sorunu)
-- [ ] 6. Klavye "Bitti" butonu + sheet'lere `.large` detent
-- [ ] 7. Çift sürükleme tutamacı + kritik stok görünürlüğü
-- [ ] 8. İnşaat ilerlemesi/aşaması düzenlenebilsin
+- [x] 1. "Net" etiketini dürüstleştir (satış − malzeme olduğu görünsün)
+- [x] 2. Rol değiştirmeyi DEBUG'a al (ortak kendini yönetici yapamasın)
+- [x] 3. Satış iptali (yanlış girilen satış geri alınabilsin)
+- [x] 4. Uygulama ikonundaki alfa kanalını kaldır (ITMS-90717)
+- [x] 5. Türkçe büyük harf (YÖNETİCİ, AKTİF, FİŞ — i/İ sorunu)
+- [x] 6. Klavye "Bitti" butonu + sheet'lere `.large` detent
+- [x] 7. Çift sürükleme tutamacı + kritik stok görünürlüğü
+- [x] 8. İnşaat ilerlemesi/aşaması düzenlenebilsin
 
 ### Faz 1 — Firebase'den ÖNCE (sonraya kalırsa veri göçü gerektirir)
 

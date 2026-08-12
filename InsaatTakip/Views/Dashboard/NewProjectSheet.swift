@@ -61,8 +61,9 @@ struct NewProjectSheet: View {
         }
         .padding(.horizontal, 20)
         .background(Palette.surface)
-        .presentationDetents([.fraction(0.72)])
-        .presentationDragIndicator(.hidden)
+        .keyboardDoneToolbar()
+        .sheetHeight(0.72)
+        .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)
     }

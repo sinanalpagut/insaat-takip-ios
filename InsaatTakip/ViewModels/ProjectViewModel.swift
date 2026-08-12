@@ -198,6 +198,49 @@ final class ProjectViewModel: ObservableObject {
         return true
     }
 
+    /// Projenin inşaat ilerlemesini ve yapım aşamasını günceller.
+    /// Bu iki alan dashboard kartının en büyük görsel öğesi; düzenlenemediği için
+    /// kullanıcının açtığı her proje sonsuza dek "%0 · Temel" görünüyordu.
+    func updateProgress(role: UserRole, projectId: String, progress: Int, phase: ProjectPhase) {
+        guard role == .admin,
+              let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
+        projects[index].progress = min(100, max(0, progress))
+        projects[index].phase = phase
+        flash("İlerleme güncellendi")
+    }
+
+    /// Satışı iptal eder; daire tekrar boşa döner.
+    /// Yanlış daireye satış işlemek tek dokunuşla mümkün olduğu için geri dönüş şart.
+    /// Liste fiyatı (TOKİ gerçek verisi) korunur — satış formunda yeniden önerilir.
+    @discardableResult
+    func cancelSale(role: UserRole, apartmentId: String) -> Bool {
+        guard role == .admin else { return false }
+        guard let index = apartments.firstIndex(where: { $0.id == apartmentId }),
+              apartments[index].isSold else { return false }
+
+        var apartment = apartments[index]
+        let buyer = apartment.buyerName ?? ""
+        let price = apartment.price
+
+        apartment.status = .available
+        apartment.buyerName = nil
+        apartment.paidAmount = 0
+        apartment.paymentStatus = nil
+        apartment.saleDateText = nil
+        apartments[index] = apartment
+
+        // İptal de bir harekettir; ortakların akışında görünmeli (şeffaflık).
+        let projectTitle = projects.first { $0.id == apartment.projectId }?.title ?? ""
+        activities.insert(ActivityItem(id: UUID(), kind: .sale,
+                                       title: "Daire No \(apartment.apartmentNumber) satışı iptal edildi",
+                                       meta: "\(projectTitle) · \(buyer) · \(Fmt.compactMoney(price))",
+                                       timeText: Fmt.clock(),
+                                       section: .bugun), at: 0)
+        hasUnreadActivity = true
+        flash("Satış iptal edildi")
+        return true
+    }
+
     /// Projeye yeni malzeme kalemi tanımlar (varsayılan katalog dışındakiler için).
     /// Rozet kodu verilmezse addan türetilir: "Seramik" → "SER".
     @discardableResult
