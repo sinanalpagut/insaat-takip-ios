@@ -5,11 +5,19 @@ import SwiftUI
 // altında 2 kolonlu ızgara: satılan = yeşil kart, boş = kesikli kenarlık.
 
 struct ApartmentsTabView: View {
+    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ProjectViewModel
 
     let projectId: UUID
     /// Daireye dokununca: satıldıysa detay, boşsa satış formu (yalnızca yönetici).
     var onSelect: (Apartment) -> Void
+    /// Basılı tutunca "Daire Bilgisini Düzenle". Boş daire dokununca satış formunu
+    /// açtığı için düzenleme ekranına ULAŞILAMIYORDU: yeni kurulan projede tüm
+    /// daireler boş olduğundan tip/alan/kat düzeltmek ve kat karşılığı işaretlemek
+    /// imkânsızdı — yani düzenleme formu tam olarak var olma sebebine erişemiyordu.
+    var onEditInfo: (Apartment) -> Void
+
+    private var isAdmin: Bool { appState.isAdmin }
 
     private var apartments: [Apartment] {
         viewModel.apartments(for: projectId)
@@ -26,6 +34,15 @@ struct ApartmentsTabView: View {
                 summaryCard
                     .padding(.top, 16)
 
+                if isAdmin {
+                    HStack {
+                        Spacer()
+                        Text("Tip, m² ve durum için karta basılı tut")
+                            .font(.manrope(10.5, .medium))
+                            .foregroundColor(Palette.textTertiary)
+                    }
+                }
+
                 LazyVGrid(columns: columns, spacing: 9) {
                     ForEach(apartments) { apartment in
                         Button {
@@ -34,6 +51,15 @@ struct ApartmentsTabView: View {
                             ApartmentCellView(apartment: apartment)
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            if isAdmin {
+                                Button {
+                                    onEditInfo(apartment)
+                                } label: {
+                                    Label("Daire Bilgisini Düzenle", systemImage: "pencil")
+                                }
+                            }
+                        }
                     }
                 }
 

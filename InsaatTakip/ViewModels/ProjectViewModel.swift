@@ -221,9 +221,11 @@ final class ProjectViewModel: ObservableObject {
         apartments(for: projectId).filter { $0.status == .reserved }.reduce(0) { $0 + $1.paidAmount }
     }
 
-    /// Kalan alacak toplamı.
+    /// Kalan alacak toplamı. Daire başına `remainingAmount` max(0,…) ile kırpıldığı
+    /// için proje toplamı da kırpılmalı: aksi halde tek bir dairedeki fazla tahsilat
+    /// ortağa "Kalan alacak −3,40 M ₺" olarak gösterilirdi.
     func outstandingAmount(for projectId: UUID) -> Double {
-        totalSales(for: projectId) - collectedAmount(for: projectId)
+        max(0, totalSales(for: projectId) - collectedAmount(for: projectId))
     }
 
     /// Dashboard alt başlığı — yalnızca kullanıcının eriştiği projeleri sayar.
@@ -611,6 +613,17 @@ final class ProjectViewModel: ObservableObject {
             flash("Tutar girilmedi")
             return false
         }
+        // Kalan alacaktan fazla tahsilat reddedilir. Kabul edilse daire kartı
+        // "Tahsil edildi" demeye devam ediyor (remainingAmount kırpılıyor), fazlalık
+        // hiçbir yerde görünmüyor, ama proje "kalan alacağı" eksiye düşüyordu —
+        // aynı havalenin iki kez girilmesi bunun en yaygın yolu.
+        let remaining = max(0, apartment.price - apartment.paidAmount)
+        if apartment.price > 0, amount > remaining {
+            flash(remaining > 0
+                  ? "Kalan alacak \(Fmt.money(remaining)) — fazlası girilemez"
+                  : "Bedelin tamamı tahsil edilmiş")
+            return false
+        }
 
         let payment = Payment(id: UUID(), apartmentId: apartmentId, amount: amount,
                               date: date, method: method,
@@ -782,49 +795,20 @@ final class ProjectViewModel: ObservableObject {
         // çevrilirken kapora ZATEN Payment olarak kayıtlı; burada isSold'a
         // bakılsaydı ikinci bir peşinat kaydı açılır ve tahsilat çift sayılırdı.
         let isNewSale = !apartment.isCommitted
+        // Bedel, tahsil edilmiş tutarın altına indirilemez: aksi halde daire
+        // bedelinden fazla tahsilat taşır, `remainingAmount` max(0,…) ile
+        // kırpıldığı için kartta görünmez, ama proje "kalan alacağı" eksiye düşer.
+        if !isNewSale, price < before.paidAmount {
+            flash("Bedel tahsil edilenin (\(Fmt.money(before.paidAmount))) altına inemez")
+            return false
+        }
+
         apartment.status = .sold
         apartment.buyerName = trimmedBuyer
         apartment.price = price
         apartment.paymentStatus = payment
         apartment.saleDate = saleDate ?? apartment.saleDate ?? Date()
         apartments[index] = apartment
-
-        // Kayıtlı bir satış değiştiyse ne değiştiği deftere yazılır: satış
-        // bedeli sessizce düzeltilebiliyor olsaydı ortağa gösterilen ciro
-        // rakamının geçmişi doğrulanamazdı.
-        if !isNewSale {
-            var changes: [AuditEntry.Change] = []
-            if before.status != apartment.status {
-                changes.append(.init(field: "Durum",
-                                     oldValue: before.status.label,
-                                     newValue: apartment.status.label))
-            }
-            if before.buyerName != apartment.buyerName {
-                changes.append(.init(field: "Alıcı",
-                                     oldValue: before.buyerName ?? "—",
-                                     newValue: trimmedBuyer))
-            }
-            if before.price != apartment.price {
-                changes.append(.init(field: "Satış bedeli",
-                                     oldValue: Fmt.money(before.price),
-                                     newValue: Fmt.money(apartment.price)))
-            }
-            if before.paymentStatus != apartment.paymentStatus {
-                changes.append(.init(field: "Ödeme durumu",
-                                     oldValue: before.paymentStatus?.rawValue ?? "—",
-                                     newValue: payment.rawValue))
-            }
-            if before.saleDate != apartment.saleDate {
-                changes.append(.init(field: "Satış tarihi",
-                                     oldValue: before.saleDate.map(Fmt.shortDate) ?? "—",
-                                     newValue: apartment.saleDate.map(Fmt.shortDate) ?? "—"))
-            }
-            if !changes.isEmpty {
-                recordAudit(recordId: apartmentId, projectId: apartment.projectId,
-                            subject: "Daire No \(apartment.apartmentNumber) satışı",
-                            action: .update, changes: changes)
-            }
-        }
 
         // İlk tahsilat da bir kayıt olarak defterde durur; `paidAmount` artık
         // doğrudan yazılmıyor, ödeme kayıtlarından hesaplanıyor.
@@ -853,22 +837,77 @@ final class ProjectViewModel: ObservableObject {
         }
         recalculateCollected(for: apartmentId)
 
-        if isNewSale {
-            // Akışta hangi projenin dairesi olduğu görünmeli — malzeme kayıtlarıyla aynı düzen.
+        // Denetim kaydı, recalculateCollected'DAN SONRA ve gerçekten yazılan
+        // son durumla karşılaştırılarak yazılır. Önceden önce yazılıyordu:
+        // kullanıcı "Tamamlandı" seçtiğinde recalculateCollected bunu (tahsilat
+        // yetmediği için) geri alıyor, ama defter "Taksitli → Tamamlandı" diye
+        // hiç gerçekleşmemiş bir değişikliği kalıcı olarak kaydediyordu.
+        let after = apartments[index]
+        if !isNewSale {
+            var changes: [AuditEntry.Change] = []
+            if before.status != after.status {
+                changes.append(.init(field: "Durum",
+                                     oldValue: before.status.label,
+                                     newValue: after.status.label))
+            }
+            if before.buyerName != after.buyerName {
+                changes.append(.init(field: "Alıcı",
+                                     oldValue: before.buyerName ?? "—",
+                                     newValue: after.buyerName ?? "—"))
+            }
+            if before.price != after.price {
+                changes.append(.init(field: "Satış bedeli",
+                                     oldValue: Fmt.money(before.price),
+                                     newValue: Fmt.money(after.price)))
+            }
+            if before.paymentStatus != after.paymentStatus {
+                changes.append(.init(field: "Ödeme durumu",
+                                     oldValue: before.paymentStatus?.rawValue ?? "—",
+                                     newValue: after.paymentStatus?.rawValue ?? "—"))
+            }
+            if before.paidAmount != after.paidAmount {
+                changes.append(.init(field: "Tahsil edilen",
+                                     oldValue: Fmt.money(before.paidAmount),
+                                     newValue: Fmt.money(after.paidAmount)))
+            }
+            if before.saleDate != after.saleDate {
+                changes.append(.init(field: "Satış tarihi",
+                                     oldValue: before.saleDate.map(Fmt.shortDate) ?? "—",
+                                     newValue: after.saleDate.map(Fmt.shortDate) ?? "—"))
+            }
+            if !changes.isEmpty {
+                recordAudit(recordId: apartmentId, projectId: apartment.projectId,
+                            subject: "Daire No \(apartment.apartmentNumber) satışı",
+                            action: .update, changes: changes)
+            }
+        }
+
+        // Satış akışa `kind: .sale` olarak düşer. Koşul isNewSale DEĞİL "bu
+        // işlemle .sold oldu mu": rezerveden çevrilen satış isNewSale=false
+        // olduğu için akışa hiç düşmüyordu — ciro artıyor ama ortak "Satış"
+        // filtresinde karşılığını bulamıyordu.
+        if before.status != .sold {
             let projectTitle = projects.first { $0.id == apartment.projectId }?.title ?? ""
             let payNote: String
-            switch payment {
+            switch after.paymentStatus ?? payment {
             case .tamamlandi: payNote = "Tahsil edildi"
             case .kapora:     payNote = "Kapora alındı"
             case .taksitli:   payNote = "Taksit planı başladı"
             }
+            let prefix = before.status == .reserved ? "rezervden satışa çevrildi" : "satıldı"
             activities.insert(ActivityItem(id: UUID(), kind: .sale,
-                                           title: "Daire No \(apartment.apartmentNumber) satıldı — \(Fmt.compactMoney(price))",
+                                           title: "Daire No \(apartment.apartmentNumber) \(prefix) — \(Fmt.compactMoney(price))",
                                            meta: "\(projectTitle) · \(trimmedBuyer) · \(payNote)",
                                            timestamp: Date()), at: 0)
             hasUnreadActivity = true
         }
-        flash(isNewSale ? "Satış kaydedildi" : "Satış kaydı güncellendi")
+
+        // Seçilen ödeme durumu tahsilata uymadığı için geri alındıysa sessiz kalmayalım.
+        if after.paymentStatus != payment {
+            flash("Tahsilat yetmediği için ödeme durumu \"\(after.paymentStatus?.rawValue ?? "—")\" kaldı")
+        } else {
+            flash(before.status == .sold ? "Satış kaydı güncellendi" : "Satış kaydedildi")
+        }
         return true
     }
 
@@ -1138,12 +1177,27 @@ final class ProjectViewModel: ObservableObject {
             return range.contains(saleDate)
         }
         let sales = sold.reduce(0) { $0 + $1.price }
-        let collected = sold.reduce(0) { $0 + $1.paidAmount }
+        let projectApartments = apartments(for: projectId)
+
+        // Dönem tahsilatı ÖDEME TARİHLERİNDEN gelir. Önceden dönemde satış tarihi
+        // olan dairelerin ömür boyu `paidAmount` toplamıydı: aynı kartta malzeme
+        // ve diğer giderler gerçekten o döneme aitken tahsilat başka bir pencereden
+        // geliyordu. Bir çeyrekte imzalanan sözleşmenin sonraki çeyreklerde ödenen
+        // taksitleri imza çeyreğine yazılıyor, o çeyrekte kasaya giren para ise
+        // hiç görünmüyordu. Bu kart ortaklara PDF olarak dağıtılıyor.
+        let revenueApartmentIds = Set(projectApartments.filter(\.countsAsRevenue).map(\.id))
+        let collected: Double
+        if let range {
+            collected = payments
+                .filter { revenueApartmentIds.contains($0.apartmentId) && range.contains($0.date) }
+                .reduce(0) { $0 + $1.amount }
+        } else {
+            collected = projectApartments.filter(\.countsAsRevenue).reduce(0) { $0 + $1.paidAmount }
+        }
 
         // Rezerve ve kat karşılığı daireler ciroya girmez ama raporda GÖRÜNMELİ:
         // aksi halde ortağa giden PDF'te "Satılan daire N adet" ya kat karşılığını
         // içerip yanlış olur ya da bekleyen kaporayı tamamen gizler.
-        let projectApartments = apartments(for: projectId)
         let reserved = projectApartments.filter { $0.status == .reserved }
         let landOwner = projectApartments.filter { $0.status == .landOwner }.count
 

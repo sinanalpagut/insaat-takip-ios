@@ -88,9 +88,12 @@ struct ProjectDetailView: View {
                         }
                         // Boş daireye dokunmak doğrudan satış formunu açar (hızlı yol);
                         // taahhütlü ve kat karşılığı daireler detayına gider.
+                        // Boş dairenin bilgi düzenleme ekranına basılı tutarak ulaşılır.
                         activeSheet = apartment.isSellable
                             ? .saleForm(apartmentId: apartment.id)
                             : .apartmentDetail(apartmentId: apartment.id)
+                    } onEditInfo: { apartment in
+                        activeSheet = .apartmentEdit(apartmentId: apartment.id)
                     }
                 case .giderler:
                     ExpensesTabView(projectId: projectId)

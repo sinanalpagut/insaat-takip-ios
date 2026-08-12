@@ -44,6 +44,11 @@ struct SaleFormSheet: View {
         selectedApartment?.status == .reserved
     }
 
+    /// Tahsilat alanı yalnızca ilk kayıtta anlamlı: sonrasında ödeme defteri yönetir.
+    private var showsPaidField: Bool {
+        payment != .tamamlandi && (!isEditing || isConverting)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetHeader(title: isConverting ? "Satışa Çevir"
@@ -79,11 +84,24 @@ struct SaleFormSheet: View {
 
                     HStack(alignment: .top, spacing: 10) {
                         moneyField("SATIŞ BEDELİ (₺)", text: $priceText, placeholder: "3.850.000")
-                        if payment != .tamamlandi {
+                        // Tahsilat alanı YALNIZCA ilk kayıtta (yeni satış veya
+                        // rezerveden çevirme) görünür. Kayıtlı bir satışta tahsilat
+                        // tek kaynaktan — ödeme kayıtlarından — türetiliyor; burada
+                        // ikinci bir yazma yolu bırakıldığında girilen tutar sessizce
+                        // çöpe gidiyordu (kaydedildi der, hiçbir yere yazmazdı).
+                        if showsPaidField {
                             moneyField("TAHSİL EDİLEN (₺)", text: $paidText, placeholder: "500.000")
                         }
                     }
                     .padding(.top, 16)
+
+                    if isEditing, !isConverting {
+                        Text("Tahsilat, daire detayındaki \"Ödeme Ekle\" ile işlenir — her ödemenin tarihi ve dekontu ayrı kayıtta durur.")
+                            .font(.manrope(11, .medium))
+                            .foregroundColor(Palette.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 8)
+                    }
 
                     Text("Ödeme Durumu")
                         .smallCapsLabel(size: 10, color: Palette.textControl, tracking: 0.9)
@@ -229,9 +247,13 @@ struct SaleFormSheet: View {
     }
 
     /// Boş dairede tanımlı liste fiyatı varsa (TOKİ gerçek verisi) forma hazır getirir.
+    /// Fiyatı olmayan daireye geçildiğinde alan MUTLAKA temizlenir: önceden erken
+    /// dönülüyordu ve önceki dairenin bedeli alanda kalıyordu — yönetici çipten
+    /// başka daire seçip kaydettiğinde hiç yazmadığı bir bedelle satış işleniyor,
+    /// ciro o tutar kadar şişiyordu.
     private func prefillListPrice(_ apartment: Apartment) {
-        guard !apartment.isCommitted, apartment.price > 0 else { return }
-        priceText = Fmt.qty(apartment.price)
+        guard !apartment.isCommitted else { return }
+        priceText = apartment.price > 0 ? Fmt.qty(apartment.price) : ""
     }
 
     private func save() {
