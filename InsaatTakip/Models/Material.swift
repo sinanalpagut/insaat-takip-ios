@@ -47,6 +47,18 @@ struct Material: Codable, Identifiable, Equatable {
     /// Kritik stok: kalan oranı eşiğin altına düşünce uyarı paletine geçer.
     static let criticalThreshold = 0.10
     var isCritical: Bool { remainingFraction < Material.criticalThreshold }
+
+    /// Toplamları devir + hareketlerden yeniden türetir.
+    /// Formül burada durur çünkü iki ayrı çağıranı var: çalışma zamanında
+    /// ProjectViewModel (fiş eklenince/silinince), veri kaynağı kurulurken de
+    /// repository. İki yerde ayrı yazılsaydı biri değişip diğeri kalırdı.
+    mutating func recalculate(from logs: [MaterialLog]) {
+        let mine = logs.filter { $0.materialId == id }
+        let entries = mine.filter { $0.type == .entry }
+        totalIn = openingIn + entries.reduce(0) { $0 + $1.amount }
+        totalOut = openingOut + mine.filter { $0.type == .exit }.reduce(0) { $0 + $1.amount }
+        accruedCost = openingCost + entries.reduce(0) { $0 + $1.amount * $1.unitPrice }
+    }
 }
 
 /// Malzeme giriş / çıkış kaydı.
