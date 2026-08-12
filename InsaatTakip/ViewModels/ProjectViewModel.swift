@@ -27,6 +27,8 @@ final class ProjectViewModel: ObservableObject {
     @Published var expenses: [Expense] = []            // Malzeme dışı giderler
     @Published var payments: [Payment] = []            // Daire tahsilatları
     @Published var apartmentPhotos: [ApartmentPhoto] = []   // Daire görselleri
+    /// Düzenleme ve silmelerin değişiklik kaydı (eski → yeni, kim, ne zaman).
+    @Published var auditEntries: [AuditEntry] = []
     /// Fiş fotoğrafları — hareket kimliğine göre (kamerayla çekilen irsaliye).
     @Published var receiptImages: [UUID: UIImage] = [:]
 
@@ -197,7 +199,7 @@ final class ProjectViewModel: ObservableObject {
     @discardableResult
     func addReceipt(role: UserRole, materialId: UUID, type: MaterialLog.LogType,
                     amountText: String, unitPriceText: String, reference: String,
-                    receiptImage: UIImage? = nil) -> Bool {
+                    date: Date = Date(), receiptImage: UIImage? = nil) -> Bool {
         guard role == .admin else { return false }   // Ortak veri giremez
         guard let index = materials.firstIndex(where: { $0.id == materialId }) else {
             flash("Malzeme seçilmedi")
@@ -219,29 +221,30 @@ final class ProjectViewModel: ObservableObject {
             let newPrice = Self.parseNumber(unitPriceText)
             // Fiyat yalnızca bu girişe uygulanır; geçmiş stok yeniden fiyatlanmaz.
             effectivePrice = newPrice > 0 ? newPrice : material.unitPrice
-            material.totalIn += amount
-            material.accruedCost += amount * effectivePrice
-            if newPrice > 0 { material.unitPrice = newPrice }   // sonraki fişlere ön dolum
+            if newPrice > 0 {
+                material.unitPrice = newPrice        // sonraki fişlere ön dolum
+                materials[index] = material
+            }
         } else {
             guard material.currentStock >= amount else {
                 flash("Stok yetersiz · kalan \(Fmt.qty(material.currentStock, unit: material.unit))")
                 return false
             }
             effectivePrice = material.unitPrice
-            material.totalOut += amount
         }
-        materials[index] = material
 
         let note = reference.isEmpty
             ? (type == .entry ? "İrsaliye kaydı" : "Saha kullanımı")
             : reference
         let log = MaterialLog(id: UUID(), materialId: materialId, type: type,
                               amount: amount, unitPrice: effectivePrice,
-                              date: Date(),
+                              date: date,
                               note: note, user: User.admin.name)
         materialLogs.insert(log, at: 0)
         // Kamerayla çekilen fiş görseli hareketle birlikte saklanır.
         if let receiptImage { receiptImages[log.id] = receiptImage }
+        // Stok ve maliyet toplamları hareketlerden yeniden türetilir.
+        recalculateMaterial(materialId)
 
         // Hareket akışına düşür.
         let verb = type == .entry ? "giriş" : "çıkış"
@@ -254,6 +257,152 @@ final class ProjectViewModel: ObservableObject {
         hasUnreadActivity = true
         flash("Fiş kaydedildi")
         return true
+    }
+
+    /// Kayıtlı bir fişi düzeltir. Yanlış girilen 125.000 kg demirin tek çaresi
+    /// telafi çıkışı girmekti; o da maliyeti azaltmıyordu. Değişiklik denetim
+    /// izine yazılır — ortak da neyin ne zaman düzeltildiğini görebilsin.
+    @discardableResult
+    func updateReceipt(role: UserRole, logId: UUID, type: MaterialLog.LogType,
+                       amountText: String, unitPriceText: String, reference: String,
+                       date: Date, receiptImage: UIImage? = nil) -> Bool {
+        guard role == .admin else { return false }
+        guard let logIndex = materialLogs.firstIndex(where: { $0.id == logId }),
+              let material = materials.first(where: { $0.id == materialLogs[logIndex].materialId })
+        else { return false }
+
+        let amount = Self.parseNumber(amountText)
+        guard amount > 0 else {
+            flash("Miktar girilmedi")
+            return false
+        }
+
+        let old = materialLogs[logIndex]
+        let newPrice = Self.parseNumber(unitPriceText)
+        var updated = old
+        updated.type = type
+        updated.amount = amount
+        updated.unitPrice = newPrice > 0 ? newPrice : old.unitPrice
+        updated.date = date
+        updated.note = reference.isEmpty ? old.note : reference
+
+        // Önce uygula, sonra sonucu denetle: düzeltme stoğu eksiye düşürüyorsa
+        // (ör. çoktan harcanmış bir girişi küçültmek) işlem geri alınır.
+        materialLogs[logIndex] = updated
+        recalculateMaterial(material.id)
+        if let check = materials.first(where: { $0.id == material.id }), check.currentStock < 0 {
+            materialLogs[logIndex] = old
+            recalculateMaterial(material.id)
+            flash("Bu düzeltme stoğu eksiye düşürür")
+            return false
+        }
+        if let receiptImage { receiptImages[logId] = receiptImage }
+
+        // Neyin değiştiğini alan alan yaz.
+        var changes: [AuditEntry.Change] = []
+        if old.type != updated.type {
+            changes.append(.init(field: "Tür",
+                                 oldValue: old.type == .entry ? "Giriş" : "Çıkış",
+                                 newValue: updated.type == .entry ? "Giriş" : "Çıkış"))
+        }
+        if old.amount != updated.amount {
+            changes.append(.init(field: "Miktar",
+                                 oldValue: Fmt.qty(old.amount, unit: material.unit),
+                                 newValue: Fmt.qty(updated.amount, unit: material.unit)))
+        }
+        if old.unitPrice != updated.unitPrice {
+            changes.append(.init(field: "Birim fiyat",
+                                 oldValue: Fmt.unitPriceExact(old.unitPrice, unit: material.unit),
+                                 newValue: Fmt.unitPriceExact(updated.unitPrice, unit: material.unit)))
+        }
+        if old.date != updated.date {
+            changes.append(.init(field: "Tarih", oldValue: old.dateText, newValue: updated.dateText))
+        }
+        if old.note != updated.note {
+            changes.append(.init(field: "Açıklama", oldValue: old.note, newValue: updated.note))
+        }
+        guard !changes.isEmpty else {
+            flash("Değişiklik yok")
+            return true
+        }
+        recordAudit(recordId: logId, projectId: material.projectId,
+                    subject: "\(material.name) fişi", action: .update, changes: changes)
+        flash("Fiş güncellendi")
+        return true
+    }
+
+    /// Fişi siler; stok ve maliyet hareketlerden yeniden türetilir.
+    @discardableResult
+    func deleteReceipt(role: UserRole, logId: UUID) -> Bool {
+        guard role == .admin else { return false }
+        guard let logIndex = materialLogs.firstIndex(where: { $0.id == logId }),
+              let material = materials.first(where: { $0.id == materialLogs[logIndex].materialId })
+        else { return false }
+
+        let removed = materialLogs.remove(at: logIndex)
+        recalculateMaterial(material.id)
+        // Silinen giriş zaten harcanmışsa stok eksiye düşer — kayıt geri konur.
+        if let check = materials.first(where: { $0.id == material.id }), check.currentStock < 0 {
+            materialLogs.insert(removed, at: logIndex)
+            recalculateMaterial(material.id)
+            flash("Bu fiş silinirse stok eksiye düşer")
+            return false
+        }
+        receiptImages[logId] = nil
+
+        recordAudit(recordId: logId, projectId: material.projectId,
+                    subject: "\(material.name) fişi", action: .delete,
+                    changes: [.init(field: removed.type == .entry ? "Giriş" : "Çıkış",
+                                    oldValue: Fmt.qty(removed.amount, unit: material.unit),
+                                    newValue: "silindi")])
+        flash("Fiş silindi")
+        return true
+    }
+
+    // MARK: Denetim izi
+
+    /// Bir kaydın değişiklik geçmişi (yeniden eskiye).
+    func audit(for recordId: UUID) -> [AuditEntry] {
+        auditEntries.filter { $0.recordId == recordId }.sorted { $0.date > $1.date }
+    }
+
+    /// Bir projenin tüm değişiklik kayıtları — ortak da görebilir.
+    func audit(forProject projectId: UUID) -> [AuditEntry] {
+        auditEntries.filter { $0.projectId == projectId }.sorted { $0.date > $1.date }
+    }
+
+    /// Değişikliği deftere yazar ve hareket akışına düşürür.
+    /// Akışa da düşmesi bilinçli: düzeltme yalnızca yöneticinin gördüğü bir
+    /// yerde kalırsa "şeffaf" iddiası ortak açısından doğrulanabilir olmaz.
+    private func recordAudit(recordId: UUID, projectId: UUID, subject: String,
+                             action: AuditEntry.Action, changes: [AuditEntry.Change]) {
+        let entry = AuditEntry(id: UUID(), recordId: recordId, projectId: projectId,
+                               subject: subject, action: action, changes: changes,
+                               user: User.admin.name, date: Date())
+        auditEntries.insert(entry, at: 0)
+
+        let projectTitle = projects.first { $0.id == projectId }?.title ?? ""
+        activities.insert(ActivityItem(id: UUID(), kind: .edit,
+                                       title: "\(subject) \(action.rawValue)",
+                                       meta: [projectTitle, entry.summary]
+                                            .filter { !$0.isEmpty }.joined(separator: " · "),
+                                       timestamp: entry.date), at: 0)
+        hasUnreadActivity = true
+    }
+
+    /// Malzeme toplamları TEK yerden türetilir: devir + kayıtlı hareketler.
+    /// Silme ve düzenleme ancak böyle geri alınabilir oluyor.
+    private func recalculateMaterial(_ materialId: UUID) {
+        guard let index = materials.firstIndex(where: { $0.id == materialId }) else { return }
+        let logs = materialLogs.filter { $0.materialId == materialId }
+        var material = materials[index]
+        material.totalIn = material.openingIn
+            + logs.filter { $0.type == .entry }.reduce(0) { $0 + $1.amount }
+        material.totalOut = material.openingOut
+            + logs.filter { $0.type == .exit }.reduce(0) { $0 + $1.amount }
+        material.accruedCost = material.openingCost
+            + logs.filter { $0.type == .entry }.reduce(0) { $0 + $1.amount * $1.unitPrice }
+        materials[index] = material
     }
 
     /// Projenin inşaat ilerlemesini ve yapım aşamasını günceller.
@@ -346,10 +495,15 @@ final class ProjectViewModel: ObservableObject {
     /// Yanlış girilen tahsilatı siler; toplam yeniden hesaplanır.
     func deletePayment(role: UserRole, id: UUID) {
         guard role == .admin,
-              let payment = payments.first(where: { $0.id == id }) else { return }
+              let payment = payments.first(where: { $0.id == id }),
+              let apartment = apartments.first(where: { $0.id == payment.apartmentId }) else { return }
         payments.removeAll { $0.id == id }
         receiptImages[id] = nil
         recalculateCollected(for: payment.apartmentId)
+        recordAudit(recordId: id, projectId: apartment.projectId,
+                    subject: "Daire No \(apartment.apartmentNumber) tahsilatı", action: .delete,
+                    changes: [.init(field: payment.detailText,
+                                    oldValue: Fmt.money(payment.amount), newValue: "silindi")])
         flash("Tahsilat silindi")
     }
 
@@ -405,9 +559,13 @@ final class ProjectViewModel: ObservableObject {
 
     /// Yanlış girilen gideri siler (yalnızca yönetici).
     func deleteExpense(role: UserRole, id: UUID) {
-        guard role == .admin else { return }
+        guard role == .admin, let expense = expenses.first(where: { $0.id == id }) else { return }
         expenses.removeAll { $0.id == id }
         receiptImages[id] = nil
+        recordAudit(recordId: id, projectId: expense.projectId,
+                    subject: expense.category.rawValue, action: .delete,
+                    changes: [.init(field: expense.detailText.isEmpty ? "Tutar" : expense.detailText,
+                                    oldValue: Fmt.money(expense.amount), newValue: "silindi")])
         flash("Gider silindi")
     }
 
@@ -471,6 +629,7 @@ final class ProjectViewModel: ObservableObject {
         }
 
         var apartment = apartments[index]
+        let before = apartment
         let isNewSale = !apartment.isSold
         apartment.status = .sold
         apartment.buyerName = trimmedBuyer
@@ -478,6 +637,38 @@ final class ProjectViewModel: ObservableObject {
         apartment.paymentStatus = payment
         apartment.saleDate = saleDate ?? apartment.saleDate ?? Date()
         apartments[index] = apartment
+
+        // Kayıtlı bir satış değiştiyse ne değiştiği deftere yazılır: satış
+        // bedeli sessizce düzeltilebiliyor olsaydı ortağa gösterilen ciro
+        // rakamının geçmişi doğrulanamazdı.
+        if !isNewSale {
+            var changes: [AuditEntry.Change] = []
+            if before.buyerName != apartment.buyerName {
+                changes.append(.init(field: "Alıcı",
+                                     oldValue: before.buyerName ?? "—",
+                                     newValue: trimmedBuyer))
+            }
+            if before.price != apartment.price {
+                changes.append(.init(field: "Satış bedeli",
+                                     oldValue: Fmt.money(before.price),
+                                     newValue: Fmt.money(apartment.price)))
+            }
+            if before.paymentStatus != apartment.paymentStatus {
+                changes.append(.init(field: "Ödeme durumu",
+                                     oldValue: before.paymentStatus?.rawValue ?? "—",
+                                     newValue: payment.rawValue))
+            }
+            if before.saleDate != apartment.saleDate {
+                changes.append(.init(field: "Satış tarihi",
+                                     oldValue: before.saleDate.map(Fmt.shortDate) ?? "—",
+                                     newValue: apartment.saleDate.map(Fmt.shortDate) ?? "—"))
+            }
+            if !changes.isEmpty {
+                recordAudit(recordId: apartmentId, projectId: apartment.projectId,
+                            subject: "Daire No \(apartment.apartmentNumber) satışı",
+                            action: .update, changes: changes)
+            }
+        }
 
         // İlk tahsilat da bir kayıt olarak defterde durur; `paidAmount` artık
         // doğrudan yazılmıyor, ödeme kayıtlarından hesaplanıyor.
@@ -1370,6 +1561,27 @@ extension ProjectViewModel {
         for days in [8, 9, 10, 11, 12, 13] {
             sitePhotos.append(SitePhoto(id: UUID(), projectId: DemoID.cayirova,
                                         date: Fmt.daysAgo(days), image: nil))
+        }
+
+        seedOpeningBalances()
+    }
+
+    /// Demo verisinde toplamlar elle yazılı, hareket geçmişi ise yalnızca son
+    /// birkaç fişi içeriyor (gerçek hayatta da öyle: uygulama işin ortasında
+    /// devralınır). Toplamlar artık hareketlerden türetildiği için, fişlerle
+    /// açıklanamayan farkı bir kereye mahsus DEVİR olarak yazıyoruz. Böylece
+    /// görünen rakamlar birebir aynı kalır ama bir fiş silindiğinde yalnızca
+    /// o fişin etkisi geri alınır.
+    private func seedOpeningBalances() {
+        for index in materials.indices {
+            let logs = materialLogs.filter { $0.materialId == materials[index].id }
+            let loggedIn = logs.filter { $0.type == .entry }.reduce(0) { $0 + $1.amount }
+            let loggedOut = logs.filter { $0.type == .exit }.reduce(0) { $0 + $1.amount }
+            let loggedCost = logs.filter { $0.type == .entry }.reduce(0) { $0 + $1.amount * $1.unitPrice }
+            materials[index].openingIn = max(0, materials[index].totalIn - loggedIn)
+            materials[index].openingOut = max(0, materials[index].totalOut - loggedOut)
+            materials[index].openingCost = max(0, materials[index].accruedCost - loggedCost)
+            recalculateMaterial(materials[index].id)
         }
     }
 }

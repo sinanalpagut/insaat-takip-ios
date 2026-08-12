@@ -130,6 +130,7 @@ struct ActivityRow: View {
             case .sale:          return ("turkishlirasign", Palette.accentTint, Palette.accent)
             case .partnerJoined: return ("plus", Palette.accentTint, Palette.accent)
             case .expense:       return ("hammer.fill", Palette.alertTint, Palette.alertInk)
+            case .edit:          return ("pencil", Palette.pendingTint, Palette.textSecondary)
             }
         }()
         return Image(systemName: symbol)

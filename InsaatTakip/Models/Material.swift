@@ -12,14 +12,28 @@ struct Material: Codable, Identifiable, Equatable {
     var subtitle: String      // "Nervürlü inşaat demiri"
     var unit: String          // "kg", "m³", "torba", "adet", "m²", "ton"
     var unitPrice: Double     // Güncel/son alış birim fiyatı (₺) — yalnızca gösterim ve ön dolum
-    var totalIn: Double       // Toplam giren
-    var totalOut: Double      // Toplam kullanılan
-    var step: Double          // Fiş formunda hızlı artış adımı
 
-    /// Fiilen ödenen toplam tutar; her giriş kendi tarihindeki fiyatıyla eklenir.
-    /// Hesaplanan (totalIn × güncel fiyat) yerine biriktirilen bir değerdir:
+    // MARK: Türetilen toplamlar
+    // Aşağıdaki üç alan ViewModel dışında ASLA yazılmaz; tek yazma noktası
+    // recalculateMaterial'dır. Önceden `accruedCost += ...` ile birikiyordu
+    // ve bunu geri alan hiçbir kod yolu yoktu: yanlış girilen bir fiş
+    // maliyette kalıcı olarak duruyordu.
+    var totalIn: Double       // Toplam giren = devir + giriş fişleri
+    var totalOut: Double      // Toplam kullanılan = devir + çıkış fişleri
+    var step: Double          // Fiş formunda hızlı artış adımı
+    /// Fiilen ödenen toplam tutar; her giriş kendi tarihindeki fiyatıyla sayılır.
+    /// Hesaplanan (totalIn × güncel fiyat) yerine hareket bazlı bir toplamdır:
     /// aksi halde yeni bir fiyat girmek geçmişteki tüm stoğu yeniden fiyatlandırırdı.
     var accruedCost: Double
+
+    // MARK: Devir (açılış) bakiyesi
+    // Bir proje uygulamaya girdiğinde şantiyede zaten malzeme vardır ve o
+    // günün öncesine ait fiş yoktur. Toplamlar hareketlerden türetildiği için
+    // kayıtlı hareketlerle açıklanamayan kısım burada durur; devir olmasaydı
+    // bir fiş silindiğinde hiç fişi olmayan stok da sıfıra düşerdi.
+    var openingIn: Double = 0
+    var openingOut: Double = 0
+    var openingCost: Double = 0
 
     /// Kalan stok.
     var currentStock: Double { totalIn - totalOut }

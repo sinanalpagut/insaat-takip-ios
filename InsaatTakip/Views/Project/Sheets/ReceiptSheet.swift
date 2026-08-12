@@ -10,12 +10,17 @@ struct ReceiptSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let projectId: UUID
+    /// Doluysa form düzenleme kipindedir: yeni fiş açmak yerine bu kaydı düzeltir.
+    var editingLogId: UUID? = nil
 
     @State private var direction: MaterialLog.LogType = .entry
     @State private var selectedMaterialId: UUID?
     @State private var quantityText = ""
     @State private var unitPriceText = ""
     @State private var referenceText = ""
+    /// Hareketin tarihi. Fiş her zaman "bugün"e yazılıyordu; şantiyeden akşam
+    /// dönüp haftanın fişlerini girmek imkânsızdı ve dönem raporu bozuluyordu.
+    @State private var date = Date()
     /// Kamerayla çekilen fiş görseli (küçültülmüş).
     @State private var receiptImage: UIImage?
     @State private var showCamera = false
@@ -36,6 +41,13 @@ struct ReceiptSheet: View {
         materials.first { $0.id == selectedMaterialId } ?? materials.first
     }
 
+    private var editingLog: MaterialLog? {
+        guard let editingLogId else { return nil }
+        return viewModel.materialLogs.first { $0.id == editingLogId }
+    }
+
+    private var isEditing: Bool { editingLog != nil }
+
     /// Canlı toplam: miktar × birim fiyat.
     private var totalAmount: Double {
         ProjectViewModel.parseNumber(quantityText) * ProjectViewModel.parseNumber(unitPriceText)
@@ -43,27 +55,32 @@ struct ReceiptSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SheetHeader(title: "Malzeme / Fiş Ekle",
-                        subtitle: project?.title) { dismiss() }
+            SheetHeader(title: isEditing ? "Fişi Düzenle" : "Malzeme / Fiş Ekle",
+                        subtitle: isEditing ? selectedMaterial?.name : project?.title) { dismiss() }
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
                     segmentControl
                         .padding(.top, 16)
 
-                    Text("Malzeme")
-                        .smallCapsLabel(size: 10, color: Palette.textControl, tracking: 0.9)
-                        .padding(.top, 18)
+                    // Düzenlemede malzeme değiştirilemez: hareketi başka bir
+                    // kaleme taşımak iki malzemenin de stoğunu bozar; doğru yol
+                    // yanlış fişi silip yenisini girmektir.
+                    if !isEditing {
+                        Text("Malzeme")
+                            .smallCapsLabel(size: 10, color: Palette.textControl, tracking: 0.9)
+                            .padding(.top, 18)
 
-                    // Malzeme seçim çipleri (seçili: bakır kenarlık + tint)
-                    // + sonda "Yeni Malzeme": katalog dışı kalemler için.
-                    FlowLayout(spacing: 9) {
-                        ForEach(materials) { material in
-                            materialChip(material)
+                        // Malzeme seçim çipleri (seçili: bakır kenarlık + tint)
+                        // + sonda "Yeni Malzeme": katalog dışı kalemler için.
+                        FlowLayout(spacing: 9) {
+                            ForEach(materials) { material in
+                                materialChip(material)
+                            }
+                            newMaterialChip
                         }
-                        newMaterialChip
+                        .padding(.top, 10)
                     }
-                    .padding(.top, 10)
 
                     // Miktar + birim fiyat
                     HStack(alignment: .top, spacing: 10) {
@@ -89,6 +106,26 @@ struct ReceiptSheet: View {
                     .background(Palette.accentTint)
                     .cornerRadius(12)
                     .padding(.top, 12)
+
+                    // Hareket tarihi — geçmiş güne kayıt girilebilsin.
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Tarih")
+                            .smallCapsLabel(size: 10, color: Palette.textControl, tracking: 0.9)
+                        HStack {
+                            Text("Hareket tarihi")
+                                .font(.manrope(13.5, .medium))
+                                .foregroundColor(Palette.textMuted)
+                            Spacer()
+                            DatePicker("", selection: $date, in: ...Date(), displayedComponents: .date)
+                                .labelsHidden()
+                                .tint(Palette.accent)
+                        }
+                        .padding(.horizontal, 14)
+                        .frame(height: 52)
+                        .background(Palette.surface)
+                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
+                    }
+                    .padding(.top, 16)
 
                     Text("Fiş / İrsaliye")
                         .smallCapsLabel(size: 10, color: Palette.textControl, tracking: 0.9)
@@ -164,8 +201,17 @@ struct ReceiptSheet: View {
                         .padding(.top, 10)
                     }
 
-                    PrimaryButton(title: "Kaydet") { save() }
+                    PrimaryButton(title: isEditing ? "Değişikliği Kaydet" : "Kaydet") { save() }
                         .padding(.top, 20)
+
+                    // Bu kayıt daha önce düzeltilmişse geçmişi burada durur.
+                    if let editingLogId {
+                        let history = viewModel.audit(for: editingLogId)
+                        if !history.isEmpty {
+                            auditSection(history)
+                                .padding(.top, 22)
+                        }
+                    }
 
                     Spacer().frame(height: 24)
                 }
@@ -179,6 +225,17 @@ struct ReceiptSheet: View {
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)
         .onAppear {
+            if let log = editingLog {
+                // Düzenleme kipinde form kayıtlı değerlerle açılır.
+                selectedMaterialId = log.materialId
+                direction = log.type
+                quantityText = Fmt.qty(log.amount)
+                unitPriceText = Fmt.decimalText(log.unitPrice)
+                referenceText = log.note
+                date = log.date
+                receiptImage = viewModel.receiptImages[log.id]
+                return
+            }
             // Tasarımdaki gibi: seçili malzemenin güncel birim fiyatı hazır gelir.
             if selectedMaterialId == nil { selectedMaterialId = materials.first?.id }
             syncUnitPrice()
@@ -374,27 +431,56 @@ struct ReceiptSheet: View {
     /// Seçilen malzemenin kayıtlı birim fiyatını alana yazar.
     private func syncUnitPrice() {
         guard let material = selectedMaterial else { return }
-        let price = material.unitPrice
-        unitPriceText = price == price.rounded()
-            ? Fmt.qty(price)
-            : Fmt.qty(price).replacingOccurrences(of: " ", with: "")
-        if price != price.rounded() {
-            // Ondalıklı fiyatlar "28,50" biçiminde gösterilir.
-            unitPriceText = String(format: "%.2f", price).replacingOccurrences(of: ".", with: ",")
+        unitPriceText = Fmt.decimalText(material.unitPrice)
+    }
+
+    /// Kaydın değişiklik geçmişi — kim, ne zaman, neyi neye çevirmiş.
+    private func auditSection(_ history: [AuditEntry]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Değişiklik Geçmişi")
+                .smallCapsLabel(size: 10, color: Palette.textFaded, tracking: 1.1)
+            ForEach(history) { entry in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(entry.dateText) · \(entry.user)")
+                        .font(.manrope(11, .bold))
+                        .foregroundColor(Palette.textMuted)
+                    Text(entry.summary)
+                        .font(.manrope(11.5, .medium))
+                        .foregroundColor(Palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Palette.fillSubtle)
+                .cornerRadius(11)
+            }
         }
     }
 
     private func save() {
+        let role = appState.currentUser?.role ?? .partner
+        if let editingLogId {
+            let saved = viewModel.updateReceipt(role: role, logId: editingLogId,
+                                                type: direction,
+                                                amountText: quantityText,
+                                                unitPriceText: unitPriceText,
+                                                reference: referenceText,
+                                                date: date,
+                                                receiptImage: receiptImage)
+            if saved { dismiss() }
+            return
+        }
         guard let materialId = selectedMaterial?.id else {
             viewModel.flash("Malzeme seçilmedi")
             return
         }
-        let saved = viewModel.addReceipt(role: appState.currentUser?.role ?? .partner,
+        let saved = viewModel.addReceipt(role: role,
                                          materialId: materialId,
                                          type: direction,
                                          amountText: quantityText,
                                          unitPriceText: unitPriceText,
                                          reference: referenceText,
+                                         date: date,
                                          receiptImage: receiptImage)
         if saved { dismiss() }
     }

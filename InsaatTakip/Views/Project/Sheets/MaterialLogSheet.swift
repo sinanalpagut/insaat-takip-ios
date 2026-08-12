@@ -5,6 +5,7 @@ import SwiftUI
 // GİREN / KULLANILAN / KALAN kutuları ve SON HAREKETLER listesi.
 
 struct MaterialLogSheet: View {
+    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
@@ -12,10 +13,16 @@ struct MaterialLogSheet: View {
 
     /// Dokunulan fiş fotoğrafının tam ekran önizlemesi.
     @State private var previewedReceipt: SharePayloadImage?
+    /// Düzenlenmek üzere açılan hareket.
+    @State private var editingLog: MaterialLog?
+    /// Silme onayı — tek dokunuşla veri kaybı olmasın.
+    @State private var pendingDelete: MaterialLog?
 
     private var material: Material? {
         viewModel.materials.first { $0.id == materialId }
     }
+
+    private var isAdmin: Bool { appState.currentUser?.role == .admin }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -60,10 +67,18 @@ struct MaterialLogSheet: View {
                 }
                 .padding(.top, 18)
 
-                Text("Son Hareketler")
-                    .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
-                    .padding(.top, 22)
-                    .padding(.bottom, 4)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Son Hareketler")
+                        .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                    Spacer()
+                    if isAdmin {
+                        Text("Düzeltmek için basılı tut")
+                            .font(.manrope(10.5, .medium))
+                            .foregroundColor(Palette.textTertiary)
+                    }
+                }
+                .padding(.top, 22)
+                .padding(.bottom, 4)
 
                 // Giriş / çıkış kayıtları
                 ScrollView(showsIndicators: false) {
@@ -85,6 +100,23 @@ struct MaterialLogSheet: View {
         .presentationDetents([.fraction(0.62), .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
+        .toastOverlay(viewModel.toast)
+        .sheet(item: $editingLog) { log in
+            if let projectId = material?.projectId {
+                ReceiptSheet(projectId: projectId, editingLogId: log.id)
+            }
+        }
+        .alert("Fiş silinsin mi?", isPresented: Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }
+        ), presenting: pendingDelete) { log in
+            Button("Vazgeç", role: .cancel) { }
+            Button("Sil", role: .destructive) {
+                viewModel.deleteReceipt(role: appState.currentUser?.role ?? .partner, logId: log.id)
+            }
+        } message: { log in
+            Text("\(log.signedAmount(unit: material?.unit ?? "")) · \(log.note)\nStok ve maliyet yeniden hesaplanır; işlem değişiklik kaydına geçer.")
+        }
         .fullScreenCover(item: $previewedReceipt) { payload in
             // ZStack hizası tüm çocuklara uygulandığı için görsel üste yapışıyordu;
             // görsel ortalanır, kapat butonu ayrı bir overlay olarak üste konur.
@@ -154,9 +186,21 @@ struct MaterialLogSheet: View {
                     .font(.manrope(13, .bold))
                     .foregroundColor(Palette.ink)
                     .lineLimit(1)
-                Text("\(log.dateText) · \(log.user)")
-                    .font(.manrope(11, .medium))
-                    .foregroundColor(Palette.textSecondary)
+                HStack(spacing: 6) {
+                    Text("\(log.dateText) · \(log.user)")
+                        .font(.manrope(11, .medium))
+                        .foregroundColor(Palette.textSecondary)
+                    // Sonradan düzeltilen kayıt sessizce değişmiş görünmesin.
+                    if !viewModel.audit(for: log.id).isEmpty {
+                        Text("düzenlendi")
+                            .font(.manrope(9.5, .bold))
+                            .foregroundColor(Palette.textMuted)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Palette.fillMuted)
+                            .cornerRadius(5)
+                    }
+                }
             }
 
             Spacer()
@@ -166,6 +210,22 @@ struct MaterialLogSheet: View {
                 .foregroundColor(log.type == .entry ? Palette.success : Palette.textMuted)
         }
         .padding(.vertical, 12)
+        // Boş alan da dokunulabilir olsun (aksi halde yalnızca metne basmak gerekir).
+        .contentShape(Rectangle())
+        .contextMenu {
+            if isAdmin {
+                Button {
+                    editingLog = log
+                } label: {
+                    Label("Düzenle", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    pendingDelete = log
+                } label: {
+                    Label("Sil", systemImage: "trash")
+                }
+            }
+        }
     }
 }
 

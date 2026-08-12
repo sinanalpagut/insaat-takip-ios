@@ -19,6 +19,8 @@ struct SaleFormSheet: View {
     @State private var priceText = ""
     @State private var paidText = ""
     @State private var payment: PaymentStatus = .tamamlandi
+    /// Sözleşme tarihi; düzenlemede kayıtlı tarihle açılır.
+    @State private var saleDate = Date()
     @State private var didPrefill = false
 
     /// Formda seçilebilecek daireler: boş olanlar + düzenlenen daire.
@@ -85,14 +87,47 @@ struct SaleFormSheet: View {
                     }
                     .padding(.top, 10)
 
+                    // Sözleşme tarihi — satış her zaman "bugün"e yazılıyordu,
+                    // geçmişe dönük satış aylık ciro grafiğinde yanlış aya düşerdi.
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Tarih")
+                            .smallCapsLabel(size: 10, color: Palette.textControl, tracking: 0.9)
+                        HStack {
+                            Text("Sözleşme tarihi")
+                                .font(.manrope(13.5, .medium))
+                                .foregroundColor(Palette.textMuted)
+                            Spacer()
+                            DatePicker("", selection: $saleDate, in: ...Date(), displayedComponents: .date)
+                                .labelsHidden()
+                                .tint(Palette.accent)
+                        }
+                        .padding(.horizontal, 14)
+                        .frame(height: 52)
+                        .background(Palette.surface)
+                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
+                    }
+                    .padding(.top, 16)
+
                     PrimaryButton(title: isEditing ? "Kaydı Güncelle" : "Satışı Kaydet") { save() }
                         .padding(.top, 22)
 
-                    Text("Satış, ortakların akışına ve dönem raporuna anında yansır.")
+                    Text(isEditing
+                         ? "Değişiklikler kayda geçer ve ortakların akışında görünür."
+                         : "Satış, ortakların akışına ve dönem raporuna anında yansır.")
                         .font(.manrope(11, .medium))
                         .foregroundColor(Palette.textTertiary)
                         .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
                         .padding(.top, 12)
+
+                    // Bu satış daha önce düzeltildiyse geçmişi burada durur.
+                    if let apartmentId = selectedApartmentId {
+                        let history = viewModel.audit(for: apartmentId)
+                        if !history.isEmpty {
+                            auditSection(history)
+                                .padding(.top, 20)
+                        }
+                    }
 
                     Spacer().frame(height: 24)
                 }
@@ -180,6 +215,7 @@ struct SaleFormSheet: View {
         priceText = Fmt.qty(apartment.price)
         paidText = Fmt.qty(apartment.paidAmount)
         payment = apartment.paymentStatus ?? .tamamlandi
+        saleDate = apartment.saleDate ?? Date()
     }
 
     /// Boş dairede tanımlı liste fiyatı varsa (TOKİ gerçek verisi) forma hazır getirir.
@@ -198,7 +234,31 @@ struct SaleFormSheet: View {
                                        buyerName: buyerName,
                                        priceText: priceText,
                                        paidText: paidText,
-                                       payment: payment)
+                                       payment: payment,
+                                       saleDate: saleDate)
         if saved { dismiss() }
+    }
+
+    /// Bu satışın değişiklik geçmişi — kim, ne zaman, neyi neye çevirmiş.
+    private func auditSection(_ history: [AuditEntry]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Değişiklik Geçmişi")
+                .smallCapsLabel(size: 10, color: Palette.textFaded, tracking: 1.1)
+            ForEach(history) { entry in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(entry.dateText) · \(entry.user)")
+                        .font(.manrope(11, .bold))
+                        .foregroundColor(Palette.textMuted)
+                    Text(entry.summary)
+                        .font(.manrope(11.5, .medium))
+                        .foregroundColor(Palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Palette.fillSubtle)
+                .cornerRadius(11)
+            }
+        }
     }
 }

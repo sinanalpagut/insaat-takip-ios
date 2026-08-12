@@ -65,6 +65,14 @@ enum Fmt {
         return f.string(from: NSNumber(value: value / 1_000_000)) ?? ""
     }
 
+    /// Sayıyı forma geri yazmak için: 28,5 → "28,50" · 2450 → "2.450".
+    /// Girdi alanına dolarken tr-TR ayracı korunur ki parseNumber geri okuyabilsin.
+    static func decimalText(_ value: Double) -> String {
+        guard value.isFinite else { return "" }
+        if value == value.rounded() { return qty(value) }
+        return decimal2.string(from: NSNumber(value: value)) ?? ""
+    }
+
     /// Birim fiyat, listede tam sayıya yuvarlanır: 28,5 → "29 ₺/kg".
     static func unitPriceRounded(_ price: Double, unit: String) -> String {
         "\(qty(price.rounded())) ₺/\(unit)"
