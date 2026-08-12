@@ -39,7 +39,7 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
 - [ ] 10c. Para → kuruş `Int64` — **Faz 2'ye ertelendi**: `Double` bu
       büyüklüklerde kuruşu tam temsil ediyor; değişiklik her para alanına
       dokunduğu için Firebase göçüyle birlikte yapılacak
-- [ ] 11. Gider defteri (işçilik, taşeron, arsa, harç, makine, yakıt)
+- [x] 11. Gider defteri (işçilik, taşeron, arsa, harç, makine, yakıt)
 - [ ] 12. Tahsilat ve taksit defteri (ödeme geçmişi, vade, dekont)
 - [ ] 13. Silme / düzenleme / geçmiş tarihli kayıt + denetim izi
 - [ ] 14. Daire durum modeli (kat karşılığı, rezerve, iptal) + daire bilgisi düzenleme

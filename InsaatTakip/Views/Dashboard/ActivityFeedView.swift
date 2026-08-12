@@ -129,6 +129,7 @@ struct ActivityRow: View {
             case .materialOut:   return ("arrow.up", Palette.pendingTint, Palette.textFaded)
             case .sale:          return ("turkishlirasign", Palette.accentTint, Palette.accent)
             case .partnerJoined: return ("plus", Palette.accentTint, Palette.accent)
+            case .expense:       return ("hammer.fill", Palette.alertTint, Palette.alertInk)
             }
         }()
         return Image(systemName: symbol)

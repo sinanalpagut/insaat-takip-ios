@@ -9,6 +9,7 @@ struct ActivityItem: Codable, Identifiable, Equatable {
         case materialOut    // ↑ çıkış (nötr)
         case sale           // ₺ satış (bakır)
         case partnerJoined  // ＋ ortak katıldı (bakır)
+        case expense        // 🔨 malzeme dışı gider (uyarı tonu)
     }
 
     /// Akıştaki zaman grubu — saklanmaz, timestamp'ten hesaplanır.

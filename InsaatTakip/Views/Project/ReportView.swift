@@ -121,16 +121,18 @@ struct ReportView: View {
             Divider().overlay(Palette.divider)
             summaryRow("Malzeme gideri", Fmt.compactMoney(summary.materialCost))
             Divider().overlay(Palette.divider)
-            // "Dönem net" DEĞİL: yalnızca satış − malzeme. Negatif sonuç uyarı rengiyle.
-            summaryRow("Satış − Malzeme", Fmt.compactMoney(summary.net),
+            summaryRow("Diğer giderler", Fmt.compactMoney(summary.otherExpenses))
+            Divider().overlay(Palette.divider)
+            // Gider defteri geldiği için "Dönem net" artık dürüst bir rakam.
+            summaryRow("Dönem net", Fmt.compactMoney(summary.net),
                        valueColor: summary.net >= 0 ? Palette.success : Palette.alertInk)
 
-            // Bu kart ortaklara PDF olarak dağıtılıyor; neyin dahil OLMADIĞI yazılı olmalı.
+            // Bu kart ortaklara PDF olarak dağıtılıyor; kapsamı yazılı olmalı.
             HStack(alignment: .top, spacing: 7) {
                 Image(systemName: "info.circle")
                     .font(.system(size: 11, weight: .medium))
                     .padding(.top, 1)
-                Text("Bu tutar işçilik, taşeron, arsa, ruhsat ve harç giderlerini içermez.")
+                Text("Yalnızca uygulamaya girilen gider kayıtlarını kapsar; vergi ve finansman giderleri dahil değildir.")
                     .font(.manrope(11, .medium))
                     .lineSpacing(2)
             }

@@ -24,6 +24,7 @@ final class ProjectViewModel: ObservableObject {
     @Published var documents: [ProjectDocument] = []   // Plan & proje dosyaları
     @Published var activities: [ActivityItem] = []     // Hareket / bildirim akışı
     @Published var sitePhotos: [SitePhoto] = []        // Şantiye fotoğraf yuvaları
+    @Published var expenses: [Expense] = []            // Malzeme dışı giderler
     @Published var apartmentPhotos: [ApartmentPhoto] = []   // Daire görselleri
     /// Fiş fotoğrafları — hareket kimliğine göre (kamerayla çekilen irsaliye).
     @Published var receiptImages: [UUID: UIImage] = [:]
@@ -139,9 +140,32 @@ final class ProjectViewModel: ObservableObject {
         materials(for: projectId).reduce(0) { $0 + $1.totalCost }
     }
 
-    /// Net = satış − malzeme gideri.
+    /// Projenin malzeme dışı giderleri (işçilik, taşeron, arsa, harç…).
+    func expenses(for projectId: UUID) -> [Expense] {
+        expenses.filter { $0.projectId == projectId }.sorted { $0.date > $1.date }
+    }
+
+    func totalOtherExpenses(for projectId: UUID) -> Double {
+        expenses.filter { $0.projectId == projectId }.reduce(0) { $0 + $1.amount }
+    }
+
+    /// Kategori bazlı kırılım (büyükten küçüğe) — Giderler sekmesindeki özet.
+    func expenseBreakdown(for projectId: UUID) -> [(category: Expense.Category, total: Double)] {
+        Dictionary(grouping: expenses.filter { $0.projectId == projectId }, by: \.category)
+            .map { (category: $0.key, total: $0.value.reduce(0) { $0 + $1.amount }) }
+            .sorted { $0.total > $1.total }
+    }
+
+    /// Projenin TOPLAM gideri: malzeme + diğer kalemler.
+    func totalCost(for projectId: UUID) -> Double {
+        totalMaterialCost(for: projectId) + totalOtherExpenses(for: projectId)
+    }
+
+    /// Net = satış − (malzeme + diğer giderler).
+    /// Gider defteri geldiği için artık "net" demek dürüst; yalnızca uygulamaya
+    /// GİRİLEN giderleri kapsadığı ekranlarda ayrıca belirtilir.
     func netAmount(for projectId: UUID) -> Double {
-        totalSales(for: projectId) - totalMaterialCost(for: projectId)
+        totalSales(for: projectId) - totalCost(for: projectId)
     }
 
     func soldCount(for projectId: UUID) -> Int {
@@ -271,6 +295,47 @@ final class ProjectViewModel: ObservableObject {
         hasUnreadActivity = true
         flash("Satış iptal edildi")
         return true
+    }
+
+    /// Malzeme dışı gider kaydeder (işçilik, taşeron, arsa, harç…).
+    /// Tarih serbesttir: akşam toplu giriş yapan müteahhit geçmiş güne yazabilir.
+    @discardableResult
+    func addExpense(role: UserRole, projectId: UUID, category: Expense.Category,
+                    amountText: String, payee: String, note: String,
+                    date: Date, receiptImage: UIImage? = nil) -> Bool {
+        guard role == .admin else { return false }
+
+        let amount = Self.parseNumber(amountText)
+        guard amount > 0 else {
+            flash("Tutar girilmedi")
+            return false
+        }
+
+        let expense = Expense(id: UUID(), projectId: projectId, category: category,
+                              amount: amount, date: date,
+                              payee: payee.trimmingCharacters(in: .whitespaces),
+                              note: note.trimmingCharacters(in: .whitespaces),
+                              user: User.admin.name)
+        expenses.insert(expense, at: 0)
+        if let receiptImage { receiptImages[expense.id] = receiptImage }
+
+        let projectTitle = projects.first { $0.id == projectId }?.title ?? ""
+        activities.insert(ActivityItem(id: UUID(), kind: .expense,
+                                       title: "\(category.rawValue) · \(Fmt.compactMoney(amount))",
+                                       meta: [projectTitle, expense.detailText]
+                                            .filter { !$0.isEmpty }.joined(separator: " · "),
+                                       timestamp: Date()), at: 0)
+        hasUnreadActivity = true
+        flash("Gider kaydedildi")
+        return true
+    }
+
+    /// Yanlış girilen gideri siler (yalnızca yönetici).
+    func deleteExpense(role: UserRole, id: UUID) {
+        guard role == .admin else { return }
+        expenses.removeAll { $0.id == id }
+        receiptImages[id] = nil
+        flash("Gider silindi")
     }
 
     /// Projeye yeni malzeme kalemi tanımlar (varsayılan katalog dışındakiler için).
@@ -574,7 +639,9 @@ final class ProjectViewModel: ObservableObject {
         var salesTotal: Double
         var collectedTotal: Double
         var materialCost: Double
-        var net: Double { salesTotal - materialCost }
+        var otherExpenses: Double
+        var totalCost: Double { materialCost + otherExpenses }
+        var net: Double { salesTotal - totalCost }
     }
 
     struct MonthBar: Identifiable {
@@ -635,8 +702,16 @@ final class ProjectViewModel: ObservableObject {
             cost = totalMaterialCost(for: projectId)
         }
 
+        // Malzeme dışı giderler de aynı dönem penceresine göre süzülür.
+        let projectExpenses = expenses.filter { $0.projectId == projectId }
+        let otherCost = projectExpenses.reduce(0.0) { sum, expense in
+            guard let range else { return sum + expense.amount }
+            return range.contains(expense.date) ? sum + expense.amount : sum
+        }
+
         return ReportSummary(title: title, soldCount: sold.count,
-                             salesTotal: sales, collectedTotal: collected, materialCost: cost)
+                             salesTotal: sales, collectedTotal: collected,
+                             materialCost: cost, otherExpenses: otherCost)
     }
 
     /// Son 6 tamamlanmış ayın satış çubukları — yıl sınırını takvim aşar.
@@ -665,6 +740,7 @@ final class ProjectViewModel: ObservableObject {
         case tumu = "Tümü"
         case malzeme = "Malzeme"
         case satis = "Satış"
+        case gider = "Gider"
     }
 
     func activities(filter: ActivityFilter) -> [ActivityItem] {
@@ -672,6 +748,7 @@ final class ProjectViewModel: ObservableObject {
         case .tumu:    return activities
         case .malzeme: return activities.filter(\.isMaterial)
         case .satis:   return activities.filter(\.isSale)
+        case .gider:   return activities.filter { $0.kind == .expense }
         }
     }
 
@@ -1104,6 +1181,29 @@ extension ProjectViewModel {
                                 name: "Sözleşme Dönemi Bilgilendirmesi", versionText: "resmî", sizeMB: 0.1,
                                 date: Fmt.makeDate(2, 1, 2025), partnerVisible: true),
             ])
+        }
+
+        // ---- Giderler (malzeme dışı) ----------------------------------------
+        // Gerçekçi bir betonarme konut projesinde malzeme toplam maliyetin
+        // ancak %35-45'idir; kalanı işçilik, taşeron, arsa ve resmî giderlerdir.
+        let expenseSeed: [(UUID, Expense.Category, Double, Int, String, String)] = [
+            (DemoID.cayirova, .arsa,       8_500_000, 640, "Arsa sahibi", "Kat karşılığı peşinat"),
+            (DemoID.cayirova, .taseron,    2_450_000,  95, "Öz Kalıp İnşaat", "Kaba yapı 3. hakediş"),
+            (DemoID.cayirova, .iscilik,    1_180_000,  40, "Şantiye ekibi", "Temmuz puantajı"),
+            (DemoID.cayirova, .iscilik,    1_240_000,  10, "Şantiye ekibi", "Ağustos puantajı"),
+            (DemoID.cayirova, .ruhsatHarc,   680_000, 520, "Çayırova Belediyesi", "Yapı ruhsat harcı"),
+            (DemoID.cayirova, .makine,       420_000,  62, "Kaya Vinç", "Kule vinç kirası"),
+            (DemoID.cayirova, .yakit,        135_000,  18, "Petrol Ofisi", "Jeneratör ve nakliye"),
+            (DemoID.kars309,  .taseron,    1_620_000, 520, "Serhat Yapı", "İnce işler hakedişi"),
+            (DemoID.kars309,  .iscilik,      890_000, 480, "Şantiye ekibi", "Kış dönemi puantajı"),
+            (DemoID.kars309,  .ruhsatHarc,   310_000, 700, "Kars Belediyesi", "Ruhsat ve iskân harcı"),
+            (DemoID.kars327,  .taseron,    2_980_000, 500, "Serhat Yapı", "GB blok ince işler"),
+            (DemoID.kars327,  .iscilik,    1_460_000, 460, "Şantiye ekibi", "Kış dönemi puantajı"),
+        ]
+        for (projectId, category, amount, daysAgo, payee, note) in expenseSeed {
+            expenses.append(Expense(id: UUID(), projectId: projectId, category: category,
+                                    amount: amount, date: Fmt.daysAgo(daysAgo),
+                                    payee: payee, note: note, user: admin))
         }
 
         // ---- Hareket akışı (ekran 07) ---------------------------------------

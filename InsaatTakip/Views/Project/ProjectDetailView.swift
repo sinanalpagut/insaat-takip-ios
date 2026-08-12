@@ -17,6 +17,7 @@ struct ProjectDetailView: View {
 
     enum Tab: String, CaseIterable {
         case malzemeler = "Malzemeler"
+        case giderler = "Giderler"
         case daireler = "Daireler"
         case ortaklar = "Ortaklar"
         case belgeler = "Belgeler"
@@ -31,6 +32,7 @@ struct ProjectDetailView: View {
         case saleForm(apartmentId: UUID?)
         case upload
         case progress
+        case expense
 
         var id: String {
             switch self {
@@ -41,6 +43,7 @@ struct ProjectDetailView: View {
             case .saleForm(let id):        return "sale-\(id?.uuidString ?? "yeni")"
             case .upload:                  return "upload"
             case .progress:                return "progress"
+            case .expense:                 return "expense"
             }
         }
     }
@@ -81,6 +84,8 @@ struct ProjectDetailView: View {
                             ? .apartmentDetail(apartmentId: apartment.id)
                             : .saleForm(apartmentId: apartment.id)
                     }
+                case .giderler:
+                    ExpensesTabView(projectId: projectId)
                 case .ortaklar:
                     PartnersTabView(projectId: projectId)
                 case .belgeler:
@@ -93,6 +98,7 @@ struct ProjectDetailView: View {
         .floatingActionButton(fabTitle ?? "", visible: isAdmin && fabTitle != nil) {
             switch tab {
             case .malzemeler: activeSheet = .receipt
+            case .giderler:   activeSheet = .expense
             case .daireler:   activeSheet = .saleForm(apartmentId: nil)
             case .ortaklar:   activeSheet = .invite
             case .belgeler:   activeSheet = .upload
@@ -149,6 +155,7 @@ struct ProjectDetailView: View {
     private var fabTitle: String? {
         switch tab {
         case .malzemeler: return "Fiş Ekle"
+        case .giderler:   return "Gider Ekle"
         case .daireler:
             let hasAvailable = viewModel.apartments(for: projectId).contains { !$0.isSold }
             return hasAvailable ? "Satış Ekle" : nil
@@ -176,6 +183,8 @@ struct ProjectDetailView: View {
             UploadSheet(projectId: projectId)
         case .progress:
             ProgressSheet(projectId: projectId)
+        case .expense:
+            ExpenseSheet(projectId: projectId)
         }
     }
 
@@ -240,12 +249,12 @@ struct ProjectDetailView: View {
             HStack(spacing: 9) {
                 financeTile("Satış", Fmt.compactMoney(viewModel.totalSales(for: projectId)),
                             background: Color.white.opacity(0.07), valueColor: .white)
-                financeTile("Malzeme", Fmt.compactMoney(viewModel.totalMaterialCost(for: projectId)),
+                financeTile("Gider", Fmt.compactMoney(viewModel.totalCost(for: projectId)),
                             background: Color.white.opacity(0.07), valueColor: .white)
-                // "Net" DEĞİL: bu rakam yalnızca satış − malzeme. İşçilik, taşeron,
-                // arsa ve harç henüz modellenmediği için "net kâr" demek ortağı
-                // yanıltırdı. Gider defteri (Faz 1) gelene kadar ne olduğu yazılı durur.
-                financeTile("Satış − Malzeme", Fmt.compactMoney(viewModel.netAmount(for: projectId)),
+                // Gider defteri geldiği için "Net" artık dürüst: satış − (malzeme +
+                // işçilik, taşeron, arsa, harç…). Yalnızca GİRİLEN giderleri
+                // kapsadığı raporda ayrıca belirtilir.
+                financeTile("Net", Fmt.compactMoney(viewModel.netAmount(for: projectId)),
                             background: Palette.accent.opacity(0.22), valueColor: Palette.accentLight)
             }
             .padding(.top, 16)
@@ -261,6 +270,10 @@ struct ProjectDetailView: View {
         switch tab {
         case .malzemeler:
             return project.meta
+        case .giderler:
+            let other = viewModel.totalOtherExpenses(for: projectId)
+            let material = viewModel.totalMaterialCost(for: projectId)
+            return "Malzeme \(Fmt.compactMoney(material)) · Diğer \(Fmt.compactMoney(other))"
         case .daireler:
             let collected = Fmt.compactMoney(viewModel.collectedAmount(for: projectId))
             let outstanding = Fmt.compactMoney(viewModel.outstandingAmount(for: projectId))
@@ -311,28 +324,30 @@ struct ProjectDetailView: View {
     // MARK: Sekme çubuğu
 
     private var tabBar: some View {
-        HStack(spacing: 0) {
-            ForEach(Tab.allCases, id: \.self) { option in
-                Button {
-                    tab = option   // Tasarım gereği geçiş anlık, cross-fade yok
-                } label: {
-                    VStack(spacing: 0) {
-                        Text(option.rawValue)
-                            .font(.manrope(13.5, .bold))
-                            .foregroundColor(tab == option ? Palette.ink : Palette.tabInactive)
-                            .padding(.top, 14)
-                            .padding(.bottom, 12)
-                            .padding(.horizontal, 13)
-                        Rectangle()
-                            .fill(tab == option ? Palette.accent : Color.clear)
-                            .frame(height: 2.5)
+        // 5 sekme sabit genişliğe sığmıyor; yatay kaydırma eklendi.
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 0) {
+                ForEach(Tab.allCases, id: \.self) { option in
+                    Button {
+                        tab = option   // Tasarım gereği geçiş anlık, cross-fade yok
+                    } label: {
+                        VStack(spacing: 0) {
+                            Text(option.rawValue)
+                                .font(.manrope(13.5, .bold))
+                                .foregroundColor(tab == option ? Palette.ink : Palette.tabInactive)
+                                .padding(.top, 14)
+                                .padding(.bottom, 12)
+                                .padding(.horizontal, 13)
+                            Rectangle()
+                                .fill(tab == option ? Palette.accent : Color.clear)
+                                .frame(height: 2.5)
+                        }
+                        .fixedSize()
                     }
-                    .fixedSize()
                 }
             }
-            Spacer()
+            .padding(.horizontal, 8)
         }
-        .padding(.horizontal, 8)
         .background(Palette.surface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Palette.border).frame(height: 1)
