@@ -134,8 +134,9 @@ final class ProjectViewModel: ObservableObject {
 
     /// Toplam satış cirosu (yalnızca satılan dairelerin bedelleri).
     /// Not: Boş daireler liste fiyatı taşıyabilir (TOKİ gerçek verisi) — ciroya girmez.
+    /// Rezerve daire de girmez: sözleşme henüz kesinleşmedi. Kat karşılığı zaten bedelsiz.
     func totalSales(for projectId: UUID) -> Double {
-        apartments(for: projectId).filter(\.isSold).reduce(0) { $0 + $1.price }
+        apartments(for: projectId).filter(\.countsAsRevenue).reduce(0) { $0 + $1.price }
     }
 
     /// Toplam malzeme gideri (giren × birim fiyat).
@@ -172,12 +173,52 @@ final class ProjectViewModel: ObservableObject {
     }
 
     func soldCount(for projectId: UUID) -> Int {
-        apartments(for: projectId).filter(\.isSold).count
+        apartments(for: projectId).filter(\.countsAsRevenue).count
     }
 
-    /// Tahsil edilen toplam.
+    /// Rezerve (kapora aşamasındaki) daire sayısı.
+    func reservedCount(for projectId: UUID) -> Int {
+        apartments(for: projectId).filter { $0.status == .reserved }.count
+    }
+
+    /// Arsa sahibine giden kat karşılığı daire sayısı.
+    func landOwnerCount(for projectId: UUID) -> Int {
+        apartments(for: projectId).filter { $0.status == .landOwner }.count
+    }
+
+    /// Gerçekten satışa hazır, boş daire sayısı ("Kalan" karosu).
+    /// Önceden "toplam − satılan" deniyordu; bu, kat karşılığı ve rezerve
+    /// daireleri satılabilir stok gibi gösteriyordu — maddenin asıl semptomu.
+    func availableCount(for projectId: UUID) -> Int {
+        apartments(for: projectId).filter(\.isSellable).count
+    }
+
+    /// Satış oranının PAYDASI: kat karşılığı hariç toplam daire.
+    /// Kat karşılığı paydada kalsaydı, müteahhidin payının tamamı satılsa bile
+    /// oran hiçbir zaman %100 olmazdı.
+    func sellableCount(for projectId: UUID) -> Int {
+        apartments(for: projectId).filter(\.isInSalesScope).count
+    }
+
+    /// Satış oranı (0…1). Tek payda: hem dashboard hem Daireler sekmesi bunu kullanır —
+    /// önceden biri `apartments.count`, diğeri `project.totalApartments` kullanıyordu.
+    func salesRate(for projectId: UUID) -> Double {
+        let sellable = sellableCount(for: projectId)
+        return sellable > 0 ? Double(soldCount(for: projectId)) / Double(sellable) : 0
+    }
+
+    /// Tahsil edilen toplam — yalnızca SATILAN dairelerden.
+    /// Payı (totalSales) ve çıkanı aynı daire kümesinden almak zorunlu: aksi
+    /// halde ilk rezerve kaporası girdiğinde "kalan alacak" sessizce düşer,
+    /// az satışlı projede eksiye iner.
     func collectedAmount(for projectId: UUID) -> Double {
-        apartments(for: projectId).reduce(0) { $0 + $1.paidAmount }
+        apartments(for: projectId).filter(\.countsAsRevenue).reduce(0) { $0 + $1.paidAmount }
+    }
+
+    /// Rezerve dairelerde bekleyen kapora havuzu. Gerçek nakit olduğu için
+    /// görünmeli, ama ciroya ve satış tahsilatına karışmamalı.
+    func depositAmount(for projectId: UUID) -> Double {
+        apartments(for: projectId).filter { $0.status == .reserved }.reduce(0) { $0 + $1.paidAmount }
     }
 
     /// Kalan alacak toplamı.
@@ -423,11 +464,13 @@ final class ProjectViewModel: ObservableObject {
     func cancelSale(role: UserRole, apartmentId: UUID) -> Bool {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }),
-              apartments[index].isSold else { return false }
+              apartments[index].isCommitted else { return false }
 
         var apartment = apartments[index]
         let buyer = apartment.buyerName ?? ""
         let price = apartment.price
+        let collected = apartment.paidAmount
+        let wasReserved = apartment.status == .reserved
 
         apartment.status = .available
         apartment.buyerName = nil
@@ -441,14 +484,109 @@ final class ProjectViewModel: ObservableObject {
         removed.forEach { receiptImages[$0.id] = nil }
         payments.removeAll { $0.apartmentId == apartmentId }
 
+        // İptal, silinen tahsilatın ANLIK GÖRÜNTÜSÜYLE deftere yazılır.
+        // Daire .available'a döndüğü ve ödeme kayıtları silindiği için, bu kayıt
+        // olmadan gerçekten tahsil edilmiş paranın izi hiçbir yerde kalmazdı;
+        // ortağa dağıtılan geçmiş rapordaki ciro farkı da açıklanamazdı.
+        var changes: [AuditEntry.Change] = [
+            .init(field: "Durum",
+                  oldValue: wasReserved ? "Rezerve" : "Satıldı",
+                  newValue: "Boş"),
+            .init(field: "Alıcı", oldValue: buyer.isEmpty ? "—" : buyer, newValue: "kaydı kaldırıldı"),
+            .init(field: "Bedel", oldValue: Fmt.money(price), newValue: "—"),
+        ]
+        if collected > 0 {
+            changes.append(.init(field: "Silinen tahsilat",
+                                 oldValue: "\(removed.count) kayıt · \(Fmt.money(collected))",
+                                 newValue: "—"))
+        }
+        recordAudit(recordId: apartmentId, projectId: apartment.projectId,
+                    subject: "Daire No \(apartment.apartmentNumber) satışı",
+                    action: .delete, changes: changes)
+
         // İptal de bir harekettir; ortakların akışında görünmeli (şeffaflık).
         let projectTitle = projects.first { $0.id == apartment.projectId }?.title ?? ""
         activities.insert(ActivityItem(id: UUID(), kind: .sale,
-                                       title: "Daire No \(apartment.apartmentNumber) satışı iptal edildi",
+                                       title: "Daire No \(apartment.apartmentNumber) \(wasReserved ? "rezervi kaldırıldı" : "satışı iptal edildi")",
                                        meta: "\(projectTitle) · \(buyer) · \(Fmt.compactMoney(price))",
                                        timestamp: Date()), at: 0)
         hasUnreadActivity = true
-        flash("Satış iptal edildi")
+        flash(wasReserved ? "Rezerv kaldırıldı" : "Satış iptal edildi")
+        return true
+    }
+
+    /// Daire bilgisini günceller: tip, alan, kat, durum, liste fiyatı, teslim notu.
+    /// Bu form olmadan yeni projede uydurulan "2+1 / 95 m²" hiçbir yerden
+    /// düzeltilemiyordu — raporun "1. gün bırakma anı" dediği yer burasıydı.
+    /// Satış bu fonksiyondan YAPILAMAZ; .sold'a yalnızca saveSale geçirir.
+    @discardableResult
+    func updateApartment(role: UserRole, apartmentId: UUID, type: String, area: String,
+                         floor: Int, status: Apartment.Status,
+                         listPriceText: String, deliveryNote: String) -> Bool {
+        guard role == .admin else { return false }
+        guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return false }
+
+        let before = apartments[index]
+        // Satış kaydı olan daire bu formdan boşaltılamaz: tahsilatı hiçbir
+        // kovaya girmeyen bir daire, parayı toplamlardan sessizce düşürürdü.
+        if before.isCommitted, status != before.status, status != .sold {
+            flash("Önce satışı iptal et")
+            return false
+        }
+        guard status != .sold || before.status == .sold else {
+            flash("Satış, satış formundan kaydedilir")
+            return false
+        }
+
+        var apartment = before
+        apartment.type = type.trimmingCharacters(in: .whitespaces)
+        apartment.area = area.trimmingCharacters(in: .whitespaces)
+        apartment.floor = floor
+        apartment.deliveryNote = deliveryNote.trimmingCharacters(in: .whitespaces)
+        apartment.status = status
+
+        if status == .landOwner {
+            // Kat karşılığı daire bedelsizdir: arsa bedeli gider defterinde
+            // ".arsa" kategorisinde duruyor. Daireye ayrıca bedel yazılırsa
+            // aynı ekonomik olay iki kez maliyete girer.
+            apartment.price = 0
+            apartment.buyerName = nil
+            apartment.paymentStatus = nil
+        } else if status != .sold {
+            // Boş/rezerve dairede girilen rakam LİSTE fiyatıdır — satış formunda önerilir.
+            apartment.price = Self.parseNumber(listPriceText)
+        }
+        apartments[index] = apartment
+
+        var changes: [AuditEntry.Change] = []
+        if before.status != apartment.status {
+            changes.append(.init(field: "Durum", oldValue: before.status.label, newValue: apartment.status.label))
+        }
+        if before.type != apartment.type {
+            changes.append(.init(field: "Tip", oldValue: before.type, newValue: apartment.type))
+        }
+        if before.area != apartment.area {
+            changes.append(.init(field: "Alan", oldValue: before.area, newValue: apartment.area))
+        }
+        if before.floor != apartment.floor {
+            changes.append(.init(field: "Kat", oldValue: before.floorLabel, newValue: apartment.floorLabel))
+        }
+        if before.price != apartment.price {
+            changes.append(.init(field: "Liste fiyatı",
+                                 oldValue: Fmt.money(before.price), newValue: Fmt.money(apartment.price)))
+        }
+        if before.deliveryNote != apartment.deliveryNote {
+            changes.append(.init(field: "Teslim notu",
+                                 oldValue: before.deliveryNote, newValue: apartment.deliveryNote))
+        }
+        guard !changes.isEmpty else {
+            flash("Değişiklik yok")
+            return true
+        }
+        recordAudit(recordId: apartmentId, projectId: apartment.projectId,
+                    subject: "Daire No \(apartment.apartmentNumber)",
+                    action: .update, changes: changes)
+        flash("Daire bilgisi güncellendi")
         return true
     }
 
@@ -514,7 +652,10 @@ final class ProjectViewModel: ObservableObject {
         apartments[index].paidAmount = total
 
         // Bedelin tamamı tahsil edildiyse durum otomatik "Tamamlandı"ya geçer.
-        if apartments[index].isSold, apartments[index].price > 0 {
+        // Kapı `isCommitted`: rezerve daireye kapora işlenince de ödeme durumu
+        // oluşsun (isSold olsaydı çip boş kalırdı). Kat karşılığında price 0
+        // olduğu için blok zaten hiç çalışmaz — doğru davranış.
+        if apartments[index].isCommitted, apartments[index].price > 0 {
             if total >= apartments[index].price {
                 apartments[index].paymentStatus = .tamamlandi
             } else if apartments[index].paymentStatus == .tamamlandi {
@@ -621,6 +762,13 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return false }
 
+        // Kat karşılığı daire arsa sahibinindir; satış formunda seçilebilir
+        // olmaması yetmez, model düzeyinde de reddedilmeli.
+        guard apartments[index].status != .landOwner else {
+            flash("Kat karşılığı daire satılamaz")
+            return false
+        }
+
         let price = Self.parseNumber(priceText)
         let trimmedBuyer = buyerName.trimmingCharacters(in: .whitespaces)
         guard price > 0, !trimmedBuyer.isEmpty else {
@@ -630,7 +778,10 @@ final class ProjectViewModel: ObservableObject {
 
         var apartment = apartments[index]
         let before = apartment
-        let isNewSale = !apartment.isSold
+        // "Yeni satış" = daha önce hiçbir taahhüt yok. Rezerve daire satışa
+        // çevrilirken kapora ZATEN Payment olarak kayıtlı; burada isSold'a
+        // bakılsaydı ikinci bir peşinat kaydı açılır ve tahsilat çift sayılırdı.
+        let isNewSale = !apartment.isCommitted
         apartment.status = .sold
         apartment.buyerName = trimmedBuyer
         apartment.price = price
@@ -643,6 +794,11 @@ final class ProjectViewModel: ObservableObject {
         // rakamının geçmişi doğrulanamazdı.
         if !isNewSale {
             var changes: [AuditEntry.Change] = []
+            if before.status != apartment.status {
+                changes.append(.init(field: "Durum",
+                                     oldValue: before.status.label,
+                                     newValue: apartment.status.label))
+            }
             if before.buyerName != apartment.buyerName {
                 changes.append(.init(field: "Alıcı",
                                      oldValue: before.buyerName ?? "—",
@@ -672,14 +828,26 @@ final class ProjectViewModel: ObservableObject {
 
         // İlk tahsilat da bir kayıt olarak defterde durur; `paidAmount` artık
         // doğrudan yazılmıyor, ödeme kayıtlarından hesaplanıyor.
+        let target = payment == .tamamlandi ? price : min(price, Self.parseNumber(paidText))
         if isNewSale {
-            let initial = payment == .tamamlandi ? price : min(price, Self.parseNumber(paidText))
-            if initial > 0 {
+            if target > 0 {
                 payments.append(Payment(id: UUID(), apartmentId: apartmentId,
-                                        amount: initial,
+                                        amount: target,
                                         date: apartment.saleDate ?? Date(),
                                         method: payment == .tamamlandi ? .havale : .pesinat,
                                         note: payment == .tamamlandi ? "Satış bedeli" : "Sözleşme peşinatı",
+                                        user: User.admin.name))
+            }
+        } else if before.status == .reserved {
+            // Rezerve satışa çevriliyor: kapora zaten kayıtlı, yalnızca FARK
+            // kadar yeni kayıt açılır — yoksa aynı para iki kez sayılırdı.
+            let delta = target - before.paidAmount
+            if delta > 0 {
+                payments.append(Payment(id: UUID(), apartmentId: apartmentId,
+                                        amount: delta,
+                                        date: apartment.saleDate ?? Date(),
+                                        method: payment == .tamamlandi ? .havale : .pesinat,
+                                        note: "Sözleşme bakiyesi (kapora sonrası)",
                                         user: User.admin.name))
             }
         }
@@ -725,13 +893,15 @@ final class ProjectViewModel: ObservableObject {
         projects.append(project)
 
         // Daireler boş (satılmamış) olarak oluşturulur; kat = 4 daire varsayımıyla.
+        // Tip ve alan UYDURULMAZ: önceden sabit bir listeden ("2+1 / 95 m²")
+        // dolduruluyordu ve hiçbir ekrandan düzeltilemiyordu — müteahhit kendi
+        // projesini kurduğu ilk dakikada 20 yanlış daire görüyordu. Artık boş
+        // gelir ve daire kartından tek tek düzenlenir.
         let perFloor = max(1, Int((Double(project.totalApartments) / Double(project.floors)).rounded(.up)))
-        let types = [("2+1", "95 m²"), ("3+1", "128 m²"), ("3+1", "132 m²"), ("2+1", "98 m²")]
         for n in 1...project.totalApartments {
-            let t = types[(n - 1) % types.count]
             apartments.append(Apartment(id: UUID(), projectId: project.id,
                                         apartmentNumber: n, floor: (n - 1) / perFloor + 1,
-                                        type: t.0, area: t.1, status: .available,
+                                        type: "—", area: "—", status: .available,
                                         buyerName: nil, price: 0, paidAmount: 0,
                                         paymentStatus: nil, saleDate: nil,
                                         deliveryNote: "Yapım sürüyor"))
@@ -918,6 +1088,12 @@ final class ProjectViewModel: ObservableObject {
         var collectedTotal: Double
         var materialCost: Double
         var otherExpenses: Double
+        /// Ciroya girmeyen ama raporda görünmesi gereken kalemler.
+        /// Dönemden bağımsızdır: "şu an kaç daire rezerve / kat karşılığı" sorusunun
+        /// cevabı geçmiş bir aya göre süzülemez.
+        var reservedCount: Int = 0
+        var depositTotal: Double = 0     // Rezerve dairelerde bekleyen kapora
+        var landOwnerCount: Int = 0
         var totalCost: Double { materialCost + otherExpenses }
         var net: Double { salesTotal - totalCost }
     }
@@ -957,12 +1133,19 @@ final class ProjectViewModel: ObservableObject {
         let (range, title) = dateRange(for: period)
 
         let sold = apartments(for: projectId).filter { apartment in
-            guard apartment.isSold, let saleDate = apartment.saleDate else { return false }
+            guard apartment.countsAsRevenue, let saleDate = apartment.saleDate else { return false }
             guard let range else { return true }   // "Tümü"
             return range.contains(saleDate)
         }
         let sales = sold.reduce(0) { $0 + $1.price }
         let collected = sold.reduce(0) { $0 + $1.paidAmount }
+
+        // Rezerve ve kat karşılığı daireler ciroya girmez ama raporda GÖRÜNMELİ:
+        // aksi halde ortağa giden PDF'te "Satılan daire N adet" ya kat karşılığını
+        // içerip yanlış olur ya da bekleyen kaporayı tamamen gizler.
+        let projectApartments = apartments(for: projectId)
+        let reserved = projectApartments.filter { $0.status == .reserved }
+        let landOwner = projectApartments.filter { $0.status == .landOwner }.count
 
         // Malzeme gideri:
         //  · "Tümü" → projenin birikmiş toplam maliyeti (kayıt öncesi alımlar dahil)
@@ -989,14 +1172,17 @@ final class ProjectViewModel: ObservableObject {
 
         return ReportSummary(title: title, soldCount: sold.count,
                              salesTotal: sales, collectedTotal: collected,
-                             materialCost: cost, otherExpenses: otherCost)
+                             materialCost: cost, otherExpenses: otherCost,
+                             reservedCount: reserved.count,
+                             depositTotal: reserved.reduce(0) { $0 + $1.paidAmount },
+                             landOwnerCount: landOwner)
     }
 
     /// Son 6 tamamlanmış ayın satış çubukları — yıl sınırını takvim aşar.
     /// (Ocak'ta önceki yılın Tem–Ara'sını gösterir; grafik hiçbir ayda boş kalmaz.)
     func monthlySales(for projectId: UUID) -> [MonthBar] {
         let calendar = Fmt.calendar
-        let sold = apartments(for: projectId).compactMap { $0.isSold ? $0 : nil }
+        let sold = apartments(for: projectId).filter(\.countsAsRevenue)
 
         return (1...6).compactMap { offset in
             // 6 ay geriden bir önceki aya kadar
@@ -1270,6 +1456,14 @@ extension ProjectViewModel {
         ]
         let salesByProject = [DemoID.cayirova: p1Sales, DemoID.nilufer: p2Sales, DemoID.kepez: p3Sales]
 
+        // 145 Ada KAT KARŞILIĞI yapılıyor: 4 daire arsa sahibinin payı, 1 daire de
+        // kapora aşamasında rezerve. Bu beşi önceden "Boş" görünüyor, satış oranı
+        // 12/20 (%60) çıkıyor ve "Kalan 8" satılamayacak daireleri stok sayıyordu.
+        // Gerçekte satılabilir stok 16 daire (→ %75) ve gerçekten boş yalnızca 3 daire.
+        let p1LandOwner: Set<Int> = [15, 16, 19, 20]
+        let p1Reserved = (number: 14, buyer: "Serkan Bulut", listPrice: 3_400_000.0,
+                          deposit: 150_000.0, date: Fmt.makeDate(28, 7, 2026))
+
         // Yalnızca kurgu projeler (p1-p3) otomatik üretilir; Kars projeleri aşağıda gerçek veriyle.
         for project in projects where salesByProject[project.id] != nil {
             let sales = salesByProject[project.id] ?? []
@@ -1277,16 +1471,29 @@ extension ProjectViewModel {
             for n in 1...project.totalApartments {
                 let t = types[(n - 1) % types.count]
                 let sale = sales.first { $0.0 == n }
+                let isCayirova = project.id == DemoID.cayirova
+                let isLandOwner = isCayirova && p1LandOwner.contains(n)
+                let isReserved = isCayirova && p1Reserved.number == n
+
+                let status: Apartment.Status
+                if sale != nil { status = .sold }
+                else if isLandOwner { status = .landOwner }
+                else if isReserved { status = .reserved }
+                else { status = .available }
+
                 apartments.append(Apartment(id: UUID(), projectId: project.id,
                                             apartmentNumber: n,
                                             floor: (n - 1) / perFloor + 1,
                                             type: t.0, area: t.1,
-                                            status: sale == nil ? .available : .sold,
-                                            buyerName: sale?.1,
-                                            price: sale?.2 ?? 0,
-                                            paidAmount: sale?.4 ?? 0,
-                                            paymentStatus: sale?.3,
-                                            saleDate: sale?.5,
+                                            status: status,
+                                            buyerName: sale?.1 ?? (isReserved ? p1Reserved.buyer : nil),
+                                            // Kat karşılığı daire bedelsizdir: arsa bedeli gider
+                                            // defterinde ".arsa" kaleminde duruyor, daireye de
+                                            // bedel yazılsaydı aynı maliyet iki kez düşülürdü.
+                                            price: sale?.2 ?? (isReserved ? p1Reserved.listPrice : 0),
+                                            paidAmount: sale?.4 ?? (isReserved ? p1Reserved.deposit : 0),
+                                            paymentStatus: sale?.3 ?? (isReserved ? .kapora : nil),
+                                            saleDate: sale?.5 ?? (isReserved ? p1Reserved.date : nil),
                                             deliveryNote: project.phase == .teslim ? "Teslim edildi" : "Anahtar teslim bekliyor"))
             }
         }
@@ -1465,7 +1672,8 @@ extension ProjectViewModel {
         // Mock verideki tek `paidAmount` toplamı gerçek ödeme kayıtlarına açılır:
         // peşin satışta tek kayıt, taksitlide sözleşme peşinatı + aylık taksitler.
         // Toplam yine aynı tutar; fark, artık her ödemenin tarihi ve yöntemi var.
-        for apartment in apartments where apartment.isSold && apartment.paidAmount > 0 {
+        // `isCommitted`: rezerve dairenin kaporası da gerçek nakit, defterde durmalı.
+        for apartment in apartments where apartment.isCommitted && apartment.paidAmount > 0 {
             let saleDate = apartment.saleDate ?? Date()
             let paid = apartment.paidAmount
 
@@ -1508,7 +1716,7 @@ extension ProjectViewModel {
             }
         }
         // Toplamları kayıtlardan yeniden türet (tek doğruluk kaynağı).
-        for apartment in apartments where apartment.isSold {
+        for apartment in apartments where apartment.isCommitted {
             recalculateCollected(for: apartment.id)
         }
 

@@ -14,6 +14,8 @@ struct ApartmentDetailSheet: View {
     let apartmentId: UUID
     /// "Satış Kaydını Düzenle" — üst görünüm satış formunu açar.
     var onEdit: (UUID) -> Void
+    /// "Daire Bilgisini Düzenle" — üst görünüm daire formunu açar.
+    var onEditInfo: (UUID) -> Void
 
     @State private var pickedItems: [PhotosPickerItem] = []
     @State private var showCamera = false
@@ -54,38 +56,26 @@ struct ApartmentDetailSheet: View {
                         imageStrip(apartment)
                             .padding(.top, 10)
 
-                        // Tahsilat defteri
-                        paymentSection(apartment)
-                            .padding(.top, 20)
+                        // Tahsilat defteri — yalnızca para hareketi olabilen dairelerde.
+                        if apartment.isCommitted {
+                            paymentSection(apartment)
+                                .padding(.top, 20)
+                        }
 
                         // Detay satırları
-                        detailRow("Ödeme durumu", apartment.paymentStatus?.rawValue ?? "—")
+                        detailRow("Daire durumu", apartment.status.label)
                             .padding(.top, 14)
                         Divider().overlay(Palette.divider)
+                        detailRow("Tip / Alan", "\(apartment.type) · \(apartment.area)")
+                        Divider().overlay(Palette.divider)
+                        if apartment.isCommitted {
+                            detailRow("Ödeme durumu", apartment.paymentStatus?.rawValue ?? "—")
+                            Divider().overlay(Palette.divider)
+                        }
                         detailRow("Teslim durumu", apartment.deliveryNote)
 
                         if isAdmin {
-                            PrimaryButton(title: "Satış Kaydını Düzenle") {
-                                // Üst görünüm sheet kapanınca satış formunu açar;
-                                // sabit gecikmeye dayanan zincirleme kaldırıldı.
-                                onEdit(apartment.id)
-                                dismiss()
-                            }
-                            .padding(.top, 16)
-
-                            // Yanlış daireye satış işlemek tek dokunuş; geri dönüş olmalı.
-                            Button {
-                                showCancelConfirm = true
-                            } label: {
-                                Text("Satışı İptal Et")
-                                    .font(.manrope(13.5, .bold))
-                                    .foregroundColor(Palette.alertInk)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 48)
-                                    .background(Palette.alertTint.opacity(0.6))
-                                    .cornerRadius(13)
-                            }
-                            .padding(.top, 9)
+                            adminActions(apartment)
                         }
 
                         Spacer().frame(height: 24)
@@ -102,8 +92,10 @@ struct ApartmentDetailSheet: View {
         .onChange(of: pickedItems) { _ in
             if let apartment { importPickedPhotos(for: apartment.id) }
         }
-        .confirmationDialog("Satışı iptal et", isPresented: $showCancelConfirm, titleVisibility: .visible) {
-            Button("Satışı iptal et", role: .destructive) {
+        .confirmationDialog(apartment?.status == .reserved ? "Rezervi kaldır" : "Satışı iptal et",
+                            isPresented: $showCancelConfirm, titleVisibility: .visible) {
+            Button(apartment?.status == .reserved ? "Rezervi kaldır" : "Satışı iptal et",
+                   role: .destructive) {
                 guard let apartment else { return }
                 viewModel.cancelSale(role: appState.currentUser?.role ?? .partner,
                                      apartmentId: apartment.id)
@@ -111,7 +103,7 @@ struct ApartmentDetailSheet: View {
             }
             Button("Vazgeç", role: .cancel) {}
         } message: {
-            Text("Daire No \(apartment?.apartmentNumber ?? 0) tekrar boş duruma dönecek; alıcı ve tahsilat bilgisi silinecek. Bu işlem ortakların akışında görünür.")
+            Text("Daire No \(apartment?.apartmentNumber ?? 0) tekrar boş duruma dönecek; alıcı ve tahsilat kayıtları silinecek. İşlem, silinen tutarın anlık görüntüsüyle değişiklik defterine yazılır ve ortakların akışında görünür.")
         }
         .sheet(isPresented: $showPayment) {
             PaymentSheet(apartmentId: apartmentId)
@@ -138,25 +130,127 @@ struct ApartmentDetailSheet: View {
         return parts.joined(separator: " · ")
     }
 
-    /// Yeşil satış bedeli bloğu + ödeme çipi.
+    /// Bedel bloğu — duruma göre. Sheet artık satılmamış daireler için de
+    /// açıldığından koşulsuz yeşil "Satış Bedeli" bloğu, kat karşılığı bir
+    /// daireyi onaylanmış satış gibi gösterirdi.
+    @ViewBuilder
     private func priceBlock(_ apartment: Apartment) -> some View {
+        switch apartment.status {
+        case .sold:
+            priceCard(label: "Satış Bedeli", value: Fmt.compactMoney(apartment.price),
+                      valueColor: Palette.success,
+                      labelColor: Palette.successInk.opacity(0.6),
+                      background: Palette.successTint, border: Palette.successBorder) {
+                StatusChip(text: apartment.paymentStatus == .tamamlandi ? "Tahsil Edildi" : (apartment.paymentStatus?.rawValue ?? ""),
+                           background: apartment.paymentStatus == .tamamlandi ? Palette.successChip : Palette.pendingTint,
+                           foreground: apartment.paymentStatus == .tamamlandi ? Palette.successInk : Palette.pendingInk)
+            }
+        case .reserved:
+            priceCard(label: "Liste Fiyatı", value: Fmt.compactMoney(apartment.price),
+                      valueColor: Palette.accent,
+                      labelColor: Palette.accent.opacity(0.65),
+                      background: Palette.accentTint, border: Palette.accent.opacity(0.4)) {
+                StatusChip(text: apartment.status.badge,
+                           background: Palette.accent, foreground: .white)
+            }
+        case .landOwner:
+            priceCard(label: "Arsa Sahibi Payı", value: "Bedelsiz",
+                      valueColor: Palette.ink,
+                      labelColor: Palette.textTertiary,
+                      background: Palette.fillSubtle, border: Palette.border) {
+                StatusChip(text: apartment.status.badge,
+                           background: Palette.accent, foreground: .white)
+            }
+        case .available:
+            priceCard(label: apartment.price > 0 ? "Liste Fiyatı" : "Durum",
+                      value: apartment.price > 0 ? Fmt.compactMoney(apartment.price) : "Satışa hazır",
+                      valueColor: Palette.ink,
+                      labelColor: Palette.textTertiary,
+                      background: Palette.fillSubtle, border: Palette.border) {
+                StatusChip(text: apartment.status.badge,
+                           background: Palette.fillMuted, foreground: Palette.textFaded)
+            }
+        }
+    }
+
+    private func priceCard<Chip: View>(label: String, value: String,
+                                       valueColor: Color, labelColor: Color,
+                                       background: Color, border: Color,
+                                       @ViewBuilder chip: () -> Chip) -> some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Satış Bedeli")
-                    .smallCapsLabel(size: 10, color: Palette.successInk.opacity(0.6), tracking: 1.1)
-                Text(Fmt.compactMoney(apartment.price))
+                Text(label)
+                    .smallCapsLabel(size: 10, color: labelColor, tracking: 1.1)
+                Text(value)
                     .font(.sora(26, .bold))
-                    .foregroundColor(Palette.success)
+                    .foregroundColor(valueColor)
             }
             Spacer()
-            StatusChip(text: apartment.paymentStatus == .tamamlandi ? "Tahsil Edildi" : (apartment.paymentStatus?.rawValue ?? ""),
-                       background: apartment.paymentStatus == .tamamlandi ? Palette.successChip : Palette.pendingTint,
-                       foreground: apartment.paymentStatus == .tamamlandi ? Palette.successInk : Palette.pendingInk)
+            chip()
         }
         .padding(16)
-        .background(Palette.successTint)
+        .background(background)
         .cornerRadius(15)
-        .overlay(RoundedRectangle(cornerRadius: 15).stroke(Palette.successBorder, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(border, lineWidth: 1))
+    }
+
+    /// Yönetici eylemleri duruma göre değişir: satılmış dairede satış kaydı,
+    /// rezervede "Satışa Çevir", boş/kat karşılığında yalnızca bilgi düzenleme.
+    @ViewBuilder
+    private func adminActions(_ apartment: Apartment) -> some View {
+        VStack(spacing: 9) {
+            switch apartment.status {
+            case .sold:
+                PrimaryButton(title: "Satış Kaydını Düzenle") {
+                    // Üst görünüm sheet kapanınca satış formunu açar;
+                    // sabit gecikmeye dayanan zincirleme kaldırıldı.
+                    onEdit(apartment.id)
+                    dismiss()
+                }
+                secondaryButton("Daire Bilgisini Düzenle") {
+                    onEditInfo(apartment.id); dismiss()
+                }
+                destructiveButton("Satışı İptal Et") { showCancelConfirm = true }
+            case .reserved:
+                PrimaryButton(title: "Satışa Çevir") {
+                    onEdit(apartment.id)
+                    dismiss()
+                }
+                secondaryButton("Daire Bilgisini Düzenle") {
+                    onEditInfo(apartment.id); dismiss()
+                }
+                destructiveButton("Rezervi Kaldır") { showCancelConfirm = true }
+            case .landOwner, .available:
+                PrimaryButton(title: "Daire Bilgisini Düzenle") {
+                    onEditInfo(apartment.id); dismiss()
+                }
+            }
+        }
+        .padding(.top, 16)
+    }
+
+    private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.manrope(13.5, .bold))
+                .foregroundColor(Palette.accent)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(Palette.accentTint)
+                .cornerRadius(13)
+        }
+    }
+
+    private func destructiveButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.manrope(13.5, .bold))
+                .foregroundColor(Palette.alertInk)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(Palette.alertTint.opacity(0.6))
+                .cornerRadius(13)
+        }
     }
 
     /// 3 kolonlu görsel şeridi: dolu kareler (yatay kaydırmalı) + yöneticiye ekleme yuvası.

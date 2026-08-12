@@ -115,6 +115,18 @@ struct ReportView: View {
 
             summaryRow("Satılan daire", "\(summary.soldCount) adet")
             Divider().overlay(Palette.divider)
+            // Ciroya girmeyen ama ortağın bilmesi gereken kalemler. Kırılım
+            // olmadan "Satılan daire N adet" ya kat karşılığını içerip yanlış
+            // olur ya da bekleyen kaporayı tamamen gizler.
+            if summary.reservedCount > 0 {
+                summaryRow("Rezerve",
+                           "\(summary.reservedCount) adet · kapora \(Fmt.compactMoney(summary.depositTotal))")
+                Divider().overlay(Palette.divider)
+            }
+            if summary.landOwnerCount > 0 {
+                summaryRow("Kat karşılığı (bedelsiz)", "\(summary.landOwnerCount) adet")
+                Divider().overlay(Palette.divider)
+            }
             summaryRow("Satış geliri", Fmt.compactMoney(summary.salesTotal))
             Divider().overlay(Palette.divider)
             summaryRow("Tahsil edilen", Fmt.compactMoney(summary.collectedTotal))

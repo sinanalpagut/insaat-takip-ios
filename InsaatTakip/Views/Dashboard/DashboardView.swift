@@ -231,8 +231,12 @@ struct ProjectCardView: View {
 
             // 3 kolonlu özet: SATILAN · MALZEME · CİRO
             HStack(spacing: 0) {
+                // Payda `sellableCount`: kat karşılığı daireler satılamaz.
+                // Önceden burada saklı `project.totalApartments`, Daireler
+                // sekmesinde ise `apartments.count` vardı — aynı proje iki
+                // ekranda iki farklı oran gösteriyordu.
                 statColumn("Satılan",
-                           "\(viewModel.soldCount(for: project.id))/\(project.totalApartments)",
+                           "\(viewModel.soldCount(for: project.id))/\(viewModel.sellableCount(for: project.id))",
                            Palette.ink)
                 statColumn("Malzeme",
                            "\(viewModel.materials(for: project.id).count) kalem",

@@ -29,6 +29,7 @@ struct ProjectDetailView: View {
         case receipt
         case invite
         case apartmentDetail(apartmentId: UUID)
+        case apartmentEdit(apartmentId: UUID)
         case saleForm(apartmentId: UUID?)
         case upload
         case progress
@@ -40,6 +41,7 @@ struct ProjectDetailView: View {
             case .receipt:                 return "receipt"
             case .invite:                  return "invite"
             case .apartmentDetail(let id): return "apt-\(id)"
+            case .apartmentEdit(let id):   return "aptedit-\(id)"
             case .saleForm(let id):        return "sale-\(id?.uuidString ?? "yeni")"
             case .upload:                  return "upload"
             case .progress:                return "progress"
@@ -54,6 +56,8 @@ struct ProjectDetailView: View {
     @State private var didApplyLaunchConfig = false
     /// Daire detayı kapandıktan sonra açılacak satış düzenleme sheet'i.
     @State private var pendingSaleEdit: UUID?
+    /// Daire detayından "Daire Bilgisini Düzenle" seçilince kapanışta açılacak kayıt.
+    @State private var pendingApartmentEdit: UUID?
 
     private var isAdmin: Bool { appState.isAdmin }
 
@@ -76,13 +80,17 @@ struct ProjectDetailView: View {
                 case .daireler:
                     ApartmentsTabView(projectId: projectId) { apartment in
                         guard isAdmin else {
-                            // Ortak salt okunur: yalnızca satılmış daire detayına bakabilir.
-                            if apartment.isSold { activeSheet = .apartmentDetail(apartmentId: apartment.id) }
+                            // Ortak salt okunur ama artık HER dairenin detayını
+                            // görebilir: arsa sahibinin dairesini gizlemek
+                            // şeffaflık iddiasıyla çelişirdi.
+                            activeSheet = .apartmentDetail(apartmentId: apartment.id)
                             return
                         }
-                        activeSheet = apartment.isSold
-                            ? .apartmentDetail(apartmentId: apartment.id)
-                            : .saleForm(apartmentId: apartment.id)
+                        // Boş daireye dokunmak doğrudan satış formunu açar (hızlı yol);
+                        // taahhütlü ve kat karşılığı daireler detayına gider.
+                        activeSheet = apartment.isSellable
+                            ? .saleForm(apartmentId: apartment.id)
+                            : .apartmentDetail(apartmentId: apartment.id)
                     }
                 case .giderler:
                     ExpensesTabView(projectId: projectId)
@@ -110,6 +118,9 @@ struct ProjectDetailView: View {
             if let id = pendingSaleEdit {
                 pendingSaleEdit = nil
                 activeSheet = .saleForm(apartmentId: id)
+            } else if let id = pendingApartmentEdit {
+                pendingApartmentEdit = nil
+                activeSheet = .apartmentEdit(apartmentId: id)
             }
         }) { sheet in
             sheetContent(sheet)
@@ -140,7 +151,7 @@ struct ProjectDetailView: View {
             case "receipt": activeSheet = .receipt
             case "invite":  activeSheet = .invite
             case "apt":
-                if let id = viewModel.apartments(for: projectId).first(where: \.isSold)?.id {
+                if let id = viewModel.apartments(for: projectId).first(where: \.countsAsRevenue)?.id {
                     activeSheet = .apartmentDetail(apartmentId: id)
                 }
             case "sale":    activeSheet = .saleForm(apartmentId: nil)
@@ -157,7 +168,9 @@ struct ProjectDetailView: View {
         case .malzemeler: return "Fiş Ekle"
         case .giderler:   return "Gider Ekle"
         case .daireler:
-            let hasAvailable = viewModel.apartments(for: projectId).contains { !$0.isSold }
+            // Kat karşılığı ve rezerve daireler satış formunda seçilemez;
+            // `!isSold` denseydi tamamı elden çıkmış projede bile FAB görünürdü.
+            let hasAvailable = viewModel.apartments(for: projectId).contains(where: \.isSellable)
             return hasAvailable ? "Satış Ekle" : nil
         case .ortaklar:   return "Ortak Davet Et"
         case .belgeler:   return "Dosya Ekle"
@@ -176,7 +189,11 @@ struct ProjectDetailView: View {
         case .apartmentDetail(let apartmentId):
             ApartmentDetailSheet(apartmentId: apartmentId) { id in
                 pendingSaleEdit = id   // kapanışta açılır (onDismiss)
+            } onEditInfo: { id in
+                pendingApartmentEdit = id
             }
+        case .apartmentEdit(let apartmentId):
+            ApartmentEditSheet(apartmentId: apartmentId)
         case .saleForm(let apartmentId):
             SaleFormSheet(projectId: projectId, apartmentId: apartmentId)
         case .upload:

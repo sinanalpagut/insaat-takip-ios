@@ -23,22 +23,31 @@ struct SaleFormSheet: View {
     @State private var saleDate = Date()
     @State private var didPrefill = false
 
-    /// Formda seçilebilecek daireler: boş olanlar + düzenlenen daire.
+    /// Formda seçilebilecek daireler: gerçekten boş olanlar + düzenlenen daire.
+    /// `!isSold` denseydi kat karşılığı daire de listelenir ve yönetici arsa
+    /// sahibinin dairesini yanlışlıkla satabilirdi.
     private var selectableApartments: [Apartment] {
-        viewModel.apartments(for: projectId).filter { !$0.isSold || $0.id == apartmentId }
+        viewModel.apartments(for: projectId).filter { $0.isSellable || $0.id == apartmentId }
     }
 
     private var selectedApartment: Apartment? {
         viewModel.apartments.first { $0.id == (selectedApartmentId ?? apartmentId) }
     }
 
+    /// Rezerve daire de "düzenleme" sayılır: kaporası ve alıcı adayı forma taşınır,
+    /// başlık "Satışa Çevir" olur.
     private var isEditing: Bool {
-        selectedApartment?.isSold == true
+        selectedApartment?.isCommitted == true
+    }
+
+    private var isConverting: Bool {
+        selectedApartment?.status == .reserved
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SheetHeader(title: isEditing ? "Satış Kaydını Düzenle" : "Satış Ekle",
+            SheetHeader(title: isConverting ? "Satışa Çevir"
+                                : (isEditing ? "Satış Kaydını Düzenle" : "Satış Ekle"),
                         subtitle: viewModel.projects.first { $0.id == projectId }?.title) { dismiss() }
 
             ScrollView(showsIndicators: false) {
@@ -108,7 +117,8 @@ struct SaleFormSheet: View {
                     }
                     .padding(.top, 16)
 
-                    PrimaryButton(title: isEditing ? "Kaydı Güncelle" : "Satışı Kaydet") { save() }
+                    PrimaryButton(title: isConverting ? "Satışa Çevir"
+                                     : (isEditing ? "Kaydı Güncelle" : "Satışı Kaydet")) { save() }
                         .padding(.top, 22)
 
                     Text(isEditing
@@ -207,7 +217,7 @@ struct SaleFormSheet: View {
         didPrefill = true
         selectedApartmentId = apartmentId ?? selectableApartments.first?.id
         guard let apartment = selectedApartment else { return }
-        guard apartment.isSold else {
+        guard apartment.isCommitted else {
             prefillListPrice(apartment)
             return
         }
@@ -220,7 +230,7 @@ struct SaleFormSheet: View {
 
     /// Boş dairede tanımlı liste fiyatı varsa (TOKİ gerçek verisi) forma hazır getirir.
     private func prefillListPrice(_ apartment: Apartment) {
-        guard !apartment.isSold, apartment.price > 0 else { return }
+        guard !apartment.isCommitted, apartment.price > 0 else { return }
         priceText = Fmt.qty(apartment.price)
     }
 

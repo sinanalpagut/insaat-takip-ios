@@ -10,9 +10,44 @@ enum PaymentStatus: String, Codable, CaseIterable {
 }
 
 struct Apartment: Codable, Identifiable, Equatable {
-    enum Status: String, Codable {
-        case sold        // Satıldı (yeşil kart)
-        case available   // Boş (kesikli kenarlıklı kart)
+
+    /// Dairenin ticari durumu.
+    /// Türkiye'de projelerin çoğu KAT KARŞILIĞI yapılıyor: dairelerin bir kısmı
+    /// arsa sahibinin, bir kısmı müteahhidin. Yalnızca .sold/.available olduğu
+    /// sürece arsa sahibinin daireleri "Boş" görünüyor, satış oranı ve ciro
+    /// sistematik olarak yanlış çıkıyordu.
+    ///
+    /// İptal edilen satış ayrı bir durum DEĞİL: daire gerçekten yeniden
+    /// satılabilir hale geldiği için .available'a döner, iptalin izi denetim
+    /// defterinde alıcı/bedel/tahsilat anlık görüntüsüyle kalır (bkz. cancelSale).
+    enum Status: String, Codable, CaseIterable, Identifiable {
+        case sold        // Satıldı — ciroya girer
+        case reserved    // Rezerve / opsiyonlu — kapora aşaması, ciroya HENÜZ girmez
+        case landOwner   // Kat karşılığı payı — arsa sahibine gider, bedelsiz
+        case available   // Boş — satışa hazır
+
+        var id: String { rawValue }
+
+        /// Kart rozeti. ELLE büyük harfli: Türkçe'de "İptal".uppercased()
+        /// varsayılan locale'de "IPTAL" üretir, o yüzden çipe uppercased: false verilir.
+        var badge: String {
+            switch self {
+            case .sold:      return "SATILDI"
+            case .reserved:  return "REZERVE"
+            case .landOwner: return "KAT KARŞILIĞI"
+            case .available: return "BOŞ"
+            }
+        }
+
+        /// Detay satırındaki cümle içi metin.
+        var label: String {
+            switch self {
+            case .sold:      return "Satıldı"
+            case .reserved:  return "Rezerve — kapora aşamasında"
+            case .landOwner: return "Kat karşılığı payı (arsa sahibi)"
+            case .available: return "Boş — satışa hazır"
+            }
+        }
     }
 
     let id: UUID
@@ -29,12 +64,35 @@ struct Apartment: Codable, Identifiable, Equatable {
     var saleDate: Date?         // Sözleşme / satış tarihi
     var deliveryNote: String    // "Anahtar teslim bekliyor" vb.
 
-    var isSold: Bool { status == .sold }
+    // MARK: Durumdan türeyen kovalar
+    // Tek bir `isSold` yerine dört ayrı soru: her hesap hangi daireleri
+    // saydığını açıkça söylesin. Önceden ciro, satış oranı, "kalan stok" ve
+    // tahsilat aynı bayrağa bakıyordu; kat karşılığı daire eklenince dördü
+    // birden yanlış olurdu.
+
+    /// Ciroya sayılır mı? Yalnızca satılan. Rezerve sözleşmesi kesinleşmedi,
+    /// kat karşılığı bedelsiz.
+    var countsAsRevenue: Bool { status == .sold }
+
+    /// Satış formunda seçilebilir mi? Kat karşılığı daire asla satılamaz;
+    /// rezerve daire kendi kartındaki "Satışa Çevir" ile forma girer.
+    var isSellable: Bool { status == .available }
+
+    /// Tahsilat kabul eder mi? Rezerve dairenin kaporası da gerçek nakittir.
+    var isCommitted: Bool { status == .sold || status == .reserved }
+
+    /// Satış oranının paydasına girer mi? Kat karşılığı hariç her şey —
+    /// paydada kalsaydı tamamı elden çıkmış blok bile hiçbir zaman %100 olmazdı.
+    var isInSalesScope: Bool { status != .landOwner }
 
     var saleDateText: String? { saleDate.map(Fmt.shortDate) }
 
     /// Kat etiketi: negatif = bodrum, 0 = "Zemin", pozitif = "N. Kat" (TOKİ kat düzeni).
-    var floorLabel: String {
+    var floorLabel: String { Apartment.floorLabel(for: floor) }
+
+    /// Düzenleme formundaki kat seçicisi henüz kaydedilmemiş bir değeri
+    /// gösterdiği için etiket üretimi statik olarak da erişilebilir.
+    static func floorLabel(for floor: Int) -> String {
         if floor < 0 { return "\(-floor). Bodrum" }
         return floor == 0 ? "Zemin" : "\(floor). Kat"
     }
@@ -45,8 +103,20 @@ struct Apartment: Codable, Identifiable, Equatable {
     /// Tahsilat oranı (kart içindeki 4px bar).
     var collectionFraction: Double { price > 0 ? paidAmount / price : 0 }
 
-    /// Kart sağ altındaki metin: "Tahsil edildi" / "Kalan 3,20 M ₺"
+    /// Kart sağ altındaki metin. Duruma göre değişir: kat karşılığı dairenin
+    /// bedeli yok, rezervenin ise henüz "kalan alacağı" yok — yalnızca kaporası var.
     var collectionText: String {
-        paymentStatus == .tamamlandi ? "Tahsil edildi" : "Kalan \(Fmt.compactMoney(remainingAmount))"
+        switch status {
+        case .landOwner:
+            return "Bedelsiz devir"
+        case .reserved:
+            return paidAmount > 0 ? "Kapora \(Fmt.compactMoney(paidAmount))" : "Kapora bekleniyor"
+        case .available:
+            return ""
+        case .sold:
+            return paymentStatus == .tamamlandi
+                ? "Tahsil edildi"
+                : "Kalan \(Fmt.compactMoney(remainingAmount))"
+        }
     }
 }

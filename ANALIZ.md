@@ -42,7 +42,9 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
 - [x] 11. Gider defteri (işçilik, taşeron, arsa, harç, makine, yakıt)
 - [x] 12. Tahsilat ve taksit defteri (ödeme geçmişi, vade, dekont)
 - [x] 13. Silme / düzenleme / geçmiş tarihli kayıt + denetim izi
-- [ ] 14. Daire durum modeli (kat karşılığı, rezerve, iptal) + daire bilgisi düzenleme
+- [x] 14. Daire durum modeli (kat karşılığı, rezerve, iptal) + daire bilgisi düzenleme
+      · İptal ayrı bir durum DEĞİL: daire `.available`'a döner (yeniden satılabilir),
+        izi denetim defterinde alıcı/bedel/silinen tahsilat anlık görüntüsüyle kalır
 - [ ] 15. Repository katmanı (ProjectViewModel'i protokol arkasına al)
 
 ### Faz 2 — Kilometre taşı: kalıcılık
