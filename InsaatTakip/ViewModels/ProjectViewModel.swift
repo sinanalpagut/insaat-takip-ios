@@ -40,6 +40,29 @@ final class ProjectViewModel: ObservableObject {
         loadMockData()
     }
 
+    // MARK: - Üyelik (kim hangi projeyi görür)
+
+    /// Kullanıcının erişebildiği projeler.
+    /// · Yönetici → kurduğu projeler (ownerId)
+    /// · Ortak    → yalnızca davetle katıldığı projeler (Partner.userId)
+    /// Önceden dashboard TÜM projeleri listeliyordu; bir projeye davet edilen
+    /// ortak, diğer projelerin alıcı adlarını ve cirosunu da görüyordu.
+    func visibleProjects(for user: User?) -> [Project] {
+        guard let user else { return [] }
+        switch user.role {
+        case .admin:
+            return projects.filter { $0.ownerId == user.id }
+        case .partner:
+            let memberOf = Set(partners.filter { $0.userId == user.id }.map(\.projectId))
+            return projects.filter { memberOf.contains($0.id) }
+        }
+    }
+
+    /// Kullanıcı bu projeyi görebiliyor mu? (Derin bağlantı / eski rota koruması)
+    func canAccess(projectId: String, user: User?) -> Bool {
+        visibleProjects(for: user).contains { $0.id == projectId }
+    }
+
     // MARK: - Proje bazlı erişim (filtreleme ViewModel'de, View'da değil)
 
     func materials(for projectId: String) -> [Material] {
@@ -125,10 +148,11 @@ final class ProjectViewModel: ObservableObject {
         totalSales(for: projectId) - collectedAmount(for: projectId)
     }
 
-    /// Dashboard alt başlığı: "3 proje · 40 daire · Bugün 09:24 güncellendi"
-    var dashboardSubtitle: String {
-        let apartmentTotal = projects.reduce(0) { $0 + $1.totalApartments }
-        return "\(projects.count) proje · \(apartmentTotal) daire · Bugün \(Fmt.clock()) güncellendi"
+    /// Dashboard alt başlığı — yalnızca kullanıcının eriştiği projeleri sayar.
+    func dashboardSubtitle(for user: User?) -> String {
+        let visible = visibleProjects(for: user)
+        let apartmentTotal = visible.reduce(0) { $0 + $1.totalApartments }
+        return "\(visible.count) proje · \(apartmentTotal) daire · Bugün \(Fmt.clock()) güncellendi"
     }
 
     // MARK: - Yönetici işlemleri (yetki kontrolü çağıran ekranda + burada)
@@ -347,7 +371,7 @@ final class ProjectViewModel: ObservableObject {
                               district: district.isEmpty ? "—" : district,
                               city: city.isEmpty ? "—" : city,
                               floors: max(1, floors), totalApartments: max(1, apartmentCount),
-                              phase: .temel, progress: 0, inviteCode: nil, photoCount: 0)
+                              phase: .temel, progress: 0, ownerId: User.admin.id, invite: nil, photoCount: 0)
         projects.append(project)
 
         // Daireler boş (satılmamış) olarak oluşturulur; kat = 4 daire varsayımıyla.
@@ -376,7 +400,7 @@ final class ProjectViewModel: ObservableObject {
         partners.append(Partner(id: UUID(), projectId: project.id, name: User.admin.name,
                                 isFounder: true,
                                 joinedText: "Proje kurucusu · \(Fmt.shortDate())",
-                                sharePercent: 100))
+                                sharePercent: 100, userId: User.admin.id))
 
         flash("Proje oluşturuldu")
         return project
@@ -398,15 +422,64 @@ final class ProjectViewModel: ObservableObject {
     // MARK: Davet kodu
 
     /// Projeye 48 saat geçerli, tek kullanımlık davet kodu üretir.
+    /// Aynı kod başka bir projede kullanımdaysa yeniden üretilir.
     func generateInviteCode(role: UserRole, projectId: String) {
         guard role == .admin,
               let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
-        projects[index].inviteCode = InviteCode.generate()
+
+        var code = InviteCode.generate()
+        let activeCodes = Set(projects.compactMap { $0.invite?.isUsable == true ? $0.invite?.code : nil })
+        var attempts = 0
+        while activeCodes.contains(code), attempts < 20 {
+            code = InviteCode.generate()
+            attempts += 1
+        }
+        projects[index].invite = Invite(code: code, createdAt: Date())
     }
 
-    /// Ortağın girdiği kodu doğrular (mock: 6 haneli her kod kabul edilir).
-    func validateJoinCode(_ code: String) -> Bool {
-        InviteCode.sanitize(code).count == 6
+    /// Davet kodunu kullanır: kodu GERÇEK bir projeyle eşler, süresini ve tek
+    /// kullanım kuralını denetler, kullanıcıyı o projenin ortağı yapar.
+    /// Önceden 6 haneli her kod kabul ediliyor ve kod hiçbir projeye bağlanmıyordu.
+    enum JoinResult: Equatable {
+        case success(projectTitle: String)
+        case notFound        // böyle bir davet yok
+        case expired         // 48 saat dolmuş
+        case alreadyUsed     // kod harcanmış
+        case alreadyMember   // kullanıcı zaten bu projenin ortağı
+    }
+
+    func redeemInvite(code rawCode: String, user: User) -> JoinResult {
+        let code = InviteCode.sanitize(rawCode)
+        guard let index = projects.firstIndex(where: { $0.invite?.code == code }) else {
+            return .notFound
+        }
+        guard let invite = projects[index].invite else { return .notFound }
+        if invite.isUsed { return .alreadyUsed }
+        if invite.isExpired { return .expired }
+
+        let project = projects[index]
+        if partners.contains(where: { $0.projectId == project.id && $0.userId == user.id }) {
+            return .alreadyMember
+        }
+
+        // Kod harcanır — tek kullanımlık.
+        projects[index].invite?.usedAt = Date()
+        projects[index].invite?.usedByName = user.name
+
+        // Hisse yüzdesi yönetici tarafından sonradan tanımlanır (Faz 3: ortak cari hesabı).
+        partners.append(Partner(id: UUID(), projectId: project.id, name: user.name,
+                                isFounder: false,
+                                joinedText: "Katıldı · \(Fmt.shortDate())",
+                                sharePercent: 0,
+                                userId: user.id))
+
+        activities.insert(ActivityItem(id: UUID(), kind: .partnerJoined,
+                                       title: "\(user.name) projeye katıldı",
+                                       meta: "\(project.title) · davet kodu ile · salt okunur",
+                                       timeText: Fmt.clock(),
+                                       section: .bugun), at: 0)
+        hasUnreadActivity = true
+        return .success(projectTitle: project.title)
     }
 
     func copyInviteCode(_ raw: String) {
@@ -656,17 +729,17 @@ extension ProjectViewModel {
         // (toki.gov.tr haberi) — iki blok da Teslim fazında, ilerleme %100.
         projects = [
             Project(id: "p1", blockNumber: "145", parcelNumber: "2", district: "Çayırova", city: "Kocaeli",
-                    floors: 5, totalApartments: 20, phase: .kabaInsaat, progress: 68, inviteCode: nil, photoCount: 48),
+                    floors: 5, totalApartments: 20, phase: .kabaInsaat, progress: 68, ownerId: User.admin.id, invite: nil, photoCount: 48),
             Project(id: "p2", blockNumber: "1287", parcelNumber: "14", district: "Nilüfer", city: "Bursa",
-                    floors: 4, totalApartments: 12, phase: .temel, progress: 34, inviteCode: nil, photoCount: 12),
+                    floors: 4, totalApartments: 12, phase: .temel, progress: 34, ownerId: User.admin.id, invite: nil, photoCount: 12),
             Project(id: "p3", blockNumber: "908", parcelNumber: "7", district: "Kepez", city: "Antalya",
-                    floors: 3, totalApartments: 8, phase: .teslim, progress: 96, inviteCode: nil, photoCount: 64),
+                    floors: 3, totalApartments: 8, phase: .teslim, progress: 96, ownerId: User.admin.id, invite: nil, photoCount: 64),
             Project(id: "kars309", blockNumber: "1224", parcelNumber: "1", district: "Karacaören", city: "Kars",
-                    floors: 3, totalApartments: 12, phase: .teslim, progress: 100, inviteCode: nil, photoCount: 0),
+                    floors: 3, totalApartments: 12, phase: .teslim, progress: 100, ownerId: User.admin.id, invite: nil, photoCount: 0),
             // "kars327": GERÇEK proje — TOKİ Kars Karacaören 327 Konut, Ada 1139 / Parsel 3,
             // GB Blok 1 (1 bodrum + zemin + 4 normal kat, 22 daire, 3+1 · 103,8 m² brüt / 83,9 m² net).
             Project(id: "kars327", blockNumber: "1139", parcelNumber: "3", district: "Karacaören", city: "Kars",
-                    floors: 6, totalApartments: 22, phase: .teslim, progress: 100, inviteCode: nil, photoCount: 0),
+                    floors: 6, totalApartments: 22, phase: .teslim, progress: 100, ownerId: User.admin.id, invite: nil, photoCount: 0),
         ]
 
         // ---- Malzemeler (9 kalem × 3 proje) ---------------------------------
@@ -948,16 +1021,38 @@ extension ProjectViewModel {
         }
 
         // ---- Ortaklar (ekran 05) --------------------------------------------
-        let partnerSet: [(String, Bool, String, Int)] = [
-            ("Mehmet Kılıç", true, "Proje kurucusu · 04 Oca 2026", 40),
-            ("Serkan Aydın", false, "Katıldı · 12 Mar 2026", 25),
-            ("Ayşe Tuna", false, "Katıldı · 03 Nis 2026", 20),
-            ("Burak Erdoğan", false, "Katıldı · 21 Nis 2026", 15),
+        // Kurucu her projede aynı yöneticidir; diğer ortaklar projeye göre değişir.
+        // Uygulamayı kullanan ortak hesabı (User.partner = Serkan Aydın) yalnızca
+        // p1 ve kars309'a davetlidir — üyelik filtresinin çalıştığı buradan görülür.
+        let partnerSets: [String: [(String, Bool, String, Int, UUID?)]] = [
+            "p1": [
+                ("Mehmet Kılıç", true, "Proje kurucusu · 04 Oca 2026", 40, User.admin.id),
+                ("Serkan Aydın", false, "Katıldı · 12 Mar 2026", 25, User.partner.id),
+                ("Ayşe Tuna", false, "Katıldı · 03 Nis 2026", 20, nil),
+                ("Burak Erdoğan", false, "Katıldı · 21 Nis 2026", 15, nil),
+            ],
+            "p2": [
+                ("Mehmet Kılıç", true, "Proje kurucusu · 18 Şub 2026", 60, User.admin.id),
+                ("Hakan Yücel", false, "Katıldı · 02 Mar 2026", 40, nil),
+            ],
+            "p3": [
+                ("Mehmet Kılıç", true, "Proje kurucusu · 11 Kas 2025", 50, User.admin.id),
+                ("Ayşe Tuna", false, "Katıldı · 20 Kas 2025", 50, nil),
+            ],
+            "kars309": [
+                ("Mehmet Kılıç", true, "Proje kurucusu · 12 Ağu 2024", 55, User.admin.id),
+                ("Serkan Aydın", false, "Katıldı · 06 Oca 2025", 45, User.partner.id),
+            ],
+            "kars327": [
+                ("Mehmet Kılıç", true, "Proje kurucusu · 12 Ağu 2024", 70, User.admin.id),
+                ("Burak Erdoğan", false, "Katıldı · 09 Oca 2025", 30, nil),
+            ],
         ]
         for project in projects {
-            for (name, founder, joined, share) in partnerSet {
+            for (name, founder, joined, share, userId) in partnerSets[project.id] ?? [] {
                 partners.append(Partner(id: UUID(), projectId: project.id, name: name,
-                                        isFounder: founder, joinedText: joined, sharePercent: share))
+                                        isFounder: founder, joinedText: joined,
+                                        sharePercent: share, userId: userId))
             }
         }
 

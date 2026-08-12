@@ -20,7 +20,10 @@ struct Project: Codable, Identifiable, Equatable {
     var totalApartments: Int       // Toplam daire
     var phase: ProjectPhase        // Yapım aşaması
     var progress: Int              // İnşaat ilerlemesi (%)
-    var inviteCode: String?        // Üretilmiş aktif davet kodu
+    /// Projeyi kuran yönetici. Kimin hangi projeyi göreceği buradan belirlenir;
+    /// veritabanına geçince güvenlik kuralının dayanacağı alan da budur.
+    var ownerId: UUID
+    var invite: Invite?            // Üretilmiş aktif davet (kod + geçerlilik)
     var photoCount: Int            // Şantiye fotoğraf sayısı (arşiv dahil)
 
     /// Kart başlığı: "145 Ada / 2 Parsel"

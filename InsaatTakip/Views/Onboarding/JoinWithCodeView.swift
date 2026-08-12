@@ -148,14 +148,32 @@ struct JoinWithCodeView: View {
     // MARK: Aksiyonlar
 
     private func submit() {
-        guard viewModel.validateJoinCode(code) else {
+        guard InviteCode.sanitize(code).count == 6 else {
             showInvalid = true
             viewModel.flash("Kod 6 haneli olmalı")
             return
         }
-        dismiss()
-        appState.joinAsPartner()
-        viewModel.flash("Projeye katıldın · salt okunur erişim")
+
+        // Kod artık gerçek bir projeyle eşleşiyor; süresi ve tek kullanım kuralı denetleniyor.
+        switch viewModel.redeemInvite(code: code, user: .partner) {
+        case .success(let projectTitle):
+            dismiss()
+            appState.joinAsPartner()
+            viewModel.flash("\(projectTitle) · salt okunur erişim")
+        case .notFound:
+            showInvalid = true
+            viewModel.flash("Böyle bir davet kodu yok")
+        case .expired:
+            showInvalid = true
+            viewModel.flash("Kodun süresi dolmuş · yöneticiden yeni kod iste")
+        case .alreadyUsed:
+            showInvalid = true
+            viewModel.flash("Bu kod daha önce kullanılmış")
+        case .alreadyMember:
+            dismiss()
+            appState.joinAsPartner()
+            viewModel.flash("Bu projenin zaten ortağısın")
+        }
     }
 
     /// Panodaki "insaattakip.app/katil/X7B-9Q2" benzeri bağlantıdan kodu ayıklar.

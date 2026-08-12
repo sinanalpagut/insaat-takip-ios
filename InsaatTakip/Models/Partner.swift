@@ -9,6 +9,9 @@ struct Partner: Codable, Identifiable, Equatable {
     var isFounder: Bool         // Proje kurucusu (yönetici) mi?
     var joinedText: String      // "Katıldı · 12 Mar 2026" / "Proje kurucusu · 04 Oca 2026"
     var sharePercent: Int       // Hisse yüzdesi
+    /// Uygulamaya giren hesap. nil = hisse tanımlı ama kişi henüz katılmamış.
+    /// Ortağın hangi projeleri görebileceği bu bağdan çözülür.
+    var userId: UUID?
 
     var initials: String {
         let parts = name.split(separator: " ")
@@ -16,7 +19,40 @@ struct Partner: Codable, Identifiable, Equatable {
     }
 }
 
-// MARK: - Davet Kodu
+// MARK: - Davet
+
+/// Projeye özel davet. Tasarımda "48 saat geçerli · tek ortak için" yazıyordu
+/// ama kod bunu uygulamıyordu; artık geçerlilik ve tek kullanım burada tutulur.
+struct Invite: Codable, Equatable {
+    var code: String            // ham 6 hane (tiresiz)
+    var createdAt: Date
+    var usedAt: Date?           // dolu ise kod harcanmış
+    var usedByName: String?     // kodu kullanan ortağın adı
+
+    static let validHours = 48
+
+    var expiresAt: Date {
+        createdAt.addingTimeInterval(TimeInterval(Invite.validHours * 3600))
+    }
+
+    var isExpired: Bool { Date() >= expiresAt }
+    var isUsed: Bool { usedAt != nil }
+    var isUsable: Bool { !isUsed && !isExpired }
+
+    /// "48 saat geçerli · tek ortak için" / "Kullanıldı · Ayşe Tuna" / "Süresi doldu"
+    var statusText: String {
+        if let usedByName { return "Kullanıldı · \(usedByName)" }
+        if isUsed { return "Kullanıldı" }
+        if isExpired { return "Süresi doldu · yeni kod üret" }
+
+        let remaining = Int(expiresAt.timeIntervalSinceNow / 3600)
+        if remaining >= 1 { return "\(remaining) saat geçerli · tek ortak için" }
+        let minutes = max(1, Int(expiresAt.timeIntervalSinceNow / 60))
+        return "\(minutes) dakika geçerli · tek ortak için"
+    }
+}
+
+// MARK: - Davet Kodu üretimi
 
 enum InviteCode {
     /// Görsel olarak karışabilen karakterler (I, O, S, 0, 1) alfabeden çıkarılmıştır.

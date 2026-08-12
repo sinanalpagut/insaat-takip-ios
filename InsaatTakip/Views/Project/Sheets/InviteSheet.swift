@@ -22,14 +22,14 @@ struct InviteSheet: View {
                         subtitle: "Davet edilen kişi \(project?.title ?? "") projesini yalnızca görüntüleyebilir.",
                         subtitleAccent: project?.title) { dismiss() }
 
-            if let code = project?.inviteCode {
-                codeBlock(code)
-                linkRow(code)
-                whatsappButton(code)
+            if let invite = project?.invite {
+                codeBlock(invite)
+                linkRow(invite.code)
+                whatsappButton(invite.code)
 
                 HStack(spacing: 10) {
                     OutlineButton(title: "Kodu Kopyala") {
-                        viewModel.copyInviteCode(code)
+                        viewModel.copyInviteCode(invite.code)
                     }
                     OutlineButton(title: "Yeni Kod") {
                         viewModel.generateInviteCode(role: appState.currentUser?.role ?? .partner,
@@ -82,17 +82,19 @@ struct InviteSheet: View {
     }
 
     /// Koyu kod bloğu: DAVET KODU etiketi, Sora 34 kod, geçerlilik notu.
-    private func codeBlock(_ code: String) -> some View {
+    private func codeBlock(_ invite: Invite) -> some View {
         VStack(spacing: 8) {
             Text("Davet Kodu")
                 .smallCapsLabel(size: 9.5, color: .white.opacity(0.45), tracking: 1.4)
-            Text(InviteCode.formatted(code))
+            Text(InviteCode.formatted(invite.code))
                 .font(.sora(34, .bold))
                 .tracking(4)
-                .foregroundColor(.white)
-            Text("48 saat geçerli · tek ortak için")
+                .foregroundColor(invite.isUsable ? .white : .white.opacity(0.35))
+                .strikethrough(!invite.isUsable, color: .white.opacity(0.5))
+            // Gerçek durum: kalan süre, kullanıldıysa kim kullandı, süresi dolduysa uyarı
+            Text(invite.statusText)
                 .font(.manrope(11, .medium))
-                .foregroundColor(.white.opacity(0.45))
+                .foregroundColor(invite.isUsable ? .white.opacity(0.45) : Palette.accentLight)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)

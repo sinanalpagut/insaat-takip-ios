@@ -33,7 +33,7 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
 
 ### Faz 1 — Firebase'den ÖNCE (sonraya kalırsa veri göçü gerektirir)
 
-- [ ] 9. Kimlik ve üyelik modeli (userId/ownerId, davet kodu ↔ proje bağı, dashboard filtresi)
+- [x] 9. Kimlik ve üyelik modeli (userId/ownerId, davet kodu ↔ proje bağı, dashboard filtresi)
 - [ ] 10. Tip düzeltmeleri (tarih → `Date`, para → kuruş `Int64`, kimlikler → UUID, `ActivityItem.section`)
 - [ ] 11. Gider defteri (işçilik, taşeron, arsa, harç, makine, yakıt)
 - [ ] 12. Tahsilat ve taksit defteri (ödeme geçmişi, vade, dekont)

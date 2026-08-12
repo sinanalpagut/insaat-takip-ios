@@ -16,6 +16,12 @@ struct DashboardView: View {
 
     private var isAdmin: Bool { appState.isAdmin }
 
+    /// Yalnızca kullanıcının erişebildiği projeler (yönetici: kurduğu,
+    /// ortak: davetle katıldığı). Filtre ViewModel'de.
+    private var visibleProjects: [Project] {
+        viewModel.visibleProjects(for: appState.currentUser)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -26,13 +32,13 @@ struct DashboardView: View {
                         Text("Aktif Projeler")
                             .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
                         Spacer()
-                        Text("\(viewModel.projects.count) proje")
+                        Text("\(visibleProjects.count) proje")
                             .font(.manrope(12, .semiBold))
                             .foregroundColor(Palette.textSecondary)
                     }
                     .padding(.top, 18)
 
-                    ForEach(viewModel.projects) { project in
+                    ForEach(visibleProjects) { project in
                         NavigationLink(value: Route.project(project.id)) {
                             ProjectCardView(project: project)
                         }
@@ -114,7 +120,7 @@ struct DashboardView: View {
                 .foregroundColor(.white)
                 .padding(.top, 20)
 
-            Text(viewModel.dashboardSubtitle)
+            Text(viewModel.dashboardSubtitle(for: appState.currentUser))
                 .font(.manrope(12.5, .medium))
                 .foregroundColor(.white.opacity(0.55))
                 .padding(.top, 5)
