@@ -22,6 +22,12 @@ struct ActivityItem: Codable, Identifiable, Equatable {
     }
 
     let id: UUID
+    /// Hangi projenin hareketi. Üyelik süzgeci ancak bununla mümkün:
+    /// önceden proje yalnızca `meta` metninin içinde adıyla geçiyordu, bu yüzden
+    /// bildirim ekranı süzemiyor ve bir projeye davet edilen ortak, üyesi
+    /// OLMADIĞI projelerin alıcı adlarını ve tutarlarını da görüyordu —
+    /// dashboard'da özenle kurulan gizlilik sınırı buradan deliniyordu.
+    var projectId: UUID?
     var kind: Kind
     var title: String       // "Demir · 12.500 kg giriş"
     var meta: String        // "145 Ada / 2 Parsel · İrsaliye #4471"

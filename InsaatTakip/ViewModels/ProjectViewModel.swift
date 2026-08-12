@@ -385,7 +385,7 @@ final class ProjectViewModel: ObservableObject {
         let verb = type == .entry ? "giriş" : "çıkış"
         let project = projects.first { $0.id == material.projectId }
         changes.append(pushActivity(
-            ActivityItem(id: UUID(),
+            ActivityItem(id: UUID(), projectId: material.projectId,
                          kind: type == .entry ? .materialIn : .materialOut,
                          title: "\(material.name) · \(Fmt.qty(amount, unit: material.unit)) \(verb)",
                          meta: "\(project?.title ?? "") · \(note)",
@@ -531,7 +531,7 @@ final class ProjectViewModel: ObservableObject {
         auditEntries.insert(entry, at: 0)
 
         let projectTitle = projects.first { $0.id == projectId }?.title ?? ""
-        let activity = ActivityItem(id: UUID(), kind: .edit,
+        let activity = ActivityItem(id: UUID(), projectId: projectId, kind: .edit,
                                     title: "\(subject) \(action.rawValue)",
                                     meta: [projectTitle, entry.summary]
                                          .filter { !$0.isEmpty }.joined(separator: " · "),
@@ -622,7 +622,7 @@ final class ProjectViewModel: ObservableObject {
         // İptal de bir harekettir; ortakların akışında görünmeli (şeffaflık).
         let projectTitle = projects.first { $0.id == apartment.projectId }?.title ?? ""
         writes.append(pushActivity(
-            ActivityItem(id: UUID(), kind: .sale,
+            ActivityItem(id: UUID(), projectId: apartment.projectId, kind: .sale,
                          title: "Daire No \(apartment.apartmentNumber) \(wasReserved ? "rezervi kaldırıldı" : "satışı iptal edildi")",
                          meta: "\(projectTitle) · \(buyer) · \(Fmt.compactMoney(price))",
                          timestamp: Date())))
@@ -752,7 +752,7 @@ final class ProjectViewModel: ObservableObject {
 
         let projectTitle = projects.first { $0.id == apartment.projectId }?.title ?? ""
         writes.append(pushActivity(
-            ActivityItem(id: UUID(), kind: .sale,
+            ActivityItem(id: UUID(), projectId: apartment.projectId, kind: .sale,
                          title: "Daire No \(apartment.apartmentNumber) tahsilat — \(Fmt.compactMoney(amount))",
                          meta: "\(projectTitle) · \(payment.detailText)",
                          timestamp: Date())))
@@ -825,7 +825,7 @@ final class ProjectViewModel: ObservableObject {
 
         let projectTitle = projects.first { $0.id == projectId }?.title ?? ""
         let activity = pushActivity(
-            ActivityItem(id: UUID(), kind: .expense,
+            ActivityItem(id: UUID(), projectId: projectId, kind: .expense,
                          title: "\(category.rawValue) · \(Fmt.compactMoney(amount))",
                          meta: [projectTitle, expense.detailText]
                               .filter { !$0.isEmpty }.joined(separator: " · "),
@@ -1028,7 +1028,7 @@ final class ProjectViewModel: ObservableObject {
             }
             let prefix = before.status == .reserved ? "rezervden satışa çevrildi" : "satıldı"
             writes.append(pushActivity(
-                ActivityItem(id: UUID(), kind: .sale,
+                ActivityItem(id: UUID(), projectId: apartment.projectId, kind: .sale,
                              title: "Daire No \(apartment.apartmentNumber) \(prefix) — \(Fmt.compactMoney(price))",
                              meta: "\(projectTitle) · \(trimmedBuyer) · \(payNote)",
                              timestamp: Date())))
@@ -1176,7 +1176,7 @@ final class ProjectViewModel: ObservableObject {
         partners.append(partner)
 
         let activity = pushActivity(
-            ActivityItem(id: UUID(), kind: .partnerJoined,
+            ActivityItem(id: UUID(), projectId: project.id, kind: .partnerJoined,
                          title: "\(user.name) projeye katıldı",
                          meta: "\(project.title) · davet kodu ile · salt okunur",
                          timestamp: Date()))
@@ -1415,12 +1415,19 @@ final class ProjectViewModel: ObservableObject {
         case gider = "Gider"
     }
 
-    func activities(filter: ActivityFilter) -> [ActivityItem] {
+    /// Hareket akışı — ÖNCE üyelik, sonra tür süzgeci.
+    /// Üyelik burada uygulanmazsa dashboard'daki gizlilik sınırı bildirim
+    /// zilinden delinir: ortak, görmediği projelerin alıcı adını ve tutarını
+    /// bu ekranda okuyabilir.
+    func activities(filter: ActivityFilter, for user: User?) -> [ActivityItem] {
+        let allowed = Set(visibleProjects(for: user).map(\.id))
+        // projectId'si olmayan (proje bağımsız) kayıt bugün yok; olursa gizlenir.
+        let mine = activities.filter { $0.projectId.map(allowed.contains) ?? false }
         switch filter {
-        case .tumu:    return activities
-        case .malzeme: return activities.filter(\.isMaterial)
-        case .satis:   return activities.filter(\.isSale)
-        case .gider:   return activities.filter { $0.kind == .expense }
+        case .tumu:    return mine
+        case .malzeme: return mine.filter(\.isMaterial)
+        case .satis:   return mine.filter(\.isSale)
+        case .gider:   return mine.filter { $0.kind == .expense }
         }
     }
 

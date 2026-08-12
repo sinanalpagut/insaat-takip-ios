@@ -5,6 +5,7 @@ import SwiftUI
 // Akış BUGÜN / DÜN / BU HAFTA gruplarında; satırlar 28px glif rozetli.
 
 struct ActivityFeedView: View {
+    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
@@ -17,7 +18,8 @@ struct ActivityFeedView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(ActivityItem.Section.allCases, id: \.self) { section in
-                        let items = viewModel.activities(filter: filter).filter { $0.section == section }
+                        let items = viewModel.activities(filter: filter, for: appState.currentUser)
+                            .filter { $0.section == section }
                         if !items.isEmpty {
                             Text(section.rawValue)
                                 .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
@@ -41,6 +43,13 @@ struct ActivityFeedView: View {
         .onAppear { viewModel.markActivityRead() }
     }
 
+    /// Başlıktaki kapsam satırı — gördüğü proje sayısını dürüstçe söyler.
+    private var scopeText: String {
+        let count = viewModel.visibleProjects(for: appState.currentUser).count
+        let scope = appState.isAdmin ? "Tüm projeler" : "\(count) proje"
+        return "\(scope) · son 7 gün"
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
@@ -54,7 +63,9 @@ struct ActivityFeedView: View {
                 .foregroundColor(.white)
                 .padding(.top, 14)
 
-            Text("Tüm projeler · son 7 gün")
+            // Kapsam metni role göre: ortak yalnızca üyesi olduğu projeleri görür,
+            // "Tüm projeler" demek yanıltıcı olurdu.
+            Text(scopeText)
                 .font(.manrope(12.5, .medium))
                 .foregroundColor(.white.opacity(0.55))
                 .padding(.top, 5)

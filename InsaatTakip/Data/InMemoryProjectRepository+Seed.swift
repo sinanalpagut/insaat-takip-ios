@@ -508,17 +508,17 @@ extension InMemoryProjectRepository {
 
         // ---- Hareket akışı (ekran 07) ---------------------------------------
         activities = [
-            ActivityItem(id: UUID(), kind: .materialIn, title: "Demir · 12.500 kg giriş",
+            ActivityItem(id: UUID(), projectId: DemoID.cayirova, kind: .materialIn, title: "Demir · 12.500 kg giriş",
                          meta: "145 Ada / 2 Parsel · İrsaliye #4471", timestamp: Fmt.daysAgo(0, hour: 9, minute: 24)),
-            ActivityItem(id: UUID(), kind: .sale, title: "Daire No 17 satıldı — 3,75 M ₺",
+            ActivityItem(id: UUID(), projectId: DemoID.cayirova, kind: .sale, title: "Daire No 17 satıldı — 3,75 M ₺",
                          meta: "145 Ada / 2 Parsel · Gizem Polat · Kapora alındı", timestamp: Fmt.daysAgo(0, hour: 8, minute: 10)),
-            ActivityItem(id: UUID(), kind: .materialOut, title: "Çimento · 180 torba çıkış",
+            ActivityItem(id: UUID(), projectId: DemoID.cayirova, kind: .materialOut, title: "Çimento · 180 torba çıkış",
                          meta: "145 Ada / 2 Parsel · 5. kat şap", timestamp: Fmt.daysAgo(1, hour: 16, minute: 40)),
-            ActivityItem(id: UUID(), kind: .partnerJoined, title: "Burak Erdoğan projeye katıldı",
+            ActivityItem(id: UUID(), projectId: DemoID.cayirova, kind: .partnerJoined, title: "Burak Erdoğan projeye katıldı",
                          meta: "145 Ada / 2 Parsel · davet kodu ile · salt okunur", timestamp: Fmt.daysAgo(1, hour: 11, minute: 2)),
-            ActivityItem(id: UUID(), kind: .materialIn, title: "Pimapen · 42 adet giriş",
+            ActivityItem(id: UUID(), projectId: DemoID.kepez, kind: .materialIn, title: "Pimapen · 42 adet giriş",
                          meta: "908 Ada / 7 Parsel · İrsaliye #2210", timestamp: Fmt.daysAgo(3, hour: 10, minute: 0)),
-            ActivityItem(id: UUID(), kind: .materialOut, title: "Kum · 24 ton çıkış",
+            ActivityItem(id: UUID(), projectId: DemoID.cayirova, kind: .materialOut, title: "Kum · 24 ton çıkış",
                          meta: "145 Ada / 2 Parsel · Cephe sıva", timestamp: Fmt.daysAgo(3, hour: 10, minute: 0)),
         ]
 
