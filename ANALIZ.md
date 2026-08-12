@@ -45,7 +45,10 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
 - [x] 14. Daire durum modeli (kat karşılığı, rezerve, iptal) + daire bilgisi düzenleme
       · İptal ayrı bir durum DEĞİL: daire `.available`'a döner (yeniden satılabilir),
         izi denetim defterinde alıcı/bedel/silinen tahsilat anlık görüntüsüyle kalır
-- [ ] 15. Repository katmanı (ProjectViewModel'i protokol arkasına al)
+- [x] 15. Repository katmanı (ProjectViewModel'i protokol arkasına al)
+      · View'lar DEĞİŞMEDİ: ViewModel'in genel arayüzü senkron kaldı, kalıcılık
+        iyimser güncelleme + arka plan yazma modeline geçti
+      · DEBUG'da `verifySeam` her yazmadan sonra kaynak/ekran tutarlılığını denetler
 
 ### Faz 2 — Kilometre taşı: kalıcılık
 
