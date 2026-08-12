@@ -37,8 +37,10 @@ struct ProjectDocument: Codable, Identifiable, Equatable {
     var name: String            // "Vaziyet Planı"
     var versionText: String     // "v3" / "taslak"
     var sizeMB: Double          // 4.2
-    var dateText: String        // "12 Oca 2026"
+    var date: Date              // Yükleme / evrak tarihi
     var partnerVisible: Bool    // "Ortaklar görebilsin" anahtarı
+
+    var dateText: String { Fmt.shortDate(date) }
 
     /// Satır alt metni: "v3 · 4,2 MB · 12 Oca 2026"
     var metaText: String {

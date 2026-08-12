@@ -47,9 +47,13 @@ struct MaterialLog: Codable, Identifiable, Equatable {
     /// Kayıt anındaki birim fiyat — dondurulur; sonraki fiyat değişiklikleri
     /// geçmiş dönem raporlarını değiştirmesin diye.
     var unitPrice: Double
-    var dateText: String      // "28 Tem 2026"
+    /// Hareketin gerçekleştiği an. Metin yerine Date: sıralama, dönem filtresi
+    /// ve geçmiş tarihli kayıt ancak böyle mümkün.
+    var date: Date
     var note: String          // "İrsaliye #4471 · Yılmaz Yapı" / "5. kat perde donatısı"
     var user: String          // Kaydı giren kişi
+
+    var dateText: String { Fmt.shortDate(date) }
 
     /// "+12.500 kg" / "−6.800 kg"
     func signedAmount(unit: String) -> String {

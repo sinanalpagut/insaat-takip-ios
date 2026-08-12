@@ -11,19 +11,31 @@ struct ActivityItem: Codable, Identifiable, Equatable {
         case partnerJoined  // ＋ ortak katıldı (bakır)
     }
 
-    /// Akıştaki zaman grubu.
+    /// Akıştaki zaman grubu — saklanmaz, timestamp'ten hesaplanır.
     enum Section: String, Codable, CaseIterable {
         case bugun = "Bugün"
         case dun = "Dün"
         case buHafta = "Bu Hafta"
+        case dahaEski = "Daha Eski"
     }
 
     let id: UUID
     var kind: Kind
     var title: String       // "Demir · 12.500 kg giriş"
     var meta: String        // "145 Ada / 2 Parsel · İrsaliye #4471"
-    var timeText: String    // "09:24" / "Sal"
-    var section: Section
+    /// Olayın gerçekleştiği an. Bölüm ve zaman etiketi bundan TÜRETİLİR —
+    /// önceden "Bugün" metin olarak saklanıyordu ve yarın da "Bugün" diyordu.
+    var timestamp: Date
+
+    var timeText: String { Fmt.relativeTime(timestamp) }
+
+    /// Akıştaki grup, her görüntülemede yeniden hesaplanır.
+    var section: Section {
+        if Fmt.calendar.isDateInToday(timestamp) { return .bugun }
+        if Fmt.calendar.isDateInYesterday(timestamp) { return .dun }
+        let days = Fmt.calendar.dateComponents([.day], from: timestamp, to: Date()).day ?? 99
+        return days < 7 ? .buHafta : .dahaEski
+    }
 
     /// Filtre çipleri: Tümü / Malzeme / Satış.
     var isMaterial: Bool { kind == .materialIn || kind == .materialOut }
@@ -37,8 +49,14 @@ import UIKit
 struct SitePhoto: Identifiable, Equatable {
     let id: UUID
     let projectId: String
-    var dateText: String        // "05 Ağu"
-    var isCurrentWeek: Bool     // Bu hafta: canlı yuva · Arşiv: dolu kutu
+    var date: Date              // Çekim tarihi
+
+    var dateText: String { Fmt.dayMonth(date) }
+
+    /// "Bu hafta" grubu tarihten hesaplanır — sabit bayrak yarın yanlış olurdu.
+    var isCurrentWeek: Bool {
+        Fmt.calendar.isDate(date, equalTo: Date(), toGranularity: .weekOfYear)
+    }
 
     /// Küçültülmüş görsel. Galeriden gelen ham veri ASLA saklanmaz:
     /// 12 MP bir fotoğrafın çözülmüş hali ~48 MB'tır; birkaç kare bile
@@ -51,8 +69,7 @@ struct SitePhoto: Identifiable, Equatable {
     /// Diff maliyeti: görselin baytlarını karşılaştırmak yerine kimlik + tarih.
     static func == (lhs: SitePhoto, rhs: SitePhoto) -> Bool {
         lhs.id == rhs.id
-            && lhs.dateText == rhs.dateText
-            && lhs.isCurrentWeek == rhs.isCurrentWeek
+            && lhs.date == rhs.date
             && (lhs.image === rhs.image)
     }
 

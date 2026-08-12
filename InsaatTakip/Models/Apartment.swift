@@ -26,10 +26,12 @@ struct Apartment: Codable, Identifiable, Equatable {
     var price: Double           // Satış bedeli (satıldıysa)
     var paidAmount: Double      // Tahsil edilen tutar
     var paymentStatus: PaymentStatus?
-    var saleDateText: String?   // "18 Şub 2026"
+    var saleDate: Date?         // Sözleşme / satış tarihi
     var deliveryNote: String    // "Anahtar teslim bekliyor" vb.
 
     var isSold: Bool { status == .sold }
+
+    var saleDateText: String? { saleDate.map(Fmt.shortDate) }
 
     /// Kat etiketi: negatif = bodrum, 0 = "Zemin", pozitif = "N. Kat" (TOKİ kat düzeni).
     var floorLabel: String {

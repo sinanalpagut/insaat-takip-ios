@@ -88,7 +88,7 @@ final class ProjectViewModel: ObservableObject {
         documents.filter { $0.projectId == projectId && (role == .admin || $0.partnerVisible) }
     }
 
-    /// Belge tarihlerinden ("12 Oca 2026") en yenisini bulur; başlıktaki "son yükleme" için.
+    /// Belge tarihlerinden (Fmt.makeDate(12, 1, 2026)) en yenisini bulur; başlıktaki "son yükleme" için.
     /// İçinde bulunulan yıla aitse yıl gösterilmez ("14 Tem"), değilse tam tarih döner.
     func lastUploadText(for projectId: String, role: UserRole) -> String? {
         let currentYear = Calendar.current.component(.year, from: Date())
@@ -202,7 +202,7 @@ final class ProjectViewModel: ObservableObject {
             : reference
         let log = MaterialLog(id: UUID(), materialId: materialId, type: type,
                               amount: amount, unitPrice: effectivePrice,
-                              dateText: Fmt.shortDate(),
+                              date: Date(),
                               note: note, user: User.admin.name)
         materialLogs.insert(log, at: 0)
         // Kamerayla çekilen fiş görseli hareketle birlikte saklanır.
@@ -215,8 +215,7 @@ final class ProjectViewModel: ObservableObject {
                                        kind: type == .entry ? .materialIn : .materialOut,
                                        title: "\(material.name) · \(Fmt.qty(amount, unit: material.unit)) \(verb)",
                                        meta: "\(project?.title ?? "") · \(note)",
-                                       timeText: Fmt.clock(),
-                                       section: .bugun), at: 0)
+                                       timestamp: Date()), at: 0)
         hasUnreadActivity = true
         flash("Fiş kaydedildi")
         return true
@@ -250,7 +249,7 @@ final class ProjectViewModel: ObservableObject {
         apartment.buyerName = nil
         apartment.paidAmount = 0
         apartment.paymentStatus = nil
-        apartment.saleDateText = nil
+        apartment.saleDate = nil
         apartments[index] = apartment
 
         // İptal de bir harekettir; ortakların akışında görünmeli (şeffaflık).
@@ -258,8 +257,7 @@ final class ProjectViewModel: ObservableObject {
         activities.insert(ActivityItem(id: UUID(), kind: .sale,
                                        title: "Daire No \(apartment.apartmentNumber) satışı iptal edildi",
                                        meta: "\(projectTitle) · \(buyer) · \(Fmt.compactMoney(price))",
-                                       timeText: Fmt.clock(),
-                                       section: .bugun), at: 0)
+                                       timestamp: Date()), at: 0)
         hasUnreadActivity = true
         flash("Satış iptal edildi")
         return true
@@ -313,7 +311,7 @@ final class ProjectViewModel: ObservableObject {
     /// Daire satışı ekler veya mevcut satış kaydını günceller.
     @discardableResult
     func saveSale(role: UserRole, apartmentId: String, buyerName: String,
-                  priceText: String, paidText: String, payment: PaymentStatus, dateText: String? = nil) -> Bool {
+                  priceText: String, paidText: String, payment: PaymentStatus, saleDate: Date? = nil) -> Bool {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return false }
 
@@ -331,7 +329,7 @@ final class ProjectViewModel: ObservableObject {
         apartment.price = price
         apartment.paymentStatus = payment
         apartment.paidAmount = payment == .tamamlandi ? price : min(price, Self.parseNumber(paidText))
-        apartment.saleDateText = dateText ?? apartment.saleDateText ?? Fmt.shortDate()
+        apartment.saleDate = saleDate ?? apartment.saleDate ?? Date()
         apartments[index] = apartment
 
         if isNewSale {
@@ -346,8 +344,7 @@ final class ProjectViewModel: ObservableObject {
             activities.insert(ActivityItem(id: UUID(), kind: .sale,
                                            title: "Daire No \(apartment.apartmentNumber) satıldı — \(Fmt.compactMoney(price))",
                                            meta: "\(projectTitle) · \(trimmedBuyer) · \(payNote)",
-                                           timeText: Fmt.clock(),
-                                           section: .bugun), at: 0)
+                                           timestamp: Date()), at: 0)
             hasUnreadActivity = true
         }
         flash(isNewSale ? "Satış kaydedildi" : "Satış kaydı güncellendi")
@@ -383,7 +380,7 @@ final class ProjectViewModel: ObservableObject {
                                         apartmentNumber: n, floor: (n - 1) / perFloor + 1,
                                         type: t.0, area: t.1, status: .available,
                                         buyerName: nil, price: 0, paidAmount: 0,
-                                        paymentStatus: nil, saleDateText: nil,
+                                        paymentStatus: nil, saleDate: nil,
                                         deliveryNote: "Yapım sürüyor"))
         }
 
@@ -399,7 +396,7 @@ final class ProjectViewModel: ObservableObject {
         // Projeyi kuran yönetici, hisse dağılımının tamamıyla ilk ortak olur.
         partners.append(Partner(id: UUID(), projectId: project.id, name: User.admin.name,
                                 isFounder: true,
-                                joinedText: "Proje kurucusu · \(Fmt.shortDate())",
+                                joinedAt: Date(),
                                 sharePercent: 100, userId: User.admin.id))
 
         flash("Proje oluşturuldu")
@@ -469,15 +466,14 @@ final class ProjectViewModel: ObservableObject {
         // Hisse yüzdesi yönetici tarafından sonradan tanımlanır (Faz 3: ortak cari hesabı).
         partners.append(Partner(id: UUID(), projectId: project.id, name: user.name,
                                 isFounder: false,
-                                joinedText: "Katıldı · \(Fmt.shortDate())",
+                                joinedAt: Date(),
                                 sharePercent: 0,
                                 userId: user.id))
 
         activities.insert(ActivityItem(id: UUID(), kind: .partnerJoined,
                                        title: "\(user.name) projeye katıldı",
                                        meta: "\(project.title) · davet kodu ile · salt okunur",
-                                       timeText: Fmt.clock(),
-                                       section: .bugun), at: 0)
+                                       timestamp: Date()), at: 0)
         hasUnreadActivity = true
         return .success(projectTitle: project.title)
     }
@@ -518,7 +514,7 @@ final class ProjectViewModel: ObservableObject {
                                   name: baseName.isEmpty ? fileName : baseName,
                                   versionText: versionNote.isEmpty ? "v1" : versionNote,
                                   sizeMB: max(0.1, sizeMB),
-                                  dateText: Fmt.shortDate(),
+                                  date: Date(),
                                   partnerVisible: partnerVisible)
         documents.insert(doc, at: 0)
         flash("Dosya yüklendi")
@@ -549,8 +545,7 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin, !images.isEmpty else { return }
         for image in images {
             sitePhotos.insert(SitePhoto(id: UUID(), projectId: projectId,
-                                        dateText: String(Fmt.shortDate().dropLast(5)),
-                                        isCurrentWeek: true, image: image), at: 0)
+                                        date: Date(), image: image), at: 0)
         }
         flash(images.count == 1 ? "Fotoğraf eklendi" : "\(images.count) fotoğraf eklendi")
     }
@@ -580,39 +575,36 @@ final class ProjectViewModel: ObservableObject {
 
     static let monthNames = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
 
-    /// "18 Şub 2026" → (yıl, ay). Yıl yoksa içinde bulunulan yıl varsayılır.
-    private static func yearMonth(of dateText: String?) -> (year: Int, month: Int)? {
-        guard let text = dateText else { return nil }
-        let parts = text.split(separator: " ")
-        guard parts.count >= 2, let index = monthNames.firstIndex(of: String(parts[1])) else { return nil }
-        let currentYear = Calendar.current.component(.year, from: Date())
-        let year = parts.count > 2 ? (Int(parts[2]) ?? currentYear) : currentYear
-        return (year, index + 1)
-    }
+    /// Seçilen dönemin tarih aralığı. Metin ayrıştırma yerine takvim kullanılır;
+    /// yıl sınırı, artık yıl ve ay uzunlukları Foundation'a bırakılır.
+    private func dateRange(for period: ReportPeriod) -> (range: DateInterval?, title: String) {
+        let calendar = Fmt.calendar
+        let now = Date()
 
-    /// Seçilen dönemin özet tablosu. (Bugün: 10 Ağu 2026 senaryosu — dönemler buna göre.)
-    func reportSummary(for projectId: String, period: ReportPeriod) -> ReportSummary {
-        let currentMonth = Calendar.current.component(.month, from: Date())
-        let quarter = (currentMonth - 1) / 3 + 1
-        let months: ClosedRange<Int>
-        let title: String
         switch period {
         case .buAy:
-            months = currentMonth...currentMonth
-            title = Self.monthNames[currentMonth - 1].uppercased(with: Fmt.locale) + " AYI ÖZETİ"
-        case .ceyrek:
-            months = ((quarter - 1) * 3 + 1)...(quarter * 3)
-            title = "\(quarter). ÇEYREK ÖZETİ"
-        case .tumu:
-            months = 1...12
-            title = "PROJE GENELİ ÖZET"
-        }
+            let interval = calendar.dateInterval(of: .month, for: now)
+            let name = Self.monthNames[calendar.component(.month, from: now) - 1]
+            return (interval, name.uppercased(with: Fmt.locale) + " AYI ÖZETİ")
 
-        let currentYear = Calendar.current.component(.year, from: Date())
-        let sold = apartments(for: projectId).filter {
-            guard $0.isSold, let date = Self.yearMonth(of: $0.saleDateText) else { return false }
-            // "Tümü" geçmiş yılları da kapsar; ay/çeyrek yalnızca içinde bulunulan yılı.
-            return period == .tumu ? true : (date.year == currentYear && months.contains(date.month))
+        case .ceyrek:
+            let interval = calendar.dateInterval(of: .quarter, for: now)
+            let quarter = (calendar.component(.month, from: now) - 1) / 3 + 1
+            return (interval, "\(quarter). ÇEYREK ÖZETİ")
+
+        case .tumu:
+            return (nil, "PROJE GENELİ ÖZET")   // nil = tarih filtresi yok
+        }
+    }
+
+    /// Seçilen dönemin özet tablosu.
+    func reportSummary(for projectId: String, period: ReportPeriod) -> ReportSummary {
+        let (range, title) = dateRange(for: period)
+
+        let sold = apartments(for: projectId).filter { apartment in
+            guard apartment.isSold, let saleDate = apartment.saleDate else { return false }
+            guard let range else { return true }   // "Tümü"
+            return range.contains(saleDate)
         }
         let sales = sold.reduce(0) { $0 + $1.price }
         let collected = sold.reduce(0) { $0 + $1.paidAmount }
@@ -623,44 +615,37 @@ final class ProjectViewModel: ObservableObject {
         //    kendi tarihindeki dondurulmuş fiyatıyla (sonraki zamlar geçmişi değiştirmez)
         let cost: Double
         let materialIds = Set(materials(for: projectId).map(\.id))
-        if period == .tumu {
-            cost = totalMaterialCost(for: projectId)
-        } else {
+        if let range {
             cost = materialLogs.reduce(0) { sum, log in
                 guard log.type == .entry, materialIds.contains(log.materialId),
-                      let date = Self.yearMonth(of: log.dateText),
-                      date.year == currentYear, months.contains(date.month) else { return sum }
+                      range.contains(log.date) else { return sum }
                 return sum + log.amount * log.unitPrice
             }
+        } else {
+            cost = totalMaterialCost(for: projectId)
         }
 
         return ReportSummary(title: title, soldCount: sold.count,
                              salesTotal: sales, collectedTotal: collected, materialCost: cost)
     }
 
-    /// Son 6 tamamlanmış ayın satış çubukları — yıl sınırını aşar.
+    /// Son 6 tamamlanmış ayın satış çubukları — yıl sınırını takvim aşar.
     /// (Ocak'ta önceki yılın Tem–Ara'sını gösterir; grafik hiçbir ayda boş kalmaz.)
     func monthlySales(for projectId: String) -> [MonthBar] {
-        let now = Date()
-        let currentMonth = Calendar.current.component(.month, from: now)
-        let currentYear = Calendar.current.component(.year, from: now)
-        let sold = apartments(for: projectId).filter(\.isSold)
+        let calendar = Fmt.calendar
+        let sold = apartments(for: projectId).compactMap { $0.isSold ? $0 : nil }
 
-        // 6 ay geriden başlayıp bir önceki aya kadar: (yıl, ay) çiftleri.
-        let window: [(year: Int, month: Int)] = (1...6).map { offset in
-            let shifted = currentMonth - (7 - offset)   // -6 … -1 ay
-            return shifted <= 0
-                ? (currentYear - 1, shifted + 12)
-                : (currentYear, shifted)
-        }
+        return (1...6).compactMap { offset in
+            // 6 ay geriden bir önceki aya kadar
+            guard let monthStart = calendar.date(byAdding: .month, value: offset - 7, to: Date()),
+                  let interval = calendar.dateInterval(of: .month, for: monthStart) else { return nil }
 
-        return window.map { slot in
-            let total = sold.reduce(0.0) { sum, apt in
-                guard let date = Self.yearMonth(of: apt.saleDateText),
-                      date.year == slot.year, date.month == slot.month else { return sum }
-                return sum + apt.price
+            let total = sold.reduce(0.0) { sum, apartment in
+                guard let saleDate = apartment.saleDate, interval.contains(saleDate) else { return sum }
+                return sum + apartment.price
             }
-            return MonthBar(label: Self.monthNames[slot.month - 1], value: total)
+            let label = Self.monthNames[calendar.component(.month, from: monthStart) - 1]
+            return MonthBar(label: label, value: total)
         }
     }
 
@@ -822,15 +807,15 @@ extension ProjectViewModel {
             if material.code == "Ø12" {
                 materialLogs.append(contentsOf: [
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: 6_800,
-                                unitPrice: material.unitPrice, dateText: "02 Ağu 2026", note: "5. kat perde donatısı", user: admin),
+                                unitPrice: material.unitPrice, date: Fmt.makeDate(2, 8, 2026), note: "5. kat perde donatısı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: 12_500,
-                                unitPrice: material.unitPrice, dateText: "28 Tem 2026", note: "İrsaliye #4471 · Yılmaz Yapı", user: admin),
+                                unitPrice: material.unitPrice, date: Fmt.makeDate(28, 7, 2026), note: "İrsaliye #4471 · Yılmaz Yapı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: 4_600,
-                                unitPrice: material.unitPrice, dateText: "21 Tem 2026", note: "4. kat döşeme imalatı", user: admin),
+                                unitPrice: material.unitPrice, date: Fmt.makeDate(21, 7, 2026), note: "4. kat döşeme imalatı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: 14_000,
-                                unitPrice: material.unitPrice, dateText: "14 Tem 2026", note: "İrsaliye #4398 · Ege Yapı", user: admin),
+                                unitPrice: material.unitPrice, date: Fmt.makeDate(14, 7, 2026), note: "İrsaliye #4398 · Ege Yapı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: 3_900,
-                                unitPrice: material.unitPrice, dateText: "06 Tem 2026", note: "3. kat kolon donatısı", user: admin),
+                                unitPrice: material.unitPrice, date: Fmt.makeDate(6, 7, 2026), note: "3. kat kolon donatısı", user: admin),
                 ])
             } else {
                 let round: (Double) -> Double = { value in
@@ -839,15 +824,15 @@ extension ProjectViewModel {
                 }
                 materialLogs.append(contentsOf: [
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: round(material.totalOut * 0.16),
-                                unitPrice: material.unitPrice, dateText: "02 Ağu 2026", note: "5. kat imalatı", user: admin),
+                                unitPrice: material.unitPrice, date: Fmt.makeDate(2, 8, 2026), note: "5. kat imalatı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: round(material.totalIn * 0.21),
-                                unitPrice: material.unitPrice, dateText: "28 Tem 2026", note: "İrsaliye #4471 · Yılmaz Yapı", user: admin),
+                                unitPrice: material.unitPrice, date: Fmt.makeDate(28, 7, 2026), note: "İrsaliye #4471 · Yılmaz Yapı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: round(material.totalOut * 0.11),
-                                unitPrice: material.unitPrice, dateText: "21 Tem 2026", note: "4. kat imalatı", user: admin),
+                                unitPrice: material.unitPrice, date: Fmt.makeDate(21, 7, 2026), note: "4. kat imalatı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: round(material.totalIn * 0.28),
-                                unitPrice: material.unitPrice, dateText: "14 Tem 2026", note: "İrsaliye #4398 · Ege Yapı", user: admin),
+                                unitPrice: material.unitPrice, date: Fmt.makeDate(14, 7, 2026), note: "İrsaliye #4398 · Ege Yapı", user: admin),
                     MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: round(material.totalOut * 0.09),
-                                unitPrice: material.unitPrice, dateText: "06 Tem 2026", note: "3. kat imalatı", user: admin),
+                                unitPrice: material.unitPrice, date: Fmt.makeDate(6, 7, 2026), note: "3. kat imalatı", user: admin),
                 ])
             }
         }
@@ -856,19 +841,19 @@ extension ProjectViewModel {
         // Fiyatlar kayıt anındaki değerlerdir; sonraki zamlar bu kayıtları etkilemez.
         materialLogs.append(contentsOf: [
             MaterialLog(id: UUID(), materialId: "kars309-ALÇ", type: .exit, amount: 120,
-                        unitPrice: 210, dateText: "18 Mar 2025", note: "Saten perdah tamamlandı", user: admin),
+                        unitPrice: 210, date: Fmt.makeDate(18, 3, 2025), note: "Saten perdah tamamlandı", user: admin),
             MaterialLog(id: UUID(), materialId: "kars309-EPS", type: .exit, amount: 90,
-                        unitPrice: 96, dateText: "04 Mar 2025", note: "Cephe mantolama kapanışı", user: admin),
+                        unitPrice: 96, date: Fmt.makeDate(4, 3, 2025), note: "Cephe mantolama kapanışı", user: admin),
             MaterialLog(id: UUID(), materialId: "kars309-Ø12", type: .entry, amount: 9_500,
-                        unitPrice: 28.5, dateText: "11 Şub 2025", note: "İrsaliye #2087 · Kars Demir Çelik", user: admin),
+                        unitPrice: 28.5, date: Fmt.makeDate(11, 2, 2025), note: "İrsaliye #2087 · Kars Demir Çelik", user: admin),
             MaterialLog(id: UUID(), materialId: "kars309-Ø12", type: .exit, amount: 4_200,
-                        unitPrice: 28.5, dateText: "27 Şub 2025", note: "Çevre duvarı donatısı", user: admin),
+                        unitPrice: 28.5, date: Fmt.makeDate(27, 2, 2025), note: "Çevre duvarı donatısı", user: admin),
             MaterialLog(id: UUID(), materialId: "kars327-ALÇ", type: .exit, amount: 150,
-                        unitPrice: 210, dateText: "08 Nis 2025", note: "Son kat saten perdah", user: admin),
+                        unitPrice: 210, date: Fmt.makeDate(8, 4, 2025), note: "Son kat saten perdah", user: admin),
             MaterialLog(id: UUID(), materialId: "kars327-PVC", type: .entry, amount: 30,
-                        unitPrice: 6_800, dateText: "21 Mar 2025", note: "İrsaliye #3141 · Serhat PVC", user: admin),
+                        unitPrice: 6_800, date: Fmt.makeDate(21, 3, 2025), note: "İrsaliye #3141 · Serhat PVC", user: admin),
             MaterialLog(id: UUID(), materialId: "kars327-EPS", type: .exit, amount: 160,
-                        unitPrice: 96, dateText: "14 Nis 2025", note: "Güney cephe mantolama kapanışı", user: admin),
+                        unitPrice: 96, date: Fmt.makeDate(14, 4, 2025), note: "Güney cephe mantolama kapanışı", user: admin),
         ])
 
         // ---- Daireler --------------------------------------------------------
@@ -877,35 +862,35 @@ extension ProjectViewModel {
         let types = [("2+1", "95 m²"), ("3+1", "128 m²"), ("3+1", "132 m²"), ("2+1", "98 m²")]
 
         // (daireNo, alıcı, bedel, ödeme, tahsil edilen, tarih)
-        let p1Sales: [(Int, String, Double, PaymentStatus, Double, String)] = [
-            (1, "Ahmet Yılmaz", 3_150_000, .tamamlandi, 3_150_000, "18 Şub 2026"),
-            (2, "Merve Demir", 3_650_000, .tamamlandi, 3_650_000, "02 Mar 2026"),
-            (3, "Selim Kaya", 3_700_000, .kapora, 500_000, "14 Mar 2026"),
-            (4, "Emre Şahin", 3_200_000, .tamamlandi, 3_200_000, "27 Mar 2026"),
-            (5, "Fatma Çelik", 3_300_000, .taksitli, 1_980_000, "05 Nis 2026"),
-            (6, "Hakan Aydın", 3_800_000, .taksitli, 2_280_000, "19 Nis 2026"),
-            (7, "Berk Koç", 3_850_000, .tamamlandi, 3_850_000, "28 Nis 2026"),
-            (8, "Nazlı Arslan", 3_350_000, .kapora, 500_000, "09 May 2026"),
-            (9, "Rıza Doğan", 3_450_000, .tamamlandi, 3_450_000, "21 May 2026"),
-            (11, "Tuğçe Öztürk", 3_900_000, .taksitli, 1_510_000, "06 Haz 2026"),
-            (13, "Cem Yıldız", 3_550_000, .tamamlandi, 3_550_000, "17 Haz 2026"),
-            (17, "Gizem Polat", 3_750_000, .kapora, 500_000, "02 Tem 2026"),
+        let p1Sales: [(Int, String, Double, PaymentStatus, Double, Date)] = [
+            (1, "Ahmet Yılmaz", 3_150_000, .tamamlandi, 3_150_000, Fmt.makeDate(18, 2, 2026)),
+            (2, "Merve Demir", 3_650_000, .tamamlandi, 3_650_000, Fmt.makeDate(2, 3, 2026)),
+            (3, "Selim Kaya", 3_700_000, .kapora, 500_000, Fmt.makeDate(14, 3, 2026)),
+            (4, "Emre Şahin", 3_200_000, .tamamlandi, 3_200_000, Fmt.makeDate(27, 3, 2026)),
+            (5, "Fatma Çelik", 3_300_000, .taksitli, 1_980_000, Fmt.makeDate(5, 4, 2026)),
+            (6, "Hakan Aydın", 3_800_000, .taksitli, 2_280_000, Fmt.makeDate(19, 4, 2026)),
+            (7, "Berk Koç", 3_850_000, .tamamlandi, 3_850_000, Fmt.makeDate(28, 4, 2026)),
+            (8, "Nazlı Arslan", 3_350_000, .kapora, 500_000, Fmt.makeDate(9, 5, 2026)),
+            (9, "Rıza Doğan", 3_450_000, .tamamlandi, 3_450_000, Fmt.makeDate(21, 5, 2026)),
+            (11, "Tuğçe Öztürk", 3_900_000, .taksitli, 1_510_000, Fmt.makeDate(6, 6, 2026)),
+            (13, "Cem Yıldız", 3_550_000, .tamamlandi, 3_550_000, Fmt.makeDate(17, 6, 2026)),
+            (17, "Gizem Polat", 3_750_000, .kapora, 500_000, Fmt.makeDate(2, 7, 2026)),
         ]
-        let p2Sales: [(Int, String, Double, PaymentStatus, Double, String)] = [
-            (1, "Ahmet Yılmaz", 3_150_000, .tamamlandi, 3_150_000, "22 Şub 2026"),
-            (2, "Merve Demir", 3_650_000, .tamamlandi, 3_650_000, "09 Mar 2026"),
-            (4, "Selim Kaya", 3_200_000, .kapora, 500_000, "30 Mar 2026"),
-            (7, "Emre Şahin", 3_200_000, .tamamlandi, 3_200_000, "12 Nis 2026"),
+        let p2Sales: [(Int, String, Double, PaymentStatus, Double, Date)] = [
+            (1, "Ahmet Yılmaz", 3_150_000, .tamamlandi, 3_150_000, Fmt.makeDate(22, 2, 2026)),
+            (2, "Merve Demir", 3_650_000, .tamamlandi, 3_650_000, Fmt.makeDate(9, 3, 2026)),
+            (4, "Selim Kaya", 3_200_000, .kapora, 500_000, Fmt.makeDate(30, 3, 2026)),
+            (7, "Emre Şahin", 3_200_000, .tamamlandi, 3_200_000, Fmt.makeDate(12, 4, 2026)),
         ]
-        let p3Sales: [(Int, String, Double, PaymentStatus, Double, String)] = [
-            (1, "Kemal Ünal", 3_400_000, .tamamlandi, 3_400_000, "14 Oca 2026"),
-            (2, "Zeynep Kaplan", 3_200_000, .tamamlandi, 3_200_000, "26 Oca 2026"),
-            (3, "Murat Şen", 3_300_000, .tamamlandi, 3_300_000, "08 Şub 2026"),
-            (4, "Elif Kurt", 3_450_000, .tamamlandi, 3_450_000, "24 Şub 2026"),
-            (5, "Okan Güler", 3_150_000, .tamamlandi, 3_150_000, "11 Mar 2026"),
-            (6, "Derya Aksoy", 3_200_000, .tamamlandi, 3_200_000, "29 Mar 2026"),
-            (7, "Sinan Ateş", 3_500_000, .tamamlandi, 3_500_000, "16 Nis 2026"),
-            (8, "Pelin Erden", 3_200_000, .tamamlandi, 3_200_000, "03 May 2026"),
+        let p3Sales: [(Int, String, Double, PaymentStatus, Double, Date)] = [
+            (1, "Kemal Ünal", 3_400_000, .tamamlandi, 3_400_000, Fmt.makeDate(14, 1, 2026)),
+            (2, "Zeynep Kaplan", 3_200_000, .tamamlandi, 3_200_000, Fmt.makeDate(26, 1, 2026)),
+            (3, "Murat Şen", 3_300_000, .tamamlandi, 3_300_000, Fmt.makeDate(8, 2, 2026)),
+            (4, "Elif Kurt", 3_450_000, .tamamlandi, 3_450_000, Fmt.makeDate(24, 2, 2026)),
+            (5, "Okan Güler", 3_150_000, .tamamlandi, 3_150_000, Fmt.makeDate(11, 3, 2026)),
+            (6, "Derya Aksoy", 3_200_000, .tamamlandi, 3_200_000, Fmt.makeDate(29, 3, 2026)),
+            (7, "Sinan Ateş", 3_500_000, .tamamlandi, 3_500_000, Fmt.makeDate(16, 4, 2026)),
+            (8, "Pelin Erden", 3_200_000, .tamamlandi, 3_200_000, Fmt.makeDate(3, 5, 2026)),
         ]
         let salesByProject = ["p1": p1Sales, "p2": p2Sales, "p3": p3Sales]
 
@@ -925,7 +910,7 @@ extension ProjectViewModel {
                                             price: sale?.2 ?? 0,
                                             paidAmount: sale?.4 ?? 0,
                                             paymentStatus: sale?.3,
-                                            saleDateText: sale?.5,
+                                            saleDate: sale?.5,
                                             deliveryNote: project.phase == .teslim ? "Teslim edildi" : "Anahtar teslim bekliyor"))
             }
         }
@@ -946,19 +931,19 @@ extension ProjectViewModel {
         // MMA artışı ihmal edilmiştir). ALICI ADLARI KURGUDUR (gerçek alıcılar gizlidir).
         // No 1, 5, 9 satışta boş; liste fiyatları satış formunda hazır gelir.
         // (daireNo, kat, alıcı?, bedel, tahsil edilen, sözleşme tarihi?)
-        let karsUnits: [(Int, Int, String?, Double, Double, String?)] = [
+        let karsUnits: [(Int, Int, String?, Double, Double, Date?)] = [
             (1, 0, nil, 1_805_613, 0, nil),
-            (2, 0, "Meryem Karaca", 1_902_563, 371_003, "09 Oca 2025"),
-            (3, 0, "Hasan Demirtaş", 1_902_563, 371_003, "14 Oca 2025"),
-            (4, 0, "Elif Doğan", 1_805_613, 352_093, "16 Oca 2025"),
+            (2, 0, "Meryem Karaca", 1_902_563, 371_003, Fmt.makeDate(9, 1, 2025)),
+            (3, 0, "Hasan Demirtaş", 1_902_563, 371_003, Fmt.makeDate(14, 1, 2025)),
+            (4, 0, "Elif Doğan", 1_805_613, 352_093, Fmt.makeDate(16, 1, 2025)),
             (5, 1, nil, 2_051_221, 0, nil),
-            (6, 1, "Yusuf Aslan", 2_193_416, 427_715, "07 Oca 2025"),
-            (7, 1, "Zehra Çetin", 2_193_416, 427_715, "21 Oca 2025"),
-            (8, 1, "Osman Kaya", 2_051_221, 399_986, "23 Oca 2025"),
+            (6, 1, "Yusuf Aslan", 2_193_416, 427_715, Fmt.makeDate(7, 1, 2025)),
+            (7, 1, "Zehra Çetin", 2_193_416, 427_715, Fmt.makeDate(21, 1, 2025)),
+            (8, 1, "Osman Kaya", 2_051_221, 399_986, Fmt.makeDate(23, 1, 2025)),
             (9, 2, nil, 2_025_368, 0, nil),
-            (10, 2, "İbrahim Güneş", 2_167_562, 422_678, "28 Oca 2025"),
-            (11, 2, "Hatice Yavuz", 2_167_562, 422_678, "30 Oca 2025"),
-            (12, 2, "Ali Yıldırım", 2_025_368, 394_950, "31 Oca 2025"),
+            (10, 2, "İbrahim Güneş", 2_167_562, 422_678, Fmt.makeDate(28, 1, 2025)),
+            (11, 2, "Hatice Yavuz", 2_167_562, 422_678, Fmt.makeDate(30, 1, 2025)),
+            (12, 2, "Ali Yıldırım", 2_025_368, 394_950, Fmt.makeDate(31, 1, 2025)),
         ]
         // Teslimatlar 5-30 Mayıs 2025'te yapıldı (TOKİ resmî haberi).
         for (no, floor, buyer, price, paid, date) in karsUnits {
@@ -970,7 +955,7 @@ extension ProjectViewModel {
                                         price: price,
                                         paidAmount: paid,
                                         paymentStatus: buyer == nil ? nil : .taksitli,
-                                        saleDateText: date,
+                                        saleDate: date,
                                         deliveryNote: buyer == nil ? "Teslime hazır · satışta" : "Teslim edildi · May 2025"))
         }
 
@@ -983,29 +968,29 @@ extension ProjectViewModel {
         // Ara 2024 kurası Oca 2025 sözleşme (19 taksit ≈ %19,5). ALICI ADLARI KURGUDUR.
         // Boş: No 6, 13, 20, 21 (satış formunda gerçek liste fiyatı hazır gelir).
         // (daireNo, kat, alıcı?, bedel, tahsil edilen, sözleşme tarihi?)
-        let kars327Units: [(Int, Int, String?, Double, Double, String?)] = [
-            (1, -1, "Ramazan Öz", 1_571_822, 306_505, "03 Oca 2025"),
-            (2, -1, "Sevgi Aydemir", 1_539_559, 377_192, "12 Mar 2024"),      // emsal
-            (3, 0, "Kadir Bulut", 1_781_526, 347_398, "08 Oca 2025"),
-            (4, 0, "Nuray Ekinci", 1_781_526, 436_474, "14 Mar 2024"),        // emsal
-            (5, 0, "Veli Şimşek", 1_717_002, 420_665, "15 Mar 2024"),         // emsal
+        let kars327Units: [(Int, Int, String?, Double, Double, Date?)] = [
+            (1, -1, "Ramazan Öz", 1_571_822, 306_505, Fmt.makeDate(3, 1, 2025)),
+            (2, -1, "Sevgi Aydemir", 1_539_559, 377_192, Fmt.makeDate(12, 3, 2024)),      // emsal
+            (3, 0, "Kadir Bulut", 1_781_526, 347_398, Fmt.makeDate(8, 1, 2025)),
+            (4, 0, "Nuray Ekinci", 1_781_526, 436_474, Fmt.makeDate(14, 3, 2024)),        // emsal
+            (5, 0, "Veli Şimşek", 1_717_002, 420_665, Fmt.makeDate(15, 3, 2024)),         // emsal
             (6, 0, nil, 1_733_133, 0, nil),
-            (7, 1, "Fadime Uçar", 2_028_870, 497_073, "18 Mar 2024"),         // emsal
-            (8, 1, "Selçuk Erol", 1_910_575, 468_091, "19 Mar 2024"),         // emsal
-            (9, 1, "Melike Sarı", 1_835_297, 357_883, "13 Oca 2025"),
-            (10, 1, "Harun Tekin", 1_953_592, 380_950, "16 Oca 2025"),
-            (11, 2, "Gülay Erdem", 2_066_510, 506_295, "21 Mar 2024"),        // emsal
-            (12, 2, "Ferhat Koçak", 1_948_215, 379_902, "20 Oca 2025"),
+            (7, 1, "Fadime Uçar", 2_028_870, 497_073, Fmt.makeDate(18, 3, 2024)),         // emsal
+            (8, 1, "Selçuk Erol", 1_910_575, 468_091, Fmt.makeDate(19, 3, 2024)),         // emsal
+            (9, 1, "Melike Sarı", 1_835_297, 357_883, Fmt.makeDate(13, 1, 2025)),
+            (10, 1, "Harun Tekin", 1_953_592, 380_950, Fmt.makeDate(16, 1, 2025)),
+            (11, 2, "Gülay Erdem", 2_066_510, 506_295, Fmt.makeDate(21, 3, 2024)),        // emsal
+            (12, 2, "Ferhat Koçak", 1_948_215, 379_902, Fmt.makeDate(20, 1, 2025)),
             (13, 2, nil, 1_872_936, 0, nil),
-            (14, 2, "Şule Aksu", 1_991_231, 388_290, "22 Oca 2025"),
-            (15, 3, "Tarık Ünver", 2_012_739, 493_121, "22 Mar 2024"),        // emsal
-            (16, 3, "Aysel Turan", 2_088_018, 511_564, "25 Mar 2024"),        // emsal
-            (17, 3, "Bülent Işık", 1_894_444, 369_417, "24 Oca 2025"),
-            (18, 3, "Nazan Kurt", 1_969_723, 482_582, "26 Mar 2024"),         // emsal
-            (19, 4, "Erdal Yaman", 2_050_378, 399_824, "27 Oca 2025"),
+            (14, 2, "Şule Aksu", 1_991_231, 388_290, Fmt.makeDate(22, 1, 2025)),
+            (15, 3, "Tarık Ünver", 2_012_739, 493_121, Fmt.makeDate(22, 3, 2024)),        // emsal
+            (16, 3, "Aysel Turan", 2_088_018, 511_564, Fmt.makeDate(25, 3, 2024)),        // emsal
+            (17, 3, "Bülent Işık", 1_894_444, 369_417, Fmt.makeDate(24, 1, 2025)),
+            (18, 3, "Nazan Kurt", 1_969_723, 482_582, Fmt.makeDate(26, 3, 2024)),         // emsal
+            (19, 4, "Erdal Yaman", 2_050_378, 399_824, Fmt.makeDate(27, 1, 2025)),
             (20, 4, nil, 1_932_083, 0, nil),
             (21, 4, nil, 1_856_805, 0, nil),
-            (22, 4, "Songül Ateş", 1_975_100, 483_900, "28 Mar 2024"),        // emsal
+            (22, 4, "Songül Ateş", 1_975_100, 483_900, Fmt.makeDate(28, 3, 2024)),        // emsal
         ]
         for (no, floor, buyer, price, paid, date) in kars327Units {
             apartments.append(Apartment(id: "kars327-\(no)", projectId: "kars327",
@@ -1016,7 +1001,7 @@ extension ProjectViewModel {
                                         price: price,
                                         paidAmount: paid,
                                         paymentStatus: buyer == nil ? nil : .taksitli,
-                                        saleDateText: date,
+                                        saleDate: date,
                                         deliveryNote: buyer == nil ? "Teslime hazır · satışta" : "Teslim edildi · May 2025"))
         }
 
@@ -1024,62 +1009,62 @@ extension ProjectViewModel {
         // Kurucu her projede aynı yöneticidir; diğer ortaklar projeye göre değişir.
         // Uygulamayı kullanan ortak hesabı (User.partner = Serkan Aydın) yalnızca
         // p1 ve kars309'a davetlidir — üyelik filtresinin çalıştığı buradan görülür.
-        let partnerSets: [String: [(String, Bool, String, Int, UUID?)]] = [
+        let partnerSets: [String: [(String, Bool, Date, Int, UUID?)]] = [
             "p1": [
-                ("Mehmet Kılıç", true, "Proje kurucusu · 04 Oca 2026", 40, User.admin.id),
-                ("Serkan Aydın", false, "Katıldı · 12 Mar 2026", 25, User.partner.id),
-                ("Ayşe Tuna", false, "Katıldı · 03 Nis 2026", 20, nil),
-                ("Burak Erdoğan", false, "Katıldı · 21 Nis 2026", 15, nil),
+                ("Mehmet Kılıç", true, Fmt.makeDate(4, 1, 2026), 40, User.admin.id),
+                ("Serkan Aydın", false, Fmt.makeDate(12, 3, 2026), 25, User.partner.id),
+                ("Ayşe Tuna", false, Fmt.makeDate(3, 4, 2026), 20, nil),
+                ("Burak Erdoğan", false, Fmt.makeDate(21, 4, 2026), 15, nil),
             ],
             "p2": [
-                ("Mehmet Kılıç", true, "Proje kurucusu · 18 Şub 2026", 60, User.admin.id),
-                ("Hakan Yücel", false, "Katıldı · 02 Mar 2026", 40, nil),
+                ("Mehmet Kılıç", true, Fmt.makeDate(18, 2, 2026), 60, User.admin.id),
+                ("Hakan Yücel", false, Fmt.makeDate(2, 3, 2026), 40, nil),
             ],
             "p3": [
-                ("Mehmet Kılıç", true, "Proje kurucusu · 11 Kas 2025", 50, User.admin.id),
-                ("Ayşe Tuna", false, "Katıldı · 20 Kas 2025", 50, nil),
+                ("Mehmet Kılıç", true, Fmt.makeDate(11, 11, 2025), 50, User.admin.id),
+                ("Ayşe Tuna", false, Fmt.makeDate(20, 11, 2025), 50, nil),
             ],
             "kars309": [
-                ("Mehmet Kılıç", true, "Proje kurucusu · 12 Ağu 2024", 55, User.admin.id),
-                ("Serkan Aydın", false, "Katıldı · 06 Oca 2025", 45, User.partner.id),
+                ("Mehmet Kılıç", true, Fmt.makeDate(12, 8, 2024), 55, User.admin.id),
+                ("Serkan Aydın", false, Fmt.makeDate(6, 1, 2025), 45, User.partner.id),
             ],
             "kars327": [
-                ("Mehmet Kılıç", true, "Proje kurucusu · 12 Ağu 2024", 70, User.admin.id),
-                ("Burak Erdoğan", false, "Katıldı · 09 Oca 2025", 30, nil),
+                ("Mehmet Kılıç", true, Fmt.makeDate(12, 8, 2024), 70, User.admin.id),
+                ("Burak Erdoğan", false, Fmt.makeDate(9, 1, 2025), 30, nil),
             ],
         ]
         for project in projects {
             for (name, founder, joined, share, userId) in partnerSets[project.id] ?? [] {
                 partners.append(Partner(id: UUID(), projectId: project.id, name: name,
-                                        isFounder: founder, joinedText: joined,
+                                        isFounder: founder, joinedAt: joined,
                                         sharePercent: share, userId: userId))
             }
         }
 
         // ---- Belgeler (ekran 11) --------------------------------------------
-        let p1Documents: [(ProjectDocument.Group, ProjectDocument.FileType, String, String, Double, String, Bool)] = [
-            (.mimari, .pdf, "Vaziyet Planı", "v3", 4.2, "12 Oca 2026", true),
-            (.mimari, .pdf, "Kat Planları (1–5)", "v5", 11.8, "03 Şub 2026", true),
-            (.mimari, .dwg, "Cephe Görünüşleri", "v2", 8.6, "03 Şub 2026", true),
-            (.statik, .pdf, "Statik Hesap Raporu", "v2", 22.4, "18 Oca 2026", true),
-            (.statik, .pdf, "Zemin Etüdü", "v1", 6.1, "04 Oca 2026", true),
-            (.ruhsat, .pdf, "Yapı Ruhsatı", "v1", 1.3, "22 Oca 2026", true),
-            (.ruhsat, .pdf, "İskân Başvurusu", "taslak", 0.8, "14 Tem 2026", false),
+        let p1Documents: [(ProjectDocument.Group, ProjectDocument.FileType, String, String, Double, Date, Bool)] = [
+            (.mimari, .pdf, "Vaziyet Planı", "v3", 4.2, Fmt.makeDate(12, 1, 2026), true),
+            (.mimari, .pdf, "Kat Planları (1–5)", "v5", 11.8, Fmt.makeDate(3, 2, 2026), true),
+            (.mimari, .dwg, "Cephe Görünüşleri", "v2", 8.6, Fmt.makeDate(3, 2, 2026), true),
+            (.statik, .pdf, "Statik Hesap Raporu", "v2", 22.4, Fmt.makeDate(18, 1, 2026), true),
+            (.statik, .pdf, "Zemin Etüdü", "v1", 6.1, Fmt.makeDate(4, 1, 2026), true),
+            (.ruhsat, .pdf, "Yapı Ruhsatı", "v1", 1.3, Fmt.makeDate(22, 1, 2026), true),
+            (.ruhsat, .pdf, "İskân Başvurusu", "taslak", 0.8, Fmt.makeDate(14, 7, 2026), false),
         ]
         for (group, type, name, version, size, date, visible) in p1Documents {
             documents.append(ProjectDocument(id: UUID(), projectId: "p1", group: group, fileType: type,
                                              name: name, versionText: version, sizeMB: size,
-                                             dateText: date, partnerVisible: visible))
+                                             date: date, partnerVisible: visible))
         }
         // Diğer projelerde küçük birer dosya seti.
         for pid in ["p2", "p3"] {
             documents.append(contentsOf: [
                 ProjectDocument(id: UUID(), projectId: pid, group: .mimari, fileType: .pdf,
                                 name: "Vaziyet Planı", versionText: "v1", sizeMB: 3.4,
-                                dateText: "22 Oca 2026", partnerVisible: true),
+                                date: Fmt.makeDate(22, 1, 2026), partnerVisible: true),
                 ProjectDocument(id: UUID(), projectId: pid, group: .ruhsat, fileType: .pdf,
                                 name: "Yapı Ruhsatı", versionText: "v1", sizeMB: 1.1,
-                                dateText: "30 Oca 2026", partnerVisible: true),
+                                date: Fmt.makeDate(30, 1, 2026), partnerVisible: true),
             ])
         }
 
@@ -1089,42 +1074,42 @@ extension ProjectViewModel {
             documents.append(contentsOf: [
                 ProjectDocument(id: UUID(), projectId: pid, group: .ruhsat, fileType: .pdf,
                                 name: "TOKİ 83 Konut Fiyat Listesi", versionText: "resmî", sizeMB: 0.2,
-                                dateText: "29 Ağu 2024", partnerVisible: true),
+                                date: Fmt.makeDate(29, 8, 2024), partnerVisible: true),
                 ProjectDocument(id: UUID(), projectId: pid, group: .ruhsat, fileType: .pdf,
                                 name: "Satış-Kura Duyurusu", versionText: "resmî", sizeMB: 0.1,
-                                dateText: "16 Ara 2024", partnerVisible: true),
+                                date: Fmt.makeDate(16, 12, 2024), partnerVisible: true),
                 ProjectDocument(id: UUID(), projectId: pid, group: .sozlesme, fileType: .pdf,
                                 name: "Sözleşme Dönemi Bilgilendirmesi", versionText: "resmî", sizeMB: 0.1,
-                                dateText: "02 Oca 2025", partnerVisible: true),
+                                date: Fmt.makeDate(2, 1, 2025), partnerVisible: true),
             ])
         }
 
         // ---- Hareket akışı (ekran 07) ---------------------------------------
         activities = [
             ActivityItem(id: UUID(), kind: .materialIn, title: "Demir · 12.500 kg giriş",
-                         meta: "145 Ada / 2 Parsel · İrsaliye #4471", timeText: "09:24", section: .bugun),
+                         meta: "145 Ada / 2 Parsel · İrsaliye #4471", timestamp: Fmt.daysAgo(0, hour: 9, minute: 24)),
             ActivityItem(id: UUID(), kind: .sale, title: "Daire No 17 satıldı — 3,75 M ₺",
-                         meta: "145 Ada / 2 Parsel · Gizem Polat · Kapora alındı", timeText: "08:10", section: .bugun),
+                         meta: "145 Ada / 2 Parsel · Gizem Polat · Kapora alındı", timestamp: Fmt.daysAgo(0, hour: 8, minute: 10)),
             ActivityItem(id: UUID(), kind: .materialOut, title: "Çimento · 180 torba çıkış",
-                         meta: "145 Ada / 2 Parsel · 5. kat şap", timeText: "16:40", section: .dun),
+                         meta: "145 Ada / 2 Parsel · 5. kat şap", timestamp: Fmt.daysAgo(1, hour: 16, minute: 40)),
             ActivityItem(id: UUID(), kind: .partnerJoined, title: "Burak Erdoğan projeye katıldı",
-                         meta: "145 Ada / 2 Parsel · davet kodu ile · salt okunur", timeText: "11:02", section: .dun),
+                         meta: "145 Ada / 2 Parsel · davet kodu ile · salt okunur", timestamp: Fmt.daysAgo(1, hour: 11, minute: 2)),
             ActivityItem(id: UUID(), kind: .materialIn, title: "Pimapen · 42 adet giriş",
-                         meta: "908 Ada / 7 Parsel · İrsaliye #2210", timeText: "Sal", section: .buHafta),
+                         meta: "908 Ada / 7 Parsel · İrsaliye #2210", timestamp: Fmt.daysAgo(3, hour: 10, minute: 0)),
             ActivityItem(id: UUID(), kind: .materialOut, title: "Kum · 24 ton çıkış",
-                         meta: "145 Ada / 2 Parsel · Cephe sıva", timeText: "Pzt", section: .buHafta),
+                         meta: "145 Ada / 2 Parsel · Cephe sıva", timestamp: Fmt.daysAgo(3, hour: 10, minute: 0)),
         ]
 
         // ---- Şantiye fotoğraf yuvaları (ekran 09) ---------------------------
-        let currentWeek = ["05 Ağu", "05 Ağu", "04 Ağu", "03 Ağu", "02 Ağu", "02 Ağu"]
-        let lastWeek = ["29 Tem", "28 Tem", "27 Tem", "26 Tem", "25 Tem", "24 Tem"]
-        for date in currentWeek {
-            sitePhotos.append(SitePhoto(id: UUID(), projectId: "p1", dateText: date,
-                                        isCurrentWeek: true, image: nil))
+        // Gün sayısı bugüne göre verilir; "bu hafta / geçen hafta" ayrımını
+        // SitePhoto tarihten hesaplar (sabit bayrak yarın yanlış olurdu).
+        for days in [0, 0, 1, 2, 3, 3] {
+            sitePhotos.append(SitePhoto(id: UUID(), projectId: "p1",
+                                        date: Fmt.daysAgo(days), image: nil))
         }
-        for date in lastWeek {
-            sitePhotos.append(SitePhoto(id: UUID(), projectId: "p1", dateText: date,
-                                        isCurrentWeek: false, image: nil))
+        for days in [8, 9, 10, 11, 12, 13] {
+            sitePhotos.append(SitePhoto(id: UUID(), projectId: "p1",
+                                        date: Fmt.daysAgo(days), image: nil))
         }
     }
 }

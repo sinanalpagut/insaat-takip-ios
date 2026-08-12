@@ -7,8 +7,13 @@ struct Partner: Codable, Identifiable, Equatable {
     let projectId: String
     var name: String
     var isFounder: Bool         // Proje kurucusu (yönetici) mi?
-    var joinedText: String      // "Katıldı · 12 Mar 2026" / "Proje kurucusu · 04 Oca 2026"
+    var joinedAt: Date          // Katılım / kuruluş tarihi
     var sharePercent: Int       // Hisse yüzdesi
+
+    /// "Katıldı · 12 Mar 2026" / "Proje kurucusu · 04 Oca 2026"
+    var joinedText: String {
+        "\(isFounder ? "Proje kurucusu" : "Katıldı") · \(Fmt.shortDate(joinedAt))"
+    }
     /// Uygulamaya giren hesap. nil = hisse tanımlı ama kişi henüz katılmamış.
     /// Ortağın hangi projeleri görebileceği bu bağdan çözülür.
     var userId: UUID?

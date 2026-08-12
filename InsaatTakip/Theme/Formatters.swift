@@ -78,20 +78,64 @@ enum Fmt {
         return "\(decimal2.string(from: NSNumber(value: price)) ?? "") ₺/\(unit)"
     }
 
-    /// "10 Ağu 2026" biçiminde Türkçe kısa tarih.
-    static func shortDate(_ date: Date = Date()) -> String {
+    /// Uygulamanın her yerinde kullanılan takvim (tr-TR, pazartesi haftanın ilk günü).
+    static let calendar: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.locale = locale
+        c.firstWeekday = 2   // Pazartesi
+        return c
+    }()
+
+    private static func formatter(_ pattern: String) -> DateFormatter {
         let f = DateFormatter()
         f.locale = locale
-        f.dateFormat = "d MMM yyyy"
-        return f.string(from: date)
+        f.calendar = calendar
+        f.dateFormat = pattern
+        return f
+    }
+
+    /// "10 Ağu 2026" biçiminde Türkçe kısa tarih.
+    static func shortDate(_ date: Date = Date()) -> String {
+        formatter("d MMM yyyy").string(from: date)
+    }
+
+    /// "10 Ağu" — yıl olmadan (şantiye fotoğrafı, aynı yıl içindeki belgeler).
+    static func dayMonth(_ date: Date) -> String {
+        formatter("d MMM").string(from: date)
     }
 
     /// "09:24" biçiminde saat.
     static func clock(_ date: Date = Date()) -> String {
-        let f = DateFormatter()
-        f.locale = locale
-        f.dateFormat = "HH:mm"
-        return f.string(from: date)
+        formatter("HH:mm").string(from: date)
+    }
+
+    /// Hareket akışındaki zaman etiketi: bugün "09:24", dün "Dün",
+    /// bu hafta "Sal", daha eski "12 Mar".
+    static func relativeTime(_ date: Date) -> String {
+        if calendar.isDateInToday(date) { return clock(date) }
+        if calendar.isDateInYesterday(date) { return "Dün" }
+        if let days = calendar.dateComponents([.day], from: date, to: Date()).day, days < 7 {
+            return formatter("EEE").string(from: date)   // "Sal"
+        }
+        return dayMonth(date)
+    }
+
+    /// Belirli bir günü Date olarak üretir (mock veri ve testler için).
+    static func makeDate(_ day: Int, _ month: Int, _ year: Int,
+                         hour: Int = 12, minute: Int = 0) -> Date {
+        var components = DateComponents()
+        components.day = day
+        components.month = month
+        components.year = year
+        components.hour = hour
+        components.minute = minute
+        return calendar.date(from: components) ?? Date()
+    }
+
+    /// Bugünden geriye/ileriye gün kaydırır (mock verideki "bugün", "dün" kayıtları).
+    static func daysAgo(_ days: Int, hour: Int = 12, minute: Int = 0) -> Date {
+        let base = calendar.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
     }
 
     /// MB gösterimi: 4.2 → "4,2 MB" · 0.8 → "0,8 MB"
