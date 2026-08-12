@@ -40,7 +40,7 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
       büyüklüklerde kuruşu tam temsil ediyor; değişiklik her para alanına
       dokunduğu için Firebase göçüyle birlikte yapılacak
 - [x] 11. Gider defteri (işçilik, taşeron, arsa, harç, makine, yakıt)
-- [ ] 12. Tahsilat ve taksit defteri (ödeme geçmişi, vade, dekont)
+- [x] 12. Tahsilat ve taksit defteri (ödeme geçmişi, vade, dekont)
 - [ ] 13. Silme / düzenleme / geçmiş tarihli kayıt + denetim izi
 - [ ] 14. Daire durum modeli (kat karşılığı, rezerve, iptal) + daire bilgisi düzenleme
 - [ ] 15. Repository katmanı (ProjectViewModel'i protokol arkasına al)

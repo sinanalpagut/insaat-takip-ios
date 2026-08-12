@@ -25,6 +25,7 @@ final class ProjectViewModel: ObservableObject {
     @Published var activities: [ActivityItem] = []     // Hareket / bildirim akışı
     @Published var sitePhotos: [SitePhoto] = []        // Şantiye fotoğraf yuvaları
     @Published var expenses: [Expense] = []            // Malzeme dışı giderler
+    @Published var payments: [Payment] = []            // Daire tahsilatları
     @Published var apartmentPhotos: [ApartmentPhoto] = []   // Daire görselleri
     /// Fiş fotoğrafları — hareket kimliğine göre (kamerayla çekilen irsaliye).
     @Published var receiptImages: [UUID: UIImage] = [:]
@@ -286,6 +287,11 @@ final class ProjectViewModel: ObservableObject {
         apartment.saleDate = nil
         apartments[index] = apartment
 
+        // Satış iptal edilince o daireye ait tahsilat kayıtları da düşer.
+        let removed = payments.filter { $0.apartmentId == apartmentId }
+        removed.forEach { receiptImages[$0.id] = nil }
+        payments.removeAll { $0.apartmentId == apartmentId }
+
         // İptal de bir harekettir; ortakların akışında görünmeli (şeffaflık).
         let projectTitle = projects.first { $0.id == apartment.projectId }?.title ?? ""
         activities.insert(ActivityItem(id: UUID(), kind: .sale,
@@ -295,6 +301,73 @@ final class ProjectViewModel: ObservableObject {
         hasUnreadActivity = true
         flash("Satış iptal edildi")
         return true
+    }
+
+    // MARK: Tahsilat
+
+    /// Bir dairenin ödeme geçmişi (yeniden eskiye).
+    func payments(forApartment apartmentId: UUID) -> [Payment] {
+        payments.filter { $0.apartmentId == apartmentId }.sorted { $0.date > $1.date }
+    }
+
+    /// Daireye tahsilat işler. Toplam `paidAmount` bu kayıtlardan yeniden
+    /// hesaplandığı için yönetici eski toplamı akıldan toplamak zorunda kalmaz.
+    @discardableResult
+    func addPayment(role: UserRole, apartmentId: UUID, amountText: String,
+                    method: Payment.Method, note: String, date: Date,
+                    receiptImage: UIImage? = nil) -> Bool {
+        guard role == .admin else { return false }
+        guard let apartment = apartments.first(where: { $0.id == apartmentId }) else { return false }
+
+        let amount = Self.parseNumber(amountText)
+        guard amount > 0 else {
+            flash("Tutar girilmedi")
+            return false
+        }
+
+        let payment = Payment(id: UUID(), apartmentId: apartmentId, amount: amount,
+                              date: date, method: method,
+                              note: note.trimmingCharacters(in: .whitespaces),
+                              user: User.admin.name)
+        payments.append(payment)
+        if let receiptImage { receiptImages[payment.id] = receiptImage }
+        recalculateCollected(for: apartmentId)
+
+        let projectTitle = projects.first { $0.id == apartment.projectId }?.title ?? ""
+        activities.insert(ActivityItem(id: UUID(), kind: .sale,
+                                       title: "Daire No \(apartment.apartmentNumber) tahsilat — \(Fmt.compactMoney(amount))",
+                                       meta: "\(projectTitle) · \(payment.detailText)",
+                                       timestamp: Date()), at: 0)
+        hasUnreadActivity = true
+        flash("Tahsilat kaydedildi")
+        return true
+    }
+
+    /// Yanlış girilen tahsilatı siler; toplam yeniden hesaplanır.
+    func deletePayment(role: UserRole, id: UUID) {
+        guard role == .admin,
+              let payment = payments.first(where: { $0.id == id }) else { return }
+        payments.removeAll { $0.id == id }
+        receiptImages[id] = nil
+        recalculateCollected(for: payment.apartmentId)
+        flash("Tahsilat silindi")
+    }
+
+    /// `paidAmount` ve ödeme durumu TEK yerden, ödeme kayıtlarından türetilir.
+    private func recalculateCollected(for apartmentId: UUID) {
+        guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return }
+        let total = payments.filter { $0.apartmentId == apartmentId }.reduce(0) { $0 + $1.amount }
+        apartments[index].paidAmount = total
+
+        // Bedelin tamamı tahsil edildiyse durum otomatik "Tamamlandı"ya geçer.
+        if apartments[index].isSold, apartments[index].price > 0 {
+            if total >= apartments[index].price {
+                apartments[index].paymentStatus = .tamamlandi
+            } else if apartments[index].paymentStatus == .tamamlandi {
+                // Ödeme silinip toplam düşerse durum geri alınır.
+                apartments[index].paymentStatus = .taksitli
+            }
+        }
     }
 
     /// Malzeme dışı gider kaydeder (işçilik, taşeron, arsa, harç…).
@@ -403,9 +476,23 @@ final class ProjectViewModel: ObservableObject {
         apartment.buyerName = trimmedBuyer
         apartment.price = price
         apartment.paymentStatus = payment
-        apartment.paidAmount = payment == .tamamlandi ? price : min(price, Self.parseNumber(paidText))
         apartment.saleDate = saleDate ?? apartment.saleDate ?? Date()
         apartments[index] = apartment
+
+        // İlk tahsilat da bir kayıt olarak defterde durur; `paidAmount` artık
+        // doğrudan yazılmıyor, ödeme kayıtlarından hesaplanıyor.
+        if isNewSale {
+            let initial = payment == .tamamlandi ? price : min(price, Self.parseNumber(paidText))
+            if initial > 0 {
+                payments.append(Payment(id: UUID(), apartmentId: apartmentId,
+                                        amount: initial,
+                                        date: apartment.saleDate ?? Date(),
+                                        method: payment == .tamamlandi ? .havale : .pesinat,
+                                        note: payment == .tamamlandi ? "Satış bedeli" : "Sözleşme peşinatı",
+                                        user: User.admin.name))
+            }
+        }
+        recalculateCollected(for: apartmentId)
 
         if isNewSale {
             // Akışta hangi projenin dairesi olduğu görünmeli — malzeme kayıtlarıyla aynı düzen.
@@ -1181,6 +1268,57 @@ extension ProjectViewModel {
                                 name: "Sözleşme Dönemi Bilgilendirmesi", versionText: "resmî", sizeMB: 0.1,
                                 date: Fmt.makeDate(2, 1, 2025), partnerVisible: true),
             ])
+        }
+
+        // ---- Tahsilat kayıtları ---------------------------------------------
+        // Mock verideki tek `paidAmount` toplamı gerçek ödeme kayıtlarına açılır:
+        // peşin satışta tek kayıt, taksitlide sözleşme peşinatı + aylık taksitler.
+        // Toplam yine aynı tutar; fark, artık her ödemenin tarihi ve yöntemi var.
+        for apartment in apartments where apartment.isSold && apartment.paidAmount > 0 {
+            let saleDate = apartment.saleDate ?? Date()
+            let paid = apartment.paidAmount
+
+            if apartment.paymentStatus == .tamamlandi {
+                payments.append(Payment(id: UUID(), apartmentId: apartment.id, amount: paid,
+                                        date: saleDate, method: .havale,
+                                        note: "Satış bedeli", user: admin))
+                continue
+            }
+
+            if apartment.paymentStatus == .kapora {
+                payments.append(Payment(id: UUID(), apartmentId: apartment.id, amount: paid,
+                                        date: saleDate, method: .pesinat,
+                                        note: "Kapora", user: admin))
+                continue
+            }
+
+            // Taksitli: %10 peşinat + kalanı eşit aylık taksitlere bölünür.
+            let downPayment = min(paid, (apartment.price * 0.10).rounded())
+            payments.append(Payment(id: UUID(), apartmentId: apartment.id, amount: downPayment,
+                                    date: saleDate, method: .pesinat,
+                                    note: "Sözleşme peşinatı", user: admin))
+
+            let remaining = paid - downPayment
+            guard remaining > 0 else { continue }
+            let monthsElapsed = max(1, Fmt.calendar.dateComponents([.month], from: saleDate, to: Date()).month ?? 1)
+            let installment = (remaining / Double(monthsElapsed)).rounded()
+
+            var written = 0.0
+            for month in 1...monthsElapsed {
+                guard let date = Fmt.calendar.date(byAdding: .month, value: month, to: saleDate),
+                      date <= Date() else { break }
+                // Son taksit kuruş farkını kapatır.
+                let amount = (month == monthsElapsed) ? (remaining - written) : installment
+                guard amount > 0 else { break }
+                payments.append(Payment(id: UUID(), apartmentId: apartment.id, amount: amount,
+                                        date: date, method: .taksit,
+                                        note: "\(month). taksit", user: admin))
+                written += amount
+            }
+        }
+        // Toplamları kayıtlardan yeniden türet (tek doğruluk kaynağı).
+        for apartment in apartments where apartment.isSold {
+            recalculateCollected(for: apartment.id)
         }
 
         // ---- Giderler (malzeme dışı) ----------------------------------------

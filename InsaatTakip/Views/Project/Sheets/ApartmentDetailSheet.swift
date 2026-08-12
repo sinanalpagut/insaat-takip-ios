@@ -18,6 +18,7 @@ struct ApartmentDetailSheet: View {
     @State private var pickedItems: [PhotosPickerItem] = []
     @State private var showCamera = false
     @State private var showCancelConfirm = false
+    @State private var showPayment = false
 
     private var apartment: Apartment? {
         viewModel.apartments.first { $0.id == apartmentId }
@@ -52,6 +53,10 @@ struct ApartmentDetailSheet: View {
 
                         imageStrip(apartment)
                             .padding(.top, 10)
+
+                        // Tahsilat defteri
+                        paymentSection(apartment)
+                            .padding(.top, 20)
 
                         // Detay satırları
                         detailRow("Ödeme durumu", apartment.paymentStatus?.rawValue ?? "—")
@@ -107,6 +112,9 @@ struct ApartmentDetailSheet: View {
             Button("Vazgeç", role: .cancel) {}
         } message: {
             Text("Daire No \(apartment?.apartmentNumber ?? 0) tekrar boş duruma dönecek; alıcı ve tahsilat bilgisi silinecek. Bu işlem ortakların akışında görünür.")
+        }
+        .sheet(isPresented: $showPayment) {
+            PaymentSheet(apartmentId: apartmentId)
         }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker(
@@ -251,6 +259,119 @@ struct ApartmentDetailSheet: View {
             let ready = images
             await MainActor.run {
                 viewModel.addApartmentPhotos(role: role, apartmentId: apartmentId, images: ready)
+            }
+        }
+    }
+
+    /// Tahsilat defteri: kalan alacak + ödeme geçmişi + yöneticiye ekleme.
+    private func paymentSection(_ apartment: Apartment) -> some View {
+        let payments = viewModel.payments(forApartment: apartment.id)
+        let remaining = max(0, apartment.price - apartment.paidAmount)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Tahsilat")
+                    .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                Spacer()
+                Text("\(payments.count) ödeme")
+                    .font(.manrope(12, .semiBold))
+                    .foregroundColor(Palette.textSecondary)
+            }
+
+            // Tahsil edilen / kalan
+            HStack {
+                Text("Tahsil edilen \(Fmt.compactMoney(apartment.paidAmount))")
+                Spacer()
+                Text(remaining > 0 ? "Kalan \(Fmt.compactMoney(remaining))" : "Tamamlandı")
+                    .foregroundColor(remaining > 0 ? Palette.textMuted : Palette.success)
+            }
+            .font(.manrope(11.5, .semiBold))
+            .foregroundColor(Palette.textMuted)
+            .padding(.top, 10)
+
+            ProgressBarView(fraction: apartment.collectionFraction, fill: Palette.success, height: 5)
+                .padding(.top, 7)
+
+            // Ödeme geçmişi
+            if payments.isEmpty {
+                Text("Henüz tahsilat kaydı yok")
+                    .font(.manrope(11.5, .medium))
+                    .foregroundColor(Palette.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(payments.prefix(6).enumerated()), id: \.element.id) { index, payment in
+                        paymentRow(payment)
+                        if index < min(payments.count, 6) - 1 {
+                            Divider().overlay(Palette.divider)
+                        }
+                    }
+                }
+                .padding(.top, 6)
+
+                if payments.count > 6 {
+                    Text("+ \(payments.count - 6) ödeme daha")
+                        .font(.manrope(11.5, .semiBold))
+                        .foregroundColor(Palette.accent)
+                        .padding(.top, 4)
+                }
+            }
+
+            if isAdmin {
+                Button {
+                    showPayment = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("Ödeme Ekle")
+                            .font(.manrope(13.5, .bold))
+                    }
+                    .foregroundColor(Palette.accent)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(Palette.accentTint)
+                    .cornerRadius(13)
+                }
+                .padding(.top, 10)
+            }
+        }
+    }
+
+    private func paymentRow(_ payment: Payment) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: payment.method.icon)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Palette.success)
+                .frame(width: 28, height: 28)
+                .background(Palette.successTint)
+                .cornerRadius(9)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(payment.detailText)
+                    .font(.manrope(12.5, .bold))
+                    .foregroundColor(Palette.ink)
+                    .lineLimit(1)
+                Text(payment.dateText)
+                    .font(.manrope(11, .medium))
+                    .foregroundColor(Palette.textSecondary)
+            }
+
+            Spacer()
+
+            Text(Fmt.compactMoney(payment.amount))
+                .font(.sora(13, .bold))
+                .foregroundColor(Palette.success)
+        }
+        .padding(.vertical, 11)
+        .contextMenu {
+            if isAdmin {
+                Button(role: .destructive) {
+                    viewModel.deletePayment(role: appState.currentUser?.role ?? .partner, id: payment.id)
+                } label: {
+                    Label("Tahsilatı sil", systemImage: "trash")
+                }
             }
         }
     }
