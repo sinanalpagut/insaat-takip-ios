@@ -45,8 +45,16 @@ struct Material: Codable, Identifiable, Equatable {
     var totalCost: Double { accruedCost }
 
     /// Kritik stok: kalan oranı eşiğin altına düşünce uyarı paletine geçer.
+    ///
+    /// `totalIn > 0` koşulu şart: hiç alım yapılmamış kalem "kritik stok" değil,
+    /// yalnızca "henüz alınmadı"dır. Bu koşul olmadan yeni kurulan projede
+    /// dokuz kalemin dokuzu da kırmızı "KRİTİK" rozetiyle açılıyordu ve rozet
+    /// anlamını yitiriyordu — gerçekten kritik olan bir kalem o gürültünün
+    /// içinde fark edilmezdi.
     static let criticalThreshold = 0.10
-    var isCritical: Bool { remainingFraction < Material.criticalThreshold }
+    var isCritical: Bool {
+        totalIn > 0 && remainingFraction < Material.criticalThreshold
+    }
 
     /// Toplamları devir + hareketlerden yeniden türetir.
     /// Formül burada durur çünkü iki ayrı çağıranı var: çalışma zamanında
