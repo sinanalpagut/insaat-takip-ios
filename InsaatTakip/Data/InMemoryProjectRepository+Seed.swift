@@ -39,17 +39,17 @@ extension InMemoryProjectRepository {
         // (toki.gov.tr haberi) — iki blok da Teslim fazında, ilerleme %100.
         projects = [
             Project(id: DemoID.cayirova, blockNumber: "145", parcelNumber: "2", district: "Çayırova", city: "Kocaeli",
-                    floors: 5, totalApartments: 20, phase: .kabaInsaat, progress: 68, ownerId: User.admin.id, invite: nil, photoCount: 48),
+                    floors: 5, totalApartments: 20, phase: .kabaInsaat, progress: 68, ownerUid: User.admin.id, memberUids: [User.admin.id], createdAt: Fmt.daysAgo(400), invite: nil, photoCount: 48),
             Project(id: DemoID.nilufer, blockNumber: "1287", parcelNumber: "14", district: "Nilüfer", city: "Bursa",
-                    floors: 4, totalApartments: 12, phase: .temel, progress: 34, ownerId: User.admin.id, invite: nil, photoCount: 12),
+                    floors: 4, totalApartments: 12, phase: .temel, progress: 34, ownerUid: User.admin.id, memberUids: [User.admin.id], createdAt: Fmt.daysAgo(400), invite: nil, photoCount: 12),
             Project(id: DemoID.kepez, blockNumber: "908", parcelNumber: "7", district: "Kepez", city: "Antalya",
-                    floors: 3, totalApartments: 8, phase: .teslim, progress: 96, ownerId: User.admin.id, invite: nil, photoCount: 64),
+                    floors: 3, totalApartments: 8, phase: .teslim, progress: 96, ownerUid: User.admin.id, memberUids: [User.admin.id], createdAt: Fmt.daysAgo(400), invite: nil, photoCount: 64),
             Project(id: DemoID.kars309, blockNumber: "1224", parcelNumber: "1", district: "Karacaören", city: "Kars",
-                    floors: 3, totalApartments: 12, phase: .teslim, progress: 100, ownerId: User.admin.id, invite: nil, photoCount: 0),
+                    floors: 3, totalApartments: 12, phase: .teslim, progress: 100, ownerUid: User.admin.id, memberUids: [User.admin.id], createdAt: Fmt.daysAgo(400), invite: nil, photoCount: 0),
             // "kars327": GERÇEK proje — TOKİ Kars Karacaören 327 Konut, Ada 1139 / Parsel 3,
             // GB Blok 1 (1 bodrum + zemin + 4 normal kat, 22 daire, 3+1 · 103,8 m² brüt / 83,9 m² net).
             Project(id: DemoID.kars327, blockNumber: "1139", parcelNumber: "3", district: "Karacaören", city: "Kars",
-                    floors: 6, totalApartments: 22, phase: .teslim, progress: 100, ownerId: User.admin.id, invite: nil, photoCount: 0),
+                    floors: 6, totalApartments: 22, phase: .teslim, progress: 100, ownerUid: User.admin.id, memberUids: [User.admin.id], createdAt: Fmt.daysAgo(400), invite: nil, photoCount: 0),
         ]
 
         // ---- Malzemeler (9 kalem × 3 proje) ---------------------------------
@@ -358,7 +358,7 @@ extension InMemoryProjectRepository {
         // Kurucu her projede aynı yöneticidir; diğer ortaklar projeye göre değişir.
         // Uygulamayı kullanan ortak hesabı (User.partner = Serkan Aydın) yalnızca
         // p1 ve kars309'a davetlidir — üyelik filtresinin çalıştığı buradan görülür.
-        let partnerSets: [UUID: [(String, Bool, Date, Int, UUID?)]] = [
+        let partnerSets: [UUID: [(String, Bool, Date, Int, String?)]] = [
             DemoID.cayirova: [
                 ("Mehmet Kılıç", true, Fmt.makeDate(4, 1, 2026), 40, User.admin.id),
                 ("Serkan Aydın", false, Fmt.makeDate(12, 3, 2026), 25, User.partner.id),
@@ -382,11 +382,17 @@ extension InMemoryProjectRepository {
                 ("Burak Erdoğan", false, Fmt.makeDate(9, 1, 2025), 30, nil),
             ],
         ]
-        for project in projects {
-            for (name, founder, joined, share, userId) in partnerSets[project.id] ?? [] {
+        for (index, project) in projects.enumerated() {
+            for (name, founder, joined, share, userUid) in partnerSets[project.id] ?? [] {
                 partners.append(Partner(id: UUID(), projectId: project.id, name: name,
                                         isFounder: founder, joinedAt: joined,
-                                        sharePercent: share, userId: userId))
+                                        sharePercent: share, userUid: userUid))
+                // Üyelik izdüşümü: ortağın hesabı varsa projenin memberUids'ine girer.
+                // Firestore'da "üyesi olduğum projeler" ancak bu diziyle sorgulanabilir;
+                // güvenlik kuralı bir belgeyi doğrulayabilir ama sorguya kapsam veremez.
+                if let userUid, !projects[index].memberUids.contains(userUid) {
+                    projects[index].memberUids.append(userUid)
+                }
             }
         }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseCore
 
 // MARK: - Uygulama Girişi
 
@@ -8,6 +9,14 @@ struct InsaatTakipApp: App {
     @StateObject private var appState = AppState()
     /// Tüm proje verisi ve iş mantığı.
     @StateObject private var viewModel = ProjectViewModel()
+
+    init() {
+        // GoogleService-Info.plist'i okuyup Firebase'i başlatır. Kalıcılık ve
+        // Auth henüz bağlı değil (bkz. ANALIZ.md Faz 2) — bu satır yalnızca
+        // SDK'nın uygulamaya doğru bağlandığını doğrulamak için var; sonraki
+        // adımlarda repository ve kimlik doğrulama buna dayanacak.
+        FirebaseApp.configure()
+    }
 
     var body: some Scene {
         WindowGroup {

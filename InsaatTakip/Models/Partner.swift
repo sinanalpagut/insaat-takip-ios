@@ -16,7 +16,10 @@ struct Partner: Codable, Identifiable, Equatable {
     }
     /// Uygulamaya giren hesap. nil = hisse tanımlı ama kişi henüz katılmamış.
     /// Ortağın hangi projeleri görebileceği bu bağdan çözülür.
-    var userId: UUID?
+    /// Bu ortağın Firebase `uid`'i. `nil` olabilir: yönetici hisseyi tanımlamış
+    /// ama kişi henüz davet kodunu kullanmamış olabilir — o yüzden `Partner`
+    /// kaydı üyelikten (Project.memberUids) ayrı yaşıyor.
+    var userUid: String?
 
     var initials: String {
         let parts = name.split(separator: " ")

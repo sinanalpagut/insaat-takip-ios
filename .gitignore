@@ -31,3 +31,6 @@ fastlane/test_output
 
 # Gerçek veri referansları (TOKİ fiyat listesi vb.) — repoya girmez, yerelde kalır
 DemoAssets/
+
+# Firebase yapılandırması — proje kimliği ve API anahtarı taşır, repoya girmez
+GoogleService-Info.plist

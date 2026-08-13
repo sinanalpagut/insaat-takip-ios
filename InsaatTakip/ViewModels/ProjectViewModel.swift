@@ -144,12 +144,16 @@ final class ProjectViewModel: ObservableObject {
     /// ortak, diğer projelerin alıcı adlarını ve cirosunu da görüyordu.
     func visibleProjects(for user: User?) -> [Project] {
         guard let user else { return [] }
+        // Üyelik `memberUids` üzerinden okunur; Partner kaydı üzerinden DEĞİL.
+        // Firestore'da "üyesi olduğum projeler" ancak bu diziyle sorgulanabiliyor
+        // (`whereField("memberUids", arrayContains: uid)`), o yüzden yerel filtre
+        // de aynı alana bakmalı — iki kaynak ayrışırsa buluta geçişte ekran
+        // sessizce farklı bir liste gösterirdi.
         switch user.role {
         case .admin:
-            return projects.filter { $0.ownerId == user.id }
+            return projects.filter { $0.ownerUid == user.id }
         case .partner:
-            let memberOf = Set(partners.filter { $0.userId == user.id }.map(\.projectId))
-            return projects.filter { memberOf.contains($0.id) }
+            return projects.filter { $0.memberUids.contains(user.id) }
         }
     }
 
@@ -1061,7 +1065,11 @@ final class ProjectViewModel: ObservableObject {
                               district: district.isEmpty ? "—" : district,
                               city: city.isEmpty ? "—" : city,
                               floors: max(1, floors), totalApartments: max(1, apartmentCount),
-                              phase: .temel, progress: 0, ownerId: User.admin.id, invite: nil, photoCount: 0)
+                              phase: .temel, progress: 0,
+                              ownerUid: User.admin.id,
+                              memberUids: [User.admin.id],
+                              createdAt: Date(),
+                              invite: nil, photoCount: 0)
         projects.append(project)
         var writes: [DocumentChange] = [.project(project)]
 
@@ -1097,7 +1105,7 @@ final class ProjectViewModel: ObservableObject {
         let founder = Partner(id: UUID(), projectId: project.id, name: User.admin.name,
                               isFounder: true,
                               joinedAt: Date(),
-                              sharePercent: 100, userId: User.admin.id)
+                              sharePercent: 100, userUid: User.admin.id)
         partners.append(founder)
         writes.append(.partner(founder))
 
@@ -1159,20 +1167,24 @@ final class ProjectViewModel: ObservableObject {
         if invite.isExpired { return .expired }
 
         let project = projects[index]
-        if partners.contains(where: { $0.projectId == project.id && $0.userId == user.id }) {
+        if project.memberUids.contains(user.id) {
             return .alreadyMember
         }
 
         // Kod harcanır — tek kullanımlık.
         projects[index].invite?.usedAt = Date()
         projects[index].invite?.usedByName = user.name
+        // Üyelik izdüşümü — Partner kaydıyla BİRLİKTE yazılır. Firestore'da bu
+        // ikisi tek transaction olacak: yarısı yazılan bir katılım, ya görünmeyen
+        // bir ortak ya da hisse kaydı olmayan bir üye bırakırdı.
+        projects[index].memberUids.append(user.id)
 
         // Hisse yüzdesi yönetici tarafından sonradan tanımlanır (Faz 3: ortak cari hesabı).
         let partner = Partner(id: UUID(), projectId: project.id, name: user.name,
                               isFounder: false,
                               joinedAt: Date(),
                               sharePercent: 0,
-                              userId: user.id)
+                              userUid: user.id)
         partners.append(partner)
 
         let activity = pushActivity(

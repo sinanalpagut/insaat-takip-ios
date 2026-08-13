@@ -23,9 +23,21 @@ struct Project: Codable, Identifiable, Equatable {
     var totalApartments: Int       // Toplam daire
     var phase: ProjectPhase        // Yapım aşaması
     var progress: Int              // İnşaat ilerlemesi (%)
-    /// Projeyi kuran yönetici. Kimin hangi projeyi göreceği buradan belirlenir;
-    /// veritabanına geçince güvenlik kuralının dayanacağı alan da budur.
-    var ownerId: UUID
+    /// Projeyi kuran yöneticinin Firebase `uid`'i. Kimin hangi projeyi göreceği
+    /// buradan belirlenir; güvenlik kuralının dayandığı alan da budur
+    /// (`request.auth.uid == resource.data.ownerUid`).
+    var ownerUid: String
+    /// Projeyi görebilen TÜM kullanıcılar (sahip dahil).
+    ///
+    /// Ortağın "üyesi olduğum projeler" listesi ancak
+    /// `whereField("memberUids", arrayContains: uid)` ile sorgulanabilir:
+    /// güvenlik kuralı bir belgeyi doğrulayabilir ama sorguya KAPSAM VEREMEZ.
+    /// Bu yüzden üyelik hem burada (yetki izdüşümü) hem `Partner` kaydında
+    /// (hisse, ad, katılım tarihi — iş verisi) duruyor; ikisi farklı sorulara
+    /// cevap veriyor ve tek senkron noktası davet akışıdır.
+    var memberUids: [String]
+    /// Dashboard sıralaması ve zorunlu bileşik indeks için.
+    var createdAt: Date
     var invite: Invite?            // Üretilmiş aktif davet (kod + geçerlilik)
     var photoCount: Int            // Şantiye fotoğraf sayısı (arşiv dahil)
 
