@@ -240,8 +240,8 @@ struct SaleFormSheet: View {
             return
         }
         buyerName = apartment.buyerName ?? ""
-        priceText = Fmt.qty(apartment.price)
-        paidText = Fmt.qty(apartment.paidAmount)
+        priceText = Fmt.moneyText(apartment.price)
+        paidText = Fmt.moneyText(apartment.paidAmount)
         payment = apartment.paymentStatus ?? .tamamlandi
         saleDate = apartment.saleDate ?? Date()
     }
@@ -253,7 +253,7 @@ struct SaleFormSheet: View {
     /// ciro o tutar kadar şişiyordu.
     private func prefillListPrice(_ apartment: Apartment) {
         guard !apartment.isCommitted else { return }
-        priceText = apartment.price > 0 ? Fmt.qty(apartment.price) : ""
+        priceText = apartment.price > .zero ? Fmt.moneyText(apartment.price) : ""
     }
 
     private func save() {

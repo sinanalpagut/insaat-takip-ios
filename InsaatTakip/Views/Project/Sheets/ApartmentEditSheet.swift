@@ -201,7 +201,7 @@ struct ApartmentEditSheet: View {
         area = apartment.area == "—" ? "" : apartment.area
         floor = apartment.floor
         status = apartment.status
-        listPriceText = apartment.price > 0 ? Fmt.qty(apartment.price) : ""
+        listPriceText = apartment.price > .zero ? Fmt.moneyText(apartment.price) : ""
         deliveryNote = apartment.deliveryNote
     }
 

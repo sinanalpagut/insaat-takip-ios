@@ -36,9 +36,12 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
 - [x] 9. Kimlik ve üyelik modeli (userId/ownerId, davet kodu ↔ proje bağı, dashboard filtresi)
 - [x] 10a. Tarihler → `Date`, `ActivityItem.section` hesaplanıyor
 - [x] 10b. Kimlikler → `UUID` (Project / Material / Apartment)
-- [ ] 10c. Para → kuruş `Int64` — **Faz 2'ye ertelendi**: `Double` bu
-      büyüklüklerde kuruşu tam temsil ediyor; değişiklik her para alanına
-      dokunduğu için Firebase göçüyle birlikte yapılacak
+- [x] 10c. Para → kuruş `Int64` (`Kurus` tipi) — Faz 2 şeması Double yazılmasın diye
+      Firestore'dan ÖNCE yapıldı; sonradan yapmak kayıtlı dokümanların göçü olurdu.
+      `Kurus` bilerek tam sayı literaline uymuyor: 173 demo sabitinin her biri
+      derleme hatası verdi, yani iş listesini derleyici çıkardı. Bölme operatörü
+      de yok — para/para bölmesinin oran ürettiği üç nokta sessiz tam sayı
+      bölmesi olmak yerine derleme hatasına dönüştü.
 - [x] 11. Gider defteri (işçilik, taşeron, arsa, harç, makine, yakıt)
 - [x] 12. Tahsilat ve taksit defteri (ödeme geçmişi, vade, dekont)
 - [x] 13. Silme / düzenleme / geçmiş tarihli kayıt + denetim izi
@@ -53,6 +56,9 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
 ### Faz 2 — Kilometre taşı: kalıcılık
 
 - [ ] 16. Firestore + Auth + güvenlik kuralları
+      · KARAR (13 Ağu 2026): Auth = **telefon + SMS kodu**. Şantiyedeki ortak
+        e-posta hatırlamak zorunda kalmasın; davet akışıyla da doğal eşleşiyor.
+        Gerektirdikleri: APNs kurulumu, SMS kotası sonrası ücret, test numaraları.
 - [ ] 17. Storage (fiş/daire/belge görselleri, `storagePath`, `uploadState`)
 - [ ] 18. Gizliliğin sorgu düzeyinde uygulanması
 - [ ] 19. Stok toplamlarında atomik güncelleme (`FieldValue.increment`)

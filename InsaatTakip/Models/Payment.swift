@@ -33,7 +33,7 @@ struct Payment: Codable, Identifiable, Equatable {
 
     let id: UUID
     let apartmentId: UUID
-    var amount: Double
+    var amount: Kurus
     var date: Date
     var method: Method
     var note: String        // "3. taksit", "Konut kredisi kullanımı"

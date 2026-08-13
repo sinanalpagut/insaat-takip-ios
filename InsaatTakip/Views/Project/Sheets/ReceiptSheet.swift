@@ -49,8 +49,11 @@ struct ReceiptSheet: View {
     private var isEditing: Bool { editingLog != nil }
 
     /// Canlı toplam: miktar × birim fiyat.
-    private var totalAmount: Double {
-        ProjectViewModel.parseNumber(quantityText) * ProjectViewModel.parseNumber(unitPriceText)
+    /// Kaydedilen `accruedCost` ile AYNI fonksiyonu kullanır; ayrı hesaplansaydı
+    /// "form 356.250 ₺ dedi, listede 356.249 ₺ yazıyor" farkı doğardı.
+    private var totalAmount: Kurus {
+        Kurus.cost(quantity: ProjectViewModel.parseQuantity(quantityText),
+                   unitPrice: ProjectViewModel.parseMoney(unitPriceText))
     }
 
     var body: some View {
@@ -230,7 +233,7 @@ struct ReceiptSheet: View {
                 selectedMaterialId = log.materialId
                 direction = log.type
                 quantityText = Fmt.qty(log.amount)
-                unitPriceText = Fmt.decimalText(log.unitPrice)
+                unitPriceText = Fmt.moneyText(log.unitPrice)
                 referenceText = log.note
                 date = log.date
                 receiptImage = viewModel.receiptImages[log.id]
@@ -326,16 +329,17 @@ struct ReceiptSheet: View {
     }
 
     /// Okunan toplamı forma uygular: miktar girilmişse birim fiyatı hesaplar.
-    private func applyScannedTotal(_ total: Double) {
-        let quantity = ProjectViewModel.parseNumber(quantityText)
+    private func applyScannedTotal(_ total: Kurus) {
+        let quantity = ProjectViewModel.parseQuantity(quantityText)
         guard quantity > 0 else {
             viewModel.flash("Önce miktarı gir, sonra uygula")
             return
         }
-        let unitPrice = total / quantity
-        unitPriceText = unitPrice == unitPrice.rounded()
-            ? Fmt.qty(unitPrice)
-            : String(format: "%.2f", unitPrice).replacingOccurrences(of: ".", with: ",")
+        // Birim fiyat tam kuruşa yuvarlanır; alt kuruş hassasiyeti tutulmuyor.
+        // Elle "%.2f" biçimleme kaldırıldı — projedeki tek Fmt dışı para
+        // gösterimi buydu ve yeni ayrıştırıcı onu yanlış okurdu.
+        let unitPrice = Kurus.kurus(Int64((Double(total.raw) / quantity).rounded()))
+        unitPriceText = Fmt.moneyText(unitPrice)
         viewModel.flash("Birim fiyat fişten hesaplandı")
     }
 
@@ -431,7 +435,7 @@ struct ReceiptSheet: View {
     /// Seçilen malzemenin kayıtlı birim fiyatını alana yazar.
     private func syncUnitPrice() {
         guard let material = selectedMaterial else { return }
-        unitPriceText = Fmt.decimalText(material.unitPrice)
+        unitPriceText = Fmt.moneyText(material.unitPrice)
     }
 
     /// Kaydın değişiklik geçmişi — kim, ne zaman, neyi neye çevirmiş.

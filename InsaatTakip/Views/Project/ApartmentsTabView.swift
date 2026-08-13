@@ -116,9 +116,9 @@ struct ApartmentsTabView: View {
 
             // Paydanın neden toplamdan küçük olduğunu gizlemeyelim: kat karşılığı
             // daireler satılamaz, o yüzden orana girmez ama toplamda durur.
-            if landOwner > 0 || deposit > 0 {
+            if landOwner > 0 || deposit > .zero {
                 Text([landOwner > 0 ? "Kat karşılığı \(landOwner) daire · satılabilir \(total - landOwner)" : nil,
-                      deposit > 0 ? "Bekleyen kapora \(Fmt.compactMoney(deposit))" : nil]
+                      deposit > .zero ? "Bekleyen kapora \(Fmt.compactMoney(deposit))" : nil]
                         .compactMap { $0 }.joined(separator: " · "))
                     .font(.manrope(11, .medium))
                     .foregroundColor(Palette.textTertiary)

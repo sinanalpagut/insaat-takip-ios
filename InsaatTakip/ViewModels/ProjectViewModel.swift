@@ -226,13 +226,13 @@ final class ProjectViewModel: ObservableObject {
     /// Toplam satış cirosu (yalnızca satılan dairelerin bedelleri).
     /// Not: Boş daireler liste fiyatı taşıyabilir (TOKİ gerçek verisi) — ciroya girmez.
     /// Rezerve daire de girmez: sözleşme henüz kesinleşmedi. Kat karşılığı zaten bedelsiz.
-    func totalSales(for projectId: UUID) -> Double {
-        apartments(for: projectId).filter(\.countsAsRevenue).reduce(0) { $0 + $1.price }
+    func totalSales(for projectId: UUID) -> Kurus {
+        apartments(for: projectId).filter(\.countsAsRevenue).reduce(Kurus.zero) { $0 + $1.price }
     }
 
     /// Toplam malzeme gideri (giren × birim fiyat).
-    func totalMaterialCost(for projectId: UUID) -> Double {
-        materials(for: projectId).reduce(0) { $0 + $1.totalCost }
+    func totalMaterialCost(for projectId: UUID) -> Kurus {
+        materials(for: projectId).reduce(Kurus.zero) { $0 + $1.totalCost }
     }
 
     /// Projenin malzeme dışı giderleri (işçilik, taşeron, arsa, harç…).
@@ -240,26 +240,26 @@ final class ProjectViewModel: ObservableObject {
         expenses.filter { $0.projectId == projectId }.sorted { $0.date > $1.date }
     }
 
-    func totalOtherExpenses(for projectId: UUID) -> Double {
-        expenses.filter { $0.projectId == projectId }.reduce(0) { $0 + $1.amount }
+    func totalOtherExpenses(for projectId: UUID) -> Kurus {
+        expenses.filter { $0.projectId == projectId }.reduce(Kurus.zero) { $0 + $1.amount }
     }
 
     /// Kategori bazlı kırılım (büyükten küçüğe) — Giderler sekmesindeki özet.
-    func expenseBreakdown(for projectId: UUID) -> [(category: Expense.Category, total: Double)] {
+    func expenseBreakdown(for projectId: UUID) -> [(category: Expense.Category, total: Kurus)] {
         Dictionary(grouping: expenses.filter { $0.projectId == projectId }, by: \.category)
-            .map { (category: $0.key, total: $0.value.reduce(0) { $0 + $1.amount }) }
+            .map { (category: $0.key, total: $0.value.reduce(Kurus.zero) { $0 + $1.amount }) }
             .sorted { $0.total > $1.total }
     }
 
     /// Projenin TOPLAM gideri: malzeme + diğer kalemler.
-    func totalCost(for projectId: UUID) -> Double {
+    func totalCost(for projectId: UUID) -> Kurus {
         totalMaterialCost(for: projectId) + totalOtherExpenses(for: projectId)
     }
 
     /// Net = satış − (malzeme + diğer giderler).
     /// Gider defteri geldiği için artık "net" demek dürüst; yalnızca uygulamaya
     /// GİRİLEN giderleri kapsadığı ekranlarda ayrıca belirtilir.
-    func netAmount(for projectId: UUID) -> Double {
+    func netAmount(for projectId: UUID) -> Kurus {
         totalSales(for: projectId) - totalCost(for: projectId)
     }
 
@@ -302,21 +302,21 @@ final class ProjectViewModel: ObservableObject {
     /// Payı (totalSales) ve çıkanı aynı daire kümesinden almak zorunlu: aksi
     /// halde ilk rezerve kaporası girdiğinde "kalan alacak" sessizce düşer,
     /// az satışlı projede eksiye iner.
-    func collectedAmount(for projectId: UUID) -> Double {
-        apartments(for: projectId).filter(\.countsAsRevenue).reduce(0) { $0 + $1.paidAmount }
+    func collectedAmount(for projectId: UUID) -> Kurus {
+        apartments(for: projectId).filter(\.countsAsRevenue).reduce(Kurus.zero) { $0 + $1.paidAmount }
     }
 
     /// Rezerve dairelerde bekleyen kapora havuzu. Gerçek nakit olduğu için
     /// görünmeli, ama ciroya ve satış tahsilatına karışmamalı.
-    func depositAmount(for projectId: UUID) -> Double {
-        apartments(for: projectId).filter { $0.status == .reserved }.reduce(0) { $0 + $1.paidAmount }
+    func depositAmount(for projectId: UUID) -> Kurus {
+        apartments(for: projectId).filter { $0.status == .reserved }.reduce(Kurus.zero) { $0 + $1.paidAmount }
     }
 
     /// Kalan alacak toplamı. Daire başına `remainingAmount` max(0,…) ile kırpıldığı
     /// için proje toplamı da kırpılmalı: aksi halde tek bir dairedeki fazla tahsilat
     /// ortağa "Kalan alacak −3,40 M ₺" olarak gösterilirdi.
-    func outstandingAmount(for projectId: UUID) -> Double {
-        max(0, totalSales(for: projectId) - collectedAmount(for: projectId))
+    func outstandingAmount(for projectId: UUID) -> Kurus {
+        max(.zero, totalSales(for: projectId) - collectedAmount(for: projectId))
     }
 
     /// Dashboard alt başlığı — yalnızca kullanıcının eriştiği projeleri sayar.
@@ -340,7 +340,7 @@ final class ProjectViewModel: ObservableObject {
             return false
         }
 
-        let amount = Self.parseNumber(amountText)
+        let amount = Self.parseQuantity(amountText)
         guard amount > 0 else {
             flash("Miktar girilmedi")
             return false
@@ -349,13 +349,13 @@ final class ProjectViewModel: ObservableObject {
         var material = materials[index]
         // Kayda geçen miktar, stoğa uygulanan miktarla daima aynıdır:
         // çıkışta stok yetmiyorsa sessizce kırpmak yerine işlemi reddederiz.
-        let effectivePrice: Double
+        let effectivePrice: Kurus
 
         if type == .entry {
-            let newPrice = Self.parseNumber(unitPriceText)
+            let newPrice = Self.parseMoney(unitPriceText)
             // Fiyat yalnızca bu girişe uygulanır; geçmiş stok yeniden fiyatlanmaz.
-            effectivePrice = newPrice > 0 ? newPrice : material.unitPrice
-            if newPrice > 0 {
+            effectivePrice = newPrice > .zero ? newPrice : material.unitPrice
+            if newPrice > .zero {
                 material.unitPrice = newPrice        // sonraki fişlere ön dolum
                 materials[index] = material
             }
@@ -407,18 +407,18 @@ final class ProjectViewModel: ObservableObject {
               let material = materials.first(where: { $0.id == materialLogs[logIndex].materialId })
         else { return false }
 
-        let amount = Self.parseNumber(amountText)
+        let amount = Self.parseQuantity(amountText)
         guard amount > 0 else {
             flash("Miktar girilmedi")
             return false
         }
 
         let old = materialLogs[logIndex]
-        let newPrice = Self.parseNumber(unitPriceText)
+        let newPrice = Self.parseMoney(unitPriceText)
         var updated = old
         updated.type = type
         updated.amount = amount
-        updated.unitPrice = newPrice > 0 ? newPrice : old.unitPrice
+        updated.unitPrice = newPrice > .zero ? newPrice : old.unitPrice
         updated.date = date
         updated.note = reference.isEmpty ? old.note : reference
 
@@ -587,7 +587,7 @@ final class ProjectViewModel: ObservableObject {
 
         apartment.status = .available
         apartment.buyerName = nil
-        apartment.paidAmount = 0
+        apartment.paidAmount = .zero
         apartment.paymentStatus = nil
         apartment.saleDate = nil
         apartments[index] = apartment
@@ -608,7 +608,7 @@ final class ProjectViewModel: ObservableObject {
             .init(field: "Alıcı", oldValue: buyer.isEmpty ? "—" : buyer, newValue: "kaydı kaldırıldı"),
             .init(field: "Bedel", oldValue: Fmt.money(price), newValue: "—"),
         ]
-        if collected > 0 {
+        if collected > .zero {
             changes.append(.init(field: "Silinen tahsilat",
                                  oldValue: "\(removed.count) kayıt · \(Fmt.money(collected))",
                                  newValue: "—"))
@@ -665,12 +665,12 @@ final class ProjectViewModel: ObservableObject {
             // Kat karşılığı daire bedelsizdir: arsa bedeli gider defterinde
             // ".arsa" kategorisinde duruyor. Daireye ayrıca bedel yazılırsa
             // aynı ekonomik olay iki kez maliyete girer.
-            apartment.price = 0
+            apartment.price = .zero
             apartment.buyerName = nil
             apartment.paymentStatus = nil
         } else if status != .sold {
             // Boş/rezerve dairede girilen rakam LİSTE fiyatıdır — satış formunda önerilir.
-            apartment.price = Self.parseNumber(listPriceText)
+            apartment.price = Self.parseMoney(listPriceText)
         }
         apartments[index] = apartment
 
@@ -724,8 +724,8 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin else { return false }
         guard let apartment = apartments.first(where: { $0.id == apartmentId }) else { return false }
 
-        let amount = Self.parseNumber(amountText)
-        guard amount > 0 else {
+        let amount = Self.parseMoney(amountText)
+        guard amount > .zero else {
             flash("Tutar girilmedi")
             return false
         }
@@ -733,9 +733,9 @@ final class ProjectViewModel: ObservableObject {
         // "Tahsil edildi" demeye devam ediyor (remainingAmount kırpılıyor), fazlalık
         // hiçbir yerde görünmüyor, ama proje "kalan alacağı" eksiye düşüyordu —
         // aynı havalenin iki kez girilmesi bunun en yaygın yolu.
-        let remaining = max(0, apartment.price - apartment.paidAmount)
-        if apartment.price > 0, amount > remaining {
-            flash(remaining > 0
+        let remaining = max(.zero, apartment.price - apartment.paidAmount)
+        if apartment.price > .zero, amount > remaining {
+            flash(remaining > .zero
                   ? "Kalan alacak \(Fmt.money(remaining)) — fazlası girilemez"
                   : "Bedelin tamamı tahsil edilmiş")
             return false
@@ -783,14 +783,14 @@ final class ProjectViewModel: ObservableObject {
     @discardableResult
     private func recalculateCollected(for apartmentId: UUID) -> Apartment? {
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return nil }
-        let total = payments.filter { $0.apartmentId == apartmentId }.reduce(0) { $0 + $1.amount }
+        let total = payments.filter { $0.apartmentId == apartmentId }.reduce(Kurus.zero) { $0 + $1.amount }
         apartments[index].paidAmount = total
 
         // Bedelin tamamı tahsil edildiyse durum otomatik "Tamamlandı"ya geçer.
         // Kapı `isCommitted`: rezerve daireye kapora işlenince de ödeme durumu
         // oluşsun (isSold olsaydı çip boş kalırdı). Kat karşılığında price 0
         // olduğu için blok zaten hiç çalışmaz — doğru davranış.
-        if apartments[index].isCommitted, apartments[index].price > 0 {
+        if apartments[index].isCommitted, apartments[index].price > .zero {
             if total >= apartments[index].price {
                 apartments[index].paymentStatus = .tamamlandi
             } else if apartments[index].paymentStatus == .tamamlandi {
@@ -809,8 +809,8 @@ final class ProjectViewModel: ObservableObject {
                     date: Date, receiptImage: UIImage? = nil) -> Bool {
         guard role == .admin else { return false }
 
-        let amount = Self.parseNumber(amountText)
-        guard amount > 0 else {
+        let amount = Self.parseMoney(amountText)
+        guard amount > .zero else {
             flash("Tutar girilmedi")
             return false
         }
@@ -880,9 +880,9 @@ final class ProjectViewModel: ObservableObject {
                                 code: uniqueCode, name: trimmedName,
                                 subtitle: subtitle.trimmingCharacters(in: .whitespaces),
                                 unit: trimmedUnit,
-                                unitPrice: Self.parseNumber(unitPriceText),
+                                unitPrice: Self.parseMoney(unitPriceText),
                                 totalIn: 0, totalOut: 0,
-                                step: 10, accruedCost: 0)
+                                step: 10, accruedCost: .zero)
         materials.append(material)
         persist([.material(material)], failureNote: "Malzeme")
         flash("\(trimmedName) eklendi")
@@ -909,10 +909,10 @@ final class ProjectViewModel: ObservableObject {
             return false
         }
 
-        let price = Self.parseNumber(priceText)
+        let price = Self.parseMoney(priceText)
         let trimmedBuyer = buyerName.trimmingCharacters(in: .whitespaces)
-        guard price > 0, !trimmedBuyer.isEmpty else {
-            flash(price <= 0 ? "Satış bedeli girilmedi" : "Alıcı adı girilmedi")
+        guard price > .zero, !trimmedBuyer.isEmpty else {
+            flash(price <= .zero ? "Satış bedeli girilmedi" : "Alıcı adı girilmedi")
             return false
         }
 
@@ -940,9 +940,9 @@ final class ProjectViewModel: ObservableObject {
 
         // İlk tahsilat da bir kayıt olarak defterde durur; `paidAmount` artık
         // doğrudan yazılmıyor, ödeme kayıtlarından hesaplanıyor.
-        let target = payment == .tamamlandi ? price : min(price, Self.parseNumber(paidText))
+        let target = payment == .tamamlandi ? price : min(price, Self.parseMoney(paidText))
         if isNewSale {
-            if target > 0 {
+            if target > .zero {
                 let initial = Payment(id: UUID(), apartmentId: apartmentId,
                                       amount: target,
                                       date: apartment.saleDate ?? Date(),
@@ -956,7 +956,7 @@ final class ProjectViewModel: ObservableObject {
             // Rezerve satışa çevriliyor: kapora zaten kayıtlı, yalnızca FARK
             // kadar yeni kayıt açılır — yoksa aynı para iki kez sayılırdı.
             let delta = target - before.paidAmount
-            if delta > 0 {
+            if delta > .zero {
                 let balance = Payment(id: UUID(), apartmentId: apartmentId,
                                       amount: delta,
                                       date: apartment.saleDate ?? Date(),
@@ -1075,7 +1075,7 @@ final class ProjectViewModel: ObservableObject {
             let apartment = Apartment(id: UUID(), projectId: project.id,
                                       apartmentNumber: n, floor: (n - 1) / perFloor + 1,
                                       type: "—", area: "—", status: .available,
-                                      buyerName: nil, price: 0, paidAmount: 0,
+                                      buyerName: nil, price: .zero, paidAmount: .zero,
                                       paymentStatus: nil, saleDate: nil,
                                       deliveryNote: "Yapım sürüyor")
             apartments.append(apartment)
@@ -1088,7 +1088,7 @@ final class ProjectViewModel: ObservableObject {
             let material = Material(id: UUID(), projectId: project.id,
                                     code: item.code, name: item.name, subtitle: item.subtitle,
                                     unit: item.unit, unitPrice: item.price,
-                                    totalIn: 0, totalOut: 0, step: item.step, accruedCost: 0)
+                                    totalIn: 0, totalOut: 0, step: item.step, accruedCost: .zero)
             materials.append(material)
             writes.append(.material(material))
         }
@@ -1107,16 +1107,16 @@ final class ProjectViewModel: ObservableObject {
     }
 
     /// Yeni projelerde açılan standart malzeme kalemleri (mock verideki katalogla aynı).
-    static let materialCatalog: [(code: String, name: String, subtitle: String, unit: String, price: Double, step: Double)] = [
-        ("Ø12", "Demir", "Nervürlü inşaat demiri", "kg", 28.5, 500),
-        ("C30", "Hazır Beton", "C30/37 pompalı", "m³", 2_450, 50),
-        ("ÇMT", "Çimento", "CEM II 42,5 R", "torba", 165, 50),
-        ("TĞL", "Tuğla", "19luk yatay delikli", "adet", 22, 1_000),
-        ("EPS", "Strafor", "5 cm cephe levhası", "m²", 96, 100),
-        ("PVC", "Pimapen", "PVC doğrama · ısıcam", "adet", 6_800, 10),
-        ("KUM", "Kum", "Yıkanmış dere kumu", "ton", 950, 20),
-        ("TEL", "Bağ Teli", "1,5 mm galvaniz", "kg", 42, 25),
-        ("ALÇ", "Alçı", "Saten perdah alçısı", "torba", 210, 25),
+    static let materialCatalog: [(code: String, name: String, subtitle: String, unit: String, price: Kurus, step: Double)] = [
+        ("Ø12", "Demir", "Nervürlü inşaat demiri", "kg", .lira(28, 50), 500),
+        ("C30", "Hazır Beton", "C30/37 pompalı", "m³", .lira(2_450), 50),
+        ("ÇMT", "Çimento", "CEM II 42,5 R", "torba", .lira(165), 50),
+        ("TĞL", "Tuğla", "19luk yatay delikli", "adet", .lira(22), 1_000),
+        ("EPS", "Strafor", "5 cm cephe levhası", "m²", .lira(96), 100),
+        ("PVC", "Pimapen", "PVC doğrama · ısıcam", "adet", .lira(6_800), 10),
+        ("KUM", "Kum", "Yıkanmış dere kumu", "ton", .lira(950), 20),
+        ("TEL", "Bağ Teli", "1,5 mm galvaniz", "kg", .lira(42), 25),
+        ("ALÇ", "Alçı", "Saten perdah alçısı", "torba", .lira(210), 25),
     ]
 
     // MARK: Davet kodu
@@ -1277,24 +1277,24 @@ final class ProjectViewModel: ObservableObject {
     struct ReportSummary {
         var title: String            // "3. ÇEYREK ÖZETİ"
         var soldCount: Int
-        var salesTotal: Double
-        var collectedTotal: Double
-        var materialCost: Double
-        var otherExpenses: Double
+        var salesTotal: Kurus
+        var collectedTotal: Kurus
+        var materialCost: Kurus
+        var otherExpenses: Kurus
         /// Ciroya girmeyen ama raporda görünmesi gereken kalemler.
         /// Dönemden bağımsızdır: "şu an kaç daire rezerve / kat karşılığı" sorusunun
         /// cevabı geçmiş bir aya göre süzülemez.
         var reservedCount: Int = 0
-        var depositTotal: Double = 0     // Rezerve dairelerde bekleyen kapora
+        var depositTotal: Kurus = .zero  // Rezerve dairelerde bekleyen kapora
         var landOwnerCount: Int = 0
-        var totalCost: Double { materialCost + otherExpenses }
-        var net: Double { salesTotal - totalCost }
+        var totalCost: Kurus { materialCost + otherExpenses }
+        var net: Kurus { salesTotal - totalCost }
     }
 
     struct MonthBar: Identifiable {
         let id = UUID()
         var label: String            // "Şub"
-        var value: Double            // Ay toplam satış (₺)
+        var value: Kurus             // Ay toplam satış
     }
 
     static let monthNames = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
@@ -1330,7 +1330,7 @@ final class ProjectViewModel: ObservableObject {
             guard let range else { return true }   // "Tümü"
             return range.contains(saleDate)
         }
-        let sales = sold.reduce(0) { $0 + $1.price }
+        let sales = sold.reduce(Kurus.zero) { $0 + $1.price }
         let projectApartments = apartments(for: projectId)
 
         // Dönem tahsilatı ÖDEME TARİHLERİNDEN gelir. Önceden dönemde satış tarihi
@@ -1340,13 +1340,13 @@ final class ProjectViewModel: ObservableObject {
         // taksitleri imza çeyreğine yazılıyor, o çeyrekte kasaya giren para ise
         // hiç görünmüyordu. Bu kart ortaklara PDF olarak dağıtılıyor.
         let revenueApartmentIds = Set(projectApartments.filter(\.countsAsRevenue).map(\.id))
-        let collected: Double
+        let collected: Kurus
         if let range {
             collected = payments
                 .filter { revenueApartmentIds.contains($0.apartmentId) && range.contains($0.date) }
-                .reduce(0) { $0 + $1.amount }
+                .reduce(Kurus.zero) { $0 + $1.amount }
         } else {
-            collected = projectApartments.filter(\.countsAsRevenue).reduce(0) { $0 + $1.paidAmount }
+            collected = projectApartments.filter(\.countsAsRevenue).reduce(Kurus.zero) { $0 + $1.paidAmount }
         }
 
         // Rezerve ve kat karşılığı daireler ciroya girmez ama raporda GÖRÜNMELİ:
@@ -1359,13 +1359,13 @@ final class ProjectViewModel: ObservableObject {
         //  · "Tümü" → projenin birikmiş toplam maliyeti (kayıt öncesi alımlar dahil)
         //  · ay/çeyrek → yalnızca o dönemde KAYITLI giriş fişleri, her biri
         //    kendi tarihindeki dondurulmuş fiyatıyla (sonraki zamlar geçmişi değiştirmez)
-        let cost: Double
+        let cost: Kurus
         let materialIds = Set(materials(for: projectId).map(\.id))
         if let range {
-            cost = materialLogs.reduce(0) { sum, log in
+            cost = materialLogs.reduce(Kurus.zero) { sum, log in
                 guard log.type == .entry, materialIds.contains(log.materialId),
                       range.contains(log.date) else { return sum }
-                return sum + log.amount * log.unitPrice
+                return sum + Kurus.cost(quantity: log.amount, unitPrice: log.unitPrice)
             }
         } else {
             cost = totalMaterialCost(for: projectId)
@@ -1373,7 +1373,7 @@ final class ProjectViewModel: ObservableObject {
 
         // Malzeme dışı giderler de aynı dönem penceresine göre süzülür.
         let projectExpenses = expenses.filter { $0.projectId == projectId }
-        let otherCost = projectExpenses.reduce(0.0) { sum, expense in
+        let otherCost = projectExpenses.reduce(Kurus.zero) { sum, expense in
             guard let range else { return sum + expense.amount }
             return range.contains(expense.date) ? sum + expense.amount : sum
         }
@@ -1382,7 +1382,7 @@ final class ProjectViewModel: ObservableObject {
                              salesTotal: sales, collectedTotal: collected,
                              materialCost: cost, otherExpenses: otherCost,
                              reservedCount: reserved.count,
-                             depositTotal: reserved.reduce(0) { $0 + $1.paidAmount },
+                             depositTotal: reserved.reduce(Kurus.zero) { $0 + $1.paidAmount },
                              landOwnerCount: landOwner)
     }
 
@@ -1397,7 +1397,7 @@ final class ProjectViewModel: ObservableObject {
             guard let monthStart = calendar.date(byAdding: .month, value: offset - 7, to: Date()),
                   let interval = calendar.dateInterval(of: .month, for: monthStart) else { return nil }
 
-            let total = sold.reduce(0.0) { sum, apartment in
+            let total = sold.reduce(Kurus.zero) { sum, apartment in
                 guard let saleDate = apartment.saleDate, interval.contains(saleDate) else { return sum }
                 return sum + apartment.price
             }
@@ -1462,6 +1462,45 @@ final class ProjectViewModel: ObservableObject {
         return min(value, maxAmount)
     }
 
-    /// Tek bir tutarın / miktarın kabul edilen üst sınırı (1 trilyon).
+    /// Miktar girdisi (kg, m³, torba…). Para İÇİN KULLANILMAZ — bkz. parseMoney.
+    static func parseQuantity(_ text: String) -> Double { parseNumber(text) }
+
+    /// Para girdisini KURUŞA çevirir. Double'a hiç uğramaz: "8,17" gibi bir tutar
+    /// `Int64(Double * 100)` yolundan 816 kuruş çıkardı (0,0817'nin ikilik
+    /// gösterimi 8,17'nin biraz altında), string üzerinden 817 çıkar.
+    ///
+    /// Son ayraçtan sonra 1-2 hane varsa o ondalıktır; aksi halde tüm ayraçlar
+    /// binlik kabul edilir. Bu, bugünkü davranışın düzeltilmiş hali: mevcut
+    /// `parseNumber` TÜM noktaları koşulsuz siliyor, dolayısıyla cihaz dili
+    /// İngilizce olan kullanıcının ondalık tuşundan gelen "28.50" bugün
+    /// 2.850 ₺ olarak kaydediliyor — sessiz 100 kat hata.
+    static func parseMoney(_ text: String) -> Kurus {
+        let cleaned = text.filter { $0.isNumber || $0 == "," || $0 == "." }
+        guard !cleaned.isEmpty else { return .zero }
+
+        var whole = cleaned
+        var fraction = ""
+        if let lastSeparator = cleaned.lastIndex(where: { $0 == "," || $0 == "." }) {
+            let tail = String(cleaned[cleaned.index(after: lastSeparator)...])
+            // Ayraçtan sonra 1-2 rakam varsa ondalık, 3 ise binlik ("1.500").
+            if tail.count <= 2, !tail.isEmpty, tail.allSatisfy(\.isNumber) {
+                whole = String(cleaned[cleaned.startIndex..<lastSeparator])
+                fraction = tail
+            }
+        }
+        let digits = whole.filter(\.isNumber)
+        guard let liraPart = Int64(digits.isEmpty ? "0" : digits) else { return .zero }
+
+        // "5" → 50 kuruş, "05" → 5 kuruş.
+        let kurusPart = Int64(fraction.padding(toLength: 2, withPad: "0", startingAt: 0)) ?? 0
+        let total = liraPart.multipliedReportingOverflow(by: 100)
+        guard !total.overflow else { return Kurus.kurus(maxKurus) }
+        return Kurus.kurus(min(total.partialValue + kurusPart, maxKurus))
+    }
+
+    /// Tek bir miktarın kabul edilen üst sınırı (1 trilyon).
     static let maxAmount: Double = 1e12
+
+    /// Tek bir tutarın üst sınırı: 1 trilyon ₺ = 1e14 kuruş (Int64.max ≈ 9,2e18).
+    static let maxKurus: Int64 = 100_000_000_000_000
 }

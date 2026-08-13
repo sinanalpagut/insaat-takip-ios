@@ -48,7 +48,7 @@ struct Expense: Codable, Identifiable, Equatable {
     let id: UUID
     let projectId: UUID
     var category: Category
-    var amount: Double          // Ödenen tutar (₺)
+    var amount: Kurus           // Ödenen tutar
     var date: Date              // Ödeme / hakediş tarihi — geçmiş tarih girilebilir
     var payee: String           // Kime ödendi: "Kalıpçı Ekibi", "Yılmaz Nakliyat"
     var note: String            // "3. hakediş", "Şubat SGK"

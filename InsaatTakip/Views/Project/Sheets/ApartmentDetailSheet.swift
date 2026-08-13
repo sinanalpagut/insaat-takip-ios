@@ -162,8 +162,8 @@ struct ApartmentDetailSheet: View {
                            background: Palette.accent, foreground: .white)
             }
         case .available:
-            priceCard(label: apartment.price > 0 ? "Liste Fiyatı" : "Durum",
-                      value: apartment.price > 0 ? Fmt.compactMoney(apartment.price) : "Satışa hazır",
+            priceCard(label: apartment.price > .zero ? "Liste Fiyatı" : "Durum",
+                      value: apartment.price > .zero ? Fmt.compactMoney(apartment.price) : "Satışa hazır",
                       valueColor: Palette.ink,
                       labelColor: Palette.textTertiary,
                       background: Palette.fillSubtle, border: Palette.border) {
@@ -360,7 +360,7 @@ struct ApartmentDetailSheet: View {
     /// Tahsilat defteri: kalan alacak + ödeme geçmişi + yöneticiye ekleme.
     private func paymentSection(_ apartment: Apartment) -> some View {
         let payments = viewModel.payments(forApartment: apartment.id)
-        let remaining = max(0, apartment.price - apartment.paidAmount)
+        let remaining = max(.zero, apartment.price - apartment.paidAmount)
 
         return VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -376,8 +376,8 @@ struct ApartmentDetailSheet: View {
             HStack {
                 Text("Tahsil edilen \(Fmt.compactMoney(apartment.paidAmount))")
                 Spacer()
-                Text(remaining > 0 ? "Kalan \(Fmt.compactMoney(remaining))" : "Tamamlandı")
-                    .foregroundColor(remaining > 0 ? Palette.textMuted : Palette.success)
+                Text(remaining > .zero ? "Kalan \(Fmt.compactMoney(remaining))" : "Tamamlandı")
+                    .foregroundColor(remaining > .zero ? Palette.textMuted : Palette.success)
             }
             .font(.manrope(11.5, .semiBold))
             .foregroundColor(Palette.textMuted)

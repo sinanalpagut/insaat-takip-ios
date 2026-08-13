@@ -11,7 +11,7 @@ struct Material: Codable, Identifiable, Equatable {
     var name: String          // "Demir", "Hazır Beton"…
     var subtitle: String      // "Nervürlü inşaat demiri"
     var unit: String          // "kg", "m³", "torba", "adet", "m²", "ton"
-    var unitPrice: Double     // Güncel/son alış birim fiyatı (₺) — yalnızca gösterim ve ön dolum
+    var unitPrice: Kurus      // Güncel/son alış birim fiyatı — yalnızca gösterim ve ön dolum
 
     // MARK: Türetilen toplamlar
     // Aşağıdaki üç alan ViewModel dışında ASLA yazılmaz; tek yazma noktası
@@ -24,7 +24,7 @@ struct Material: Codable, Identifiable, Equatable {
     /// Fiilen ödenen toplam tutar; her giriş kendi tarihindeki fiyatıyla sayılır.
     /// Hesaplanan (totalIn × güncel fiyat) yerine hareket bazlı bir toplamdır:
     /// aksi halde yeni bir fiyat girmek geçmişteki tüm stoğu yeniden fiyatlandırırdı.
-    var accruedCost: Double
+    var accruedCost: Kurus
 
     // MARK: Devir (açılış) bakiyesi
     // Bir proje uygulamaya girdiğinde şantiyede zaten malzeme vardır ve o
@@ -33,7 +33,7 @@ struct Material: Codable, Identifiable, Equatable {
     // bir fiş silindiğinde hiç fişi olmayan stok da sıfıra düşerdi.
     var openingIn: Double = 0
     var openingOut: Double = 0
-    var openingCost: Double = 0
+    var openingCost: Kurus = .zero
 
     /// Kalan stok.
     var currentStock: Double { totalIn - totalOut }
@@ -42,7 +42,7 @@ struct Material: Codable, Identifiable, Equatable {
     var remainingFraction: Double { totalIn > 0 ? currentStock / totalIn : 0 }
 
     /// Toplam malzeme tutarı.
-    var totalCost: Double { accruedCost }
+    var totalCost: Kurus { accruedCost }
 
     /// Kritik stok: kalan oranı eşiğin altına düşünce uyarı paletine geçer.
     ///
@@ -65,7 +65,12 @@ struct Material: Codable, Identifiable, Equatable {
         let entries = mine.filter { $0.type == .entry }
         totalIn = openingIn + entries.reduce(0) { $0 + $1.amount }
         totalOut = openingOut + mine.filter { $0.type == .exit }.reduce(0) { $0 + $1.amount }
-        accruedCost = openingCost + entries.reduce(0) { $0 + $1.amount * $1.unitPrice }
+        // Yuvarlama fiş BAŞINA yapılır (Kurus.cost), toplamda değil: böylece bir
+        // fiş silindiğinde etkisi tam olarak geri alınıyor ve ay/çeyrek toplamları
+        // proje toplamının parçası olarak kalıyor.
+        accruedCost = openingCost + entries.reduce(Kurus.zero) {
+            $0 + Kurus.cost(quantity: $1.amount, unitPrice: $1.unitPrice)
+        }
     }
 }
 
@@ -82,7 +87,7 @@ struct MaterialLog: Codable, Identifiable, Equatable {
     var amount: Double
     /// Kayıt anındaki birim fiyat — dondurulur; sonraki fiyat değişiklikleri
     /// geçmiş dönem raporlarını değiştirmesin diye.
-    var unitPrice: Double
+    var unitPrice: Kurus
     /// Hareketin gerçekleştiği an. Metin yerine Date: sıralama, dönem filtresi
     /// ve geçmiş tarihli kayıt ancak böyle mümkün.
     var date: Date

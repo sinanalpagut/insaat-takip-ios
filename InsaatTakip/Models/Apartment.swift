@@ -58,8 +58,8 @@ struct Apartment: Codable, Identifiable, Equatable {
     var area: String            // "95 m²"
     var status: Status
     var buyerName: String?      // Satıldıysa alıcı
-    var price: Double           // Satış bedeli (satıldıysa)
-    var paidAmount: Double      // Tahsil edilen tutar
+    var price: Kurus            // Satış bedeli (satıldıysa)
+    var paidAmount: Kurus       // Tahsil edilen tutar
     var paymentStatus: PaymentStatus?
     var saleDate: Date?         // Sözleşme / satış tarihi
     var deliveryNote: String    // "Anahtar teslim bekliyor" vb.
@@ -98,10 +98,15 @@ struct Apartment: Codable, Identifiable, Equatable {
     }
 
     /// Kalan alacak.
-    var remainingAmount: Double { max(0, price - paidAmount) }
+    var remainingAmount: Kurus { max(.zero, price - paidAmount) }
 
     /// Tahsilat oranı (kart içindeki 4px bar).
-    var collectionFraction: Double { price > 0 ? paidAmount / price : 0 }
+    /// Para/para bölmesi ORAN üretir; Kurus'ta `/` bilerek tanımlı değil, bu
+    /// yüzden dönüşüm açıkça yazılır — tam sayı bölmesiyle 0/1'e yuvarlanıp
+    /// çubuğun hep boş ya da hep dolu görünmesi riski böyle kapanıyor.
+    var collectionFraction: Double {
+        price > .zero ? Double(paidAmount.raw) / Double(price.raw) : 0
+    }
 
     /// Kart sağ altındaki metin. Duruma göre değişir: kat karşılığı dairenin
     /// bedeli yok, rezervenin ise henüz "kalan alacağı" yok — yalnızca kaporası var.
@@ -110,7 +115,7 @@ struct Apartment: Codable, Identifiable, Equatable {
         case .landOwner:
             return "Bedelsiz devir"
         case .reserved:
-            return paidAmount > 0 ? "Kapora \(Fmt.compactMoney(paidAmount))" : "Kapora bekleniyor"
+            return paidAmount > .zero ? "Kapora \(Fmt.compactMoney(paidAmount))" : "Kapora bekleniyor"
         case .available:
             return ""
         case .sold:

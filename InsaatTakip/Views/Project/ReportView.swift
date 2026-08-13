@@ -137,7 +137,7 @@ struct ReportView: View {
             Divider().overlay(Palette.divider)
             // Gider defteri geldiği için "Dönem net" artık dürüst bir rakam.
             summaryRow("Dönem net", Fmt.compactMoney(summary.net),
-                       valueColor: summary.net >= 0 ? Palette.success : Palette.alertInk)
+                       valueColor: summary.net >= .zero ? Palette.success : Palette.alertInk)
 
             // Bu kart ortaklara PDF olarak dağıtılıyor; kapsamı yazılı olmalı.
             HStack(alignment: .top, spacing: 7) {
@@ -179,7 +179,8 @@ struct ReportView: View {
                 .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
 
             HStack(alignment: .bottom, spacing: 14) {
-                let maxValue = max(bars.map(\.value).max() ?? 1, 1)
+                // Sıfıra bölmeyi engelleyen taban: 1 kuruş.
+                let maxValue = max(bars.map(\.value).max() ?? .zero, Kurus.kurus(1))
                 ForEach(bars) { bar in
                     VStack(spacing: 7) {
                         Text(Fmt.millionsShort(bar.value))
@@ -187,8 +188,10 @@ struct ReportView: View {
                             .foregroundColor(Palette.textMuted)
                         // ≥7 M ₺ aylar koyu bakır, diğerleri açık ton
                         RoundedCorners(radius: 5, corners: [.topLeft, .topRight])
-                            .fill(bar.value >= 7_000_000 ? Palette.accent : Palette.barSoft)
-                            .frame(height: max(10, bar.value / maxValue * 62))
+                            // Eşik LİRA cinsinden yazılır; kuruş sabiti bırakılsaydı
+                            // 70.000 ₺ anlamına gelir ve neredeyse her ay koyu görünürdü.
+                            .fill(bar.value >= Kurus.lira(7_000_000) ? Palette.accent : Palette.barSoft)
+                            .frame(height: max(10, Double(bar.value.raw) / Double(maxValue.raw) * 62))
                         Text(bar.label)
                             .font(.manrope(11, .semiBold))
                             .foregroundColor(Palette.textTertiary)

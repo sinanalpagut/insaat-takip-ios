@@ -106,6 +106,6 @@ final class InMemoryProjectRepository: ProjectRepository {
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return }
         apartments[index].paidAmount = payments
             .filter { $0.apartmentId == apartmentId }
-            .reduce(0) { $0 + $1.amount }
+            .reduce(Kurus.zero) { $0 + $1.amount }
     }
 }

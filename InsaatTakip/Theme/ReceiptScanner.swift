@@ -17,7 +17,7 @@ enum ReceiptScanner {
 
     /// Fişten okunabilen alanlar. Hepsi opsiyoneldir — okunamayan alan nil kalır.
     struct Reading: Equatable {
-        var total: Double?          // Genel toplam / ödenecek tutar
+        var total: Kurus?           // Genel toplam / ödenecek tutar
         var dateText: String?       // "18 Şub 2026" biçimine çevrilmiş tarih
         var supplier: String?       // Firma / satıcı adı (üst satırlardan)
         var lineCount: Int = 0      // Okunan satır sayısı — hiç yazı yoksa 0
@@ -61,7 +61,9 @@ enum ReceiptScanner {
         reading.lineCount = lines.count
         guard !lines.isEmpty else { return reading }
 
-        reading.total = findTotal(in: lines)
+        // Sınır dönüşümü TEK yerde: tarayıcı içeride ₺ cinsinden çalışır
+            // (eşikler ve karşılaştırmalar öyle yazılı), dışarıya kuruş verir.
+        reading.total = findTotal(in: lines).map { Kurus.kurus(Int64(($0 * 100).rounded())) }
         reading.dateText = findDate(in: lines)
         reading.supplier = findSupplier(in: lines)
         return reading

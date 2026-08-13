@@ -80,7 +80,10 @@ struct ExpensesTabView: View {
             }
 
             // Malzeme / diğer gider oranı
-            ProgressBarView(fraction: materialCost + total > 0 ? materialCost / (materialCost + total) : 0,
+            // Para/para bölmesi ORAN üretir; Kurus'ta `/` tanımlı olmadığı için
+            // dönüşüm açıkça yazılır — tam sayı bölmesiyle 0/1'e yuvarlanma riski yok.
+            ProgressBarView(fraction: (materialCost + total) > .zero
+                                ? Double(materialCost.raw) / Double((materialCost + total).raw) : 0,
                             fill: Palette.accent,
                             track: Palette.alertInk.opacity(0.35))
                 .padding(.top, 14)

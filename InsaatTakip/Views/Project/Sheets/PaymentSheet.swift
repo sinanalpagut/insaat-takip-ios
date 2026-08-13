@@ -24,9 +24,9 @@ struct PaymentSheet: View {
     }
 
     /// Kalan alacak — formda hem bilgi hem hızlı doldurma için.
-    private var remaining: Double {
-        guard let apartment else { return 0 }
-        return max(0, apartment.price - apartment.paidAmount)
+    private var remaining: Kurus {
+        guard let apartment else { return .zero }
+        return max(.zero, apartment.price - apartment.paidAmount)
     }
 
     var body: some View {
@@ -37,9 +37,9 @@ struct PaymentSheet: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
                     // Kalan alacak kartı — tek dokunuşla tutara yazılabilir
-                    if remaining > 0 {
+                    if remaining > .zero {
                         Button {
-                            amountText = Fmt.qty(remaining)
+                            amountText = Fmt.moneyText(remaining)
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
