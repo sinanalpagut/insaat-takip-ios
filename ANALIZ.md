@@ -55,10 +55,43 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
 
 ### Faz 2 — Kilometre taşı: kalıcılık
 
-- [ ] 16. Firestore + Auth + güvenlik kuralları
+- [ ] 16. Firestore + Auth + güvenlik kuralları — **kimlik doğrulama bitti**
       · KARAR (13 Ağu 2026): Auth = **telefon + SMS kodu**. Şantiyedeki ortak
         e-posta hatırlamak zorunda kalmasın; davet akışıyla da doğal eşleşiyor.
         Gerektirdikleri: APNs kurulumu, SMS kotası sonrası ücret, test numaraları.
+      - [x] 16a. Kimlik tipi göçü: kullanıcı kimliği `UUID` → `String` uid.
+            `UUID` kalsaydı `request.auth.uid == ownerUid` karşılaştırması hiçbir
+            zaman doğru olmaz ve tüm yetki modeli sessizce çökerdi.
+      - [x] 16b. Modeller Firestore yoluna bağlandı (her belgede `projectId`) +
+            madde 19'un yeni kılığı kapatıldı.
+      - [x] 16c. Telefon + SMS girişi (commit `59f657d`). Repository ile aynı
+            dikiş: protokol + sahte + gerçek uygulama. Simülatörde sahte servis,
+            çünkü gerçek doğrulama APNs istiyor ve Firebase'in yedeği olan
+            reCAPTCHA ekranının metni Google'ın kontrolünde, Türkçe değil.
+      - [x] 16d. `users/{uid}` profili — isim kalıcılığı. Telefon doğrulaması
+            numarayı kanıtlar ama isim VERMEZ; bir yere yazılmazsa dönen
+            kullanıcı her açılışta "Adın ne?" ekranıyla karşılaşır. Bugün yerel
+            önbellek tek kaynak; uzak kopya Firestore ile bağlanacak.
+      - [ ] 16e. `FirestoreProjectRepository` (kalıcılığın kendisi)
+      - [ ] 16f. `firestore.rules` + bileşik indeksler
+      · Yol açılırken çıkan ve düzeltilen dört kusur — hepsi kimlik doğrulaması
+        gelmeden ERİŞİLEMEZ olduğu için gizliydi:
+        1. `AppState.init` parametre `auth`'u kullanıyordu, `self.auth`'u değil:
+           varsayılan çağrıda oturum hiç geri yüklenmiyordu.
+        2. Davet kodu kartı `!isAdmin` koşuluyla gösteriliyordu, ama her yeni
+           hesap `.admin` açılıyor → davet edilen ortağın kodu girecek yeri yoktu.
+           Faz 1/14'teki "ölü doğmuş özellik" hatasının aynısı. Kart artık rolden
+           bağımsız; kendi projesinin yöneticisi başkasının projesine ortak olarak
+           davet edilebilir zaten.
+        3. Dashboard'un boş durumu yoktu. Kimlik doğrulaması bu hâli erişilebilir
+           yaptı: artık her YENİ HESABIN gördüğü ilk ekran o.
+        4. Hesap kartı ismi düzenlemeye izin vermiyordu, ama isim ekranı
+           "sonradan değiştirebilirsin" diyordu. Telefon da hiçbir yerde
+           görünmüyordu — oysa kimliğin kendisi o numara.
+      · BİLİNEN SINIR: rol kullanıcı başına GLOBAL, proje başına değil. Doğrusu
+        proje başınadır (`Project.ownerUid` bunu ifade edebiliyor). Yeni hesap
+        `.admin` açılıyor çünkü aksi halde ilk kullanıcı proje kuramaz. Ayrı
+        madde olarak ele alınacak.
 - [ ] 17. Storage (fiş/daire/belge görselleri, `storagePath`, `uploadState`)
 - [ ] 18. Gizliliğin sorgu düzeyinde uygulanması
 - [x] 19. Stok toplamlarında atomik güncelleme — **çözüm değişti, sorun kapandı**
