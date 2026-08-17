@@ -158,9 +158,39 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
             · HENÜZ GERÇEK CİHAZDA DENENMEDİ: simülatörde push hiç çalışmıyor,
               bu ayarın işe yaradığı yalnızca fiziksel telefonda görülür.
       - [ ] 16g. `redeemInvite` Cloud Function — davet akışının tek yolu.
-            · ENGEL: proje **Spark (ücretsiz)** planında, Cloud Functions **Blaze**
-              istiyor. Aylık sabit ücret yok (kullanım kadar, ayda 2M çağrı
-              ücretsiz kota) ama kredi kartı gerekiyor → kullanıcı kararı.
+            **SUNUCU TARAFI BİTTİ, İSTEMCİ TARAFI DOĞRULANMADI.**
+            · Blaze engeli KALKTI (17 Ağu 2026): plan yükseltildi, bütçe uyarısı
+              25 TRY. Uyarı harcamayı KESMİYOR, yalnızca haber veriyor.
+            · Sunucu (commit `a1a7a36`), 121/121 test: geçerli kod dört belgeyi
+              tek transaction'da yazıyor; süresi dolmuş/kullanılmış kod
+              reddediliyor; projesi silinmiş davet kodu HARCAMIYOR; zaten üye
+              olan hata almıyor ve kodu yakmıyor; sahip kendi davetiyle ortak
+              olmuyor. Ad SUNUCUDAN (`users/{uid}`) çözülüyor — istemciden ad
+              alınsa kişi ortak tablosunda istediği adla görünürdü.
+            · Bölge **europe-west1** (eur3 = europe-west1 + europe-west4;
+              Frankfurt/west3 eur3'ün İÇİNDE DEĞİL — önceki notum yanlıştı).
+            · `invites/{KOD}` okuma HERKESE kapalı, sahibe de: 6 hane / 31
+              karakter alfabe, okunabilir olsa kodlar kaba kuvvetle denenirdi.
+              Mutasyonla sınandı, açıldığında 3 test düşüyor.
+            · İstemci (commit `efffbe9`): InviteService dikişi, davet üretme
+              (iki belge tek parti), JoinWithCodeView callable'a bağlı, hata
+              kodları Türkçeye çevriliyor. Derleme uyarısız.
+            · SIRADAKİ İŞ: uçtan uca test. Yönetici kod üretir → ikinci numarayla
+              girilir → kod kullanılır. Engel kalktı (bkz. commit `7f5a073`),
+              yalnızca yapılmadı.
+      - [ ] 16i. **Bekleyen yazma kullanıcıya görünmeli** — bugün bulunan gerçek
+            kusur, 16g ararken ortaya çıktı.
+            · Firestore çevrimdışıyken yazmayı KUYRUĞA alıyor ve `commit()`
+              yalnızca sunucu onayı gelince dönüyor. Dolayısıyla `persist`in
+              catch bloğu çalışmıyor: kullanıcı "kaydedildi" görüyor, veri
+              sunucuda yok. Şantiyede internetin gidip geldiği bir uygulamada
+              bu, sessiz veri kaybı demek.
+            · Bugün bunun bir yapılandırma hatasıyla (emülatöre TLS) tetiklendiği
+              görüldü ve o düzeltildi — ama kusur DURUYOR: gerçek şebekede aynı
+              durum yaşanır.
+            · Yapılacak: bekleyen yazma sayısını izleyip arayüzde göstermek
+              (ör. "3 kayıt gönderilmeyi bekliyor") ve `MemoryCacheSettings`
+              KULLANMAMAK (kalıcı önbellek kuyruğu uygulama kapanınca korur).
             Kod doğrulama, süre/tek kullanım denetimi ve `memberUids` yazması
             yönetici adına işlevde yapılacak. 16f olmadan gerekliliği
             görünmüyordu; kurallar yazıldığı an zorunlu hale geldi.
