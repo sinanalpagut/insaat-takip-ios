@@ -1,22 +1,28 @@
 import SwiftUI
-import FirebaseCore
 
 // MARK: - Uygulama Girişi
+//
+// Firebase kurulumu BURADA DEĞİL, `AppDelegate.didFinishLaunching` içinde.
+// Gerekçe: `FirebaseApp.configure()` `App.init()`te çağrıldığında SwiftUI henüz
+// app delegate'i kurmamış oluyor ve Firebase'in swizzler'ı geçici bir nesne
+// görüp bağlanamıyor — günlükte
+//   [AppDelegateSwizzler][I-SWZ001014] App Delegate does not conform to
+//   UIApplicationDelegate protocol.
+// Sonucu telefon doğrulamasında görünüyordu: doğrulama bildirimi
+// FirebaseAuth'a iletilemediği için giriş `ERROR_NOTIFICATION_NOT_FORWARDED`
+// (17054) ile düşüyordu.
 
 @main
 struct InsaatTakipApp: App {
+    /// Firebase telefon doğrulaması app delegate ZORUNLU kılıyor: doğrulama
+    /// bildiriminin FirebaseAuth'a iletilmesi gerekiyor (bkz. AppDelegate).
+    /// Bu satır olmadan telefonla giriş hiçbir ortamda çalışmıyor.
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     /// Global oturum / rol durumu.
     @StateObject private var appState = AppState()
     /// Tüm proje verisi ve iş mantığı.
     @StateObject private var viewModel = ProjectViewModel()
-
-    init() {
-        // GoogleService-Info.plist'i okuyup Firebase'i başlatır. Kalıcılık ve
-        // Auth henüz bağlı değil (bkz. ANALIZ.md Faz 2) — bu satır yalnızca
-        // SDK'nın uygulamaya doğru bağlandığını doğrulamak için var; sonraki
-        // adımlarda repository ve kimlik doğrulama buna dayanacak.
-        FirebaseApp.configure()
-    }
 
     var body: some Scene {
         WindowGroup {

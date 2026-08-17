@@ -42,7 +42,7 @@ struct NewProjectSheet: View {
                     .padding(.top, 14)
 
                     PrimaryButton(title: "Projeyi Oluştur") {
-                        if viewModel.addProject(role: appState.currentUser?.role ?? .partner,
+                        if viewModel.addProject(user: appState.currentUser,
                                                 block: block, parcel: parcel,
                                                 district: district, city: city,
                                                 floors: floors, apartmentCount: apartmentCount) != nil {

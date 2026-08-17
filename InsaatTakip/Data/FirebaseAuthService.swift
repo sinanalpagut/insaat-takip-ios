@@ -26,6 +26,13 @@ final class FirebaseAuthService: AuthService {
 
     func sendCode(to phone: String) async throws -> VerificationRequest {
         guard let e164 = PhoneFormat.e164(phone) else { throw AuthError.invalidPhone }
+        // Info.plist'te geri çağrı URL şeması YOKSA `verifyPhoneNumber` çöker —
+        // hata döndürmez, `fatalError`a bile varamadan `mainBundleUrlTypes` nil
+        // olduğu için "unexpectedly found nil" ile düşer. Yani yanlış
+        // yapılandırılmış bir derlemede kullanıcı "Kod Gönder"e bastığı anda
+        // uygulama kapanıyordu. Önce denetleyip Türkçe hata döndürüyoruz:
+        // çökme, hiçbir gerekçeyle kabul edilebilir bir davranış değil.
+        guard Self.hasCallbackURLScheme else { throw AuthError.notConfigured }
         do {
             let id = try await PhoneAuthProvider.provider()
                 .verifyPhoneNumber(e164, uiDelegate: nil)
@@ -52,10 +59,32 @@ final class FirebaseAuthService: AuthService {
         do { try Auth.auth().signOut() } catch { throw Self.mapped(error) }
     }
 
+    /// Info.plist'te Firebase'in beklediği geri çağrı şeması tanımlı mı?
+    ///
+    /// Firebase şemayı `CLIENT_ID`den (ters çevrilmiş) ya da o yoksa
+    /// `GOOGLE_APP_ID`den (`app-1-…-ios-…`) türetiyor. Burada türetmeyi
+    /// TEKRARLAMIYORUZ — SDK'nın iç kuralı sürüm sürüm değişebilir; yalnızca
+    /// böyle görünen bir şemanın kayıtlı olup olmadığına bakıyoruz. Bu, gerçek
+    /// çökme nedenini (hiç URL tipi olmaması) kesin olarak yakalıyor.
+    private static var hasCallbackURLScheme: Bool {
+        guard let types = Bundle.main.infoDictionary?["CFBundleURLTypes"] as? [[String: Any]]
+        else { return false }
+        let schemes = types.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] }
+        return schemes.contains {
+            $0.hasPrefix("app-1-") || $0.hasPrefix("com.googleusercontent.apps")
+        }
+    }
+
     /// Firebase hata kodlarını uygulamanın Türkçe hatalarına çevirir.
     /// Ham `NSError.localizedDescription` arayüze sızarsa kullanıcı İngilizce
     /// bir mesaj görür — uygulamanın tamamı Türkçe olduğu için kabul edilemez.
     private static func mapped(_ error: Error) -> AuthError {
+        #if DEBUG
+        // Kullanıcıya Türkçe kısa mesaj gidiyor; geliştirici ham hatayı görmeden
+        // yanlış eşlemeyi farkedemez. Yalnızca DEBUG.
+        let ns = error as NSError
+        print("[auth] \(ns.domain) code=\(ns.code) · \(ns.localizedDescription) · \(ns.userInfo)")
+        #endif
         let code = AuthErrorCode(rawValue: (error as NSError).code)
         switch code {
         case .invalidPhoneNumber, .missingPhoneNumber:

@@ -48,7 +48,15 @@ final class AppState: ObservableObject {
     /// istiyor, push simülatörde hiç çalışmıyor ve Firebase reCAPTCHA web
     /// akışına düşüyor — o ekranın metni Google'ın kontrolünde ve Türkçe değil.
     /// Gerçek cihazda ve yayında Firebase uygulaması devreye girer.
+    ///
+    /// İSTİSNA — emülatör modu: Auth emülatörü APNs de reCAPTCHA da istemiyor,
+    /// yani simülatörde GERÇEK telefon akışı çalışıyor. Bu şart, çünkü Firestore
+    /// kuralları `request.auth.uid` istiyor; sahte servis Firebase'e hiç
+    /// dokunmadığı için kalıcılık emülatörde sahte kimlikle denenemez.
     private static func makeAuthService() -> AuthService {
+        #if DEBUG
+        if LaunchConfig.emulatorHost != nil { return FirebaseAuthService() }
+        #endif
         #if targetEnvironment(simulator)
         return FakeAuthService()
         #else

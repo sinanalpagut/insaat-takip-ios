@@ -33,6 +33,10 @@ enum AuthError: LocalizedError, Equatable {
     case codeExpired
     case tooManyRequests
     case network
+    /// Uygulama telefon doğrulaması için yapılandırılmamış (Info.plist'te geri
+    /// çağrı URL şeması yok). Bu bir KULLANICI hatası değil, derleme hatası;
+    /// yine de çökmek yerine söylenmesi gerekiyor — bkz. FirebaseAuthService.
+    case notConfigured
     case unknown(String)
 
     /// Kullanıcıya gösterilen metin. Firebase'in İngilizce hata dizeleri
@@ -44,6 +48,7 @@ enum AuthError: LocalizedError, Equatable {
         case .codeExpired:      return "Kodun süresi doldu · yeniden gönder"
         case .tooManyRequests:  return "Çok fazla deneme · bir süre sonra tekrar dene"
         case .network:          return "Bağlantı yok"
+        case .notConfigured:    return "Telefon girişi bu derlemede yapılandırılmadı"
         case .unknown:          return "Giriş yapılamadı"
         }
     }

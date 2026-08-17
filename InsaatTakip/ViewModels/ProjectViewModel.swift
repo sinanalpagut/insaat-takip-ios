@@ -49,11 +49,40 @@ final class ProjectViewModel: ObservableObject {
     /// varsayılan argüman ifadesi olarak yazılamıyor (çağrı yerinde, izole
     /// olmayan bağlamda değerlendirilirdi). Gövdede kurmak aynı sonucu verir.
     init(repository: ProjectRepository? = nil) {
-        let source = repository ?? InMemoryProjectRepository()
+        let source = repository ?? Self.makeRepository()
         self.repository = source
         // Açılışta BEKLEME YOK: önbellek senkron okunur. `load()` async olsaydı
         // ekran bir kare boş görünür, yani kullanıcı bir fark görürdü.
         apply(source.cachedSnapshot())
+    }
+
+    /// Kalıcılık kaynağını seçer. Varsayılan hâlâ demo verisi; gerçek Firestore
+    /// `-backend firestore` ile açılıyor (bkz. LaunchConfig). Yayın derlemesinde
+    /// koşul yok, Firestore devrede.
+    private static func makeRepository() -> ProjectRepository {
+        LaunchConfig.usesFirestore ? FirestoreProjectRepository() : InMemoryProjectRepository()
+    }
+
+    /// Yetkili kaynaktan tam yükleme. `RootView` bunu bir `.task` içinde çağırır.
+    ///
+    /// Bellek içi kaynakta bu bir no-op sayılır (önbellek zaten güncel veriyi
+    /// veriyor); Firestore'da ilk açılışta önbellek BOŞ olduğu için ekranı asıl
+    /// dolduran çağrı budur. Hata sessiz geçilmez: kullanıcı boş bir dashboard'a
+    /// bakıp verisini kaybettiğini sanmasın.
+    func refresh() async {
+        do {
+            apply(try await repository.load())
+        } catch {
+            flash(Self.loadFailureMessage(for: error))
+        }
+    }
+
+    private static func loadFailureMessage(for error: Error) -> String {
+        if let repositoryError = error as? RepositoryError {
+            return repositoryError.errorDescription ?? "Veriler yüklenemedi"
+        }
+        // Firestore'un İngilizce hata dizeleri arayüze SIZMAMALI.
+        return "Veriler yüklenemedi · bağlantıyı denetle"
     }
 
     // MARK: - Kalıcılık köprüsü
@@ -100,6 +129,13 @@ final class ProjectViewModel: ObservableObject {
                 self.verifySeam(after: failureNote)
                 #endif
             } catch {
+                #if DEBUG
+                // Kullanıcıya kısa Türkçe mesaj gidiyor; ham hata görünmezse
+                // "kaydedilemedi" toast'ının NEDENİ hiçbir yerde okunamaz —
+                // oysa bu, yorumun "en sinsi hata sınıfı" dediği şeyin tam
+                // kendisi. Yalnızca DEBUG.
+                print("[persist] \(failureNote) başarısız: \(error)")
+                #endif
                 self.flash("\(failureNote) kaydedilemedi")
             }
         }
@@ -1053,9 +1089,18 @@ final class ProjectViewModel: ObservableObject {
 
     /// Yeni proje (ada/parsel) oluşturur; daireleri boş olarak açar.
     @discardableResult
-    func addProject(role: UserRole, block: String, parcel: String, district: String,
+    /// Yeni proje kurar.
+    ///
+    /// `user` ZORUNLU: sahiplik ve ilk üyelik onun `uid`'inden geliyor. Önceden
+    /// yalnızca `role` alıyordu ve sahiplik `User.admin.id`'ye SABİTLENMİŞTİ —
+    /// kimlik doğrulaması gelmeden önce zararsızdı, sonrasında iki şeyi birden
+    /// kırıyordu: proje kuran kişinin kendi listesinde görünmüyordu
+    /// (`memberUids` onun uid'ini içermiyor) ve güvenlik kuralı yazmayı
+    /// reddediyordu (`ownerUid != request.auth.uid`). Yani gerçek kimlikle
+    /// hiç kimse proje kuramıyordu.
+    func addProject(user: User?, block: String, parcel: String, district: String,
                     city: String, floors: Int, apartmentCount: Int) -> Project? {
-        guard role == .admin else { return nil }
+        guard let user, user.role == .admin else { return nil }
         let trimmedBlock = block.trimmingCharacters(in: .whitespaces)
         let trimmedParcel = parcel.trimmingCharacters(in: .whitespaces)
         guard !trimmedBlock.isEmpty, !trimmedParcel.isEmpty else {
@@ -1069,8 +1114,8 @@ final class ProjectViewModel: ObservableObject {
                               city: city.isEmpty ? "—" : city,
                               floors: max(1, floors), totalApartments: max(1, apartmentCount),
                               phase: .temel, progress: 0,
-                              ownerUid: User.admin.id,
-                              memberUids: [User.admin.id],
+                              ownerUid: user.id,
+                              memberUids: [user.id],
                               createdAt: Date(),
                               invite: nil, photoCount: 0)
         projects.append(project)
@@ -1104,10 +1149,10 @@ final class ProjectViewModel: ObservableObject {
         }
 
         // Projeyi kuran yönetici, hisse dağılımının tamamıyla ilk ortak olur.
-        let founder = Partner(id: UUID(), projectId: project.id, name: User.admin.name,
+        let founder = Partner(id: UUID(), projectId: project.id, name: user.name,
                               isFounder: true,
                               joinedAt: Date(),
-                              sharePercent: 100, userUid: User.admin.id)
+                              sharePercent: 100, userUid: user.id)
         partners.append(founder)
         writes.append(.partner(founder))
 

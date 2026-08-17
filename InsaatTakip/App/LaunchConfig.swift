@@ -52,4 +52,32 @@ enum LaunchConfig {
         return nil
         #endif
     }
+
+    /// "-backend firestore" → bellek içi demo verisi yerine gerçek Firestore.
+    ///
+    /// Varsayılan hâlâ demo verisi: 5 projelik senaryo ekran karşılaştırmaları ve
+    /// tasarım sadakati denetimleri için gerekli, ayrıca kalıcılık henüz her
+    /// akışta doğrulanmadı. Anahtar açıkça çevrilmeden gerçek veritabanına
+    /// geçilmiyor — yanlışlıkla boş bir uygulamayla karşılaşmamak için.
+    static var usesFirestore: Bool {
+        #if DEBUG
+        return value(for: "backend") == "firestore"
+        #else
+        return true
+        #endif
+    }
+
+    /// "-emulator 127.0.0.1:8080" → Firestore ve Auth emülatörüne bağlan.
+    ///
+    /// Kural testleri (tests/rules.test.mjs) kuralları JavaScript tarafından
+    /// kanıtlıyor; bu anahtar UYGULAMANIN KENDİSİNİ aynı emülatöre bağlıyor,
+    /// böylece repository'nin ürettiği gerçek yazmalar da aynı kurallardan
+    /// geçiyor. Gerçek veritabanına dokunmadan uçtan uca doğrulama yolu bu.
+    static var emulatorHost: String? {
+        #if DEBUG
+        return value(for: "emulator")
+        #else
+        return nil
+        #endif
+    }
 }

@@ -44,6 +44,12 @@ struct RootView: View {
                 }
                 .toastOverlay(viewModel.toast)
                 .onAppear { seedFromLaunchConfig() }
+                // Yetkili kaynaktan tam yükleme. `cachedSnapshot()` ekranı
+                // bir kare bile boş bırakmadan açtı; bu çağrı onun üstüne
+                // gerçek veriyi getiriyor. Oturum açıldıktan SONRA çalışması
+                // şart: Firestore sorgusu `request.auth.uid` istiyor, o yüzden
+                // burada (giriş yapılmış dalda) duruyor.
+                .task(id: appState.currentUser?.id) { await viewModel.refresh() }
             }
         }
     }
