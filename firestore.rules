@@ -111,6 +111,32 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ─────────────────────────── Davet kodları ───────────────────────────
+    //
+    // `invites/{KOD}` — belge kimliği KODUN KENDİSİ, böylece işlev tek `get` ile
+    // buluyor (projenin içine gömülü olsaydı "kodu şu olan projeyi bul" bir
+    // SORGU olurdu; hem indeks hem daha pahalı).
+    //
+    // OKUMA HERKESE KAPALI — sahibe de. 6 hane, 31 karakterlik alfabe: okunabilir
+    // olsaydı kodlar kaba kuvvetle denenip başkasının projesine girilebilirdi.
+    // Yöneticinin kodu görmesi için `projects/{pid}.invite` aynası var; orada
+    // kodun kendisi zaten sahibin yazdığı veri.
+    //
+    // YAZMA: yalnızca projenin sahibi ve yalnızca CREATE. `update` kapalı çünkü
+    // kodu harcamak (usedAt) işleve ait bir yetki; sahip bunu kendi eliyle
+    // yapabilseydi "kullanıldı" damgası güvenilmez olurdu.
+    //
+    // Kod çakışması: `create` yalnızca belge YOKKEN geçerli. Aynı kod ikinci kez
+    // üretilirse yazma reddedilir ve istemci yeni kod dener — sessizce üzerine
+    // yazıp başkasının davetini çalmak mümkün değil.
+    match /invites/{code} {
+      allow read: if false;
+      allow create: if signedIn()
+                    && request.resource.data.projectId is string
+                    && isOwner(request.resource.data.projectId);
+      allow update, delete: if false;
+    }
+
     // ─────────────────────────── Proje belgesi ───────────────────────────
 
     match /projects/{pid} {

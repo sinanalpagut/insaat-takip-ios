@@ -22,7 +22,13 @@ import {
   setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
-const PROJECT_ID = 'demo-insaattakip';
+// AYRI proje kimliği — bilinçli. `functions.test.mjs` aynı emülatörde
+// `demo-insaattakip` ad alanını kullanıyor ve kendi zeminini kurarken
+// `clearFirestore()` çağırıyor. Node test dosyalarını PARALEL çalıştırdığı için
+// aynı ad alanı paylaşılsa iki takım birbirinin verisini siler ve testler
+// gerçek bir kusur yokken kırmızıya döner. Firestore emülatörü proje kimliğine
+// göre ad alanı ayırdığından ayrı kimlik tam yalıtım veriyor.
+const PROJECT_ID = 'demo-rules';
 
 // Kimlikler: sahip, üye (davetli ortak), yabancı.
 const OWNER = 'uid-owner';
@@ -255,6 +261,73 @@ describe('projects/{pid}/apartments — yönetici yazar, ortak okur', () => {
 
   it('ortak daireyi silemez', async () => {
     await assertFails(deleteDoc(doc(memberDb, 'projects', P1, 'apartments', 'apt-1')));
+  });
+});
+
+// ═══════════════════════════ Davet kodları ═══════════════════════════
+
+describe('invites/{KOD}', () => {
+  before(seed);
+
+  const future = () => new Date(Date.now() + 48 * 3600 * 1000);
+
+  it('sahip kendi projesi için davet üretir', async () => {
+    await assertSucceeds(setDoc(doc(ownerDb, 'invites', 'X7B9Q2'), {
+      projectId: P1, createdAt: new Date(), expiresAt: future(), usedAt: null,
+    }));
+  });
+
+  it('YABANCI başkasının projesi için davet üretemez', async () => {
+    await assertFails(setDoc(doc(strangerDb, 'invites', 'AAAAAA'), {
+      projectId: P1, createdAt: new Date(), expiresAt: future(), usedAt: null,
+    }));
+  });
+
+  it('ORTAK davet üretemez — davet etmek yönetici yetkisi', async () => {
+    await assertFails(setDoc(doc(memberDb, 'invites', 'BBBBBB'), {
+      projectId: P1, createdAt: new Date(), expiresAt: future(), usedAt: null,
+    }));
+  });
+
+  it('oturum açmamış kullanıcı davet üretemez', async () => {
+    await assertFails(setDoc(doc(anonDb, 'invites', 'CCCCCC'), {
+      projectId: P1, createdAt: new Date(), expiresAt: future(), usedAt: null,
+    }));
+  });
+
+  it('kodu SAHİBİ DAHİ okuyamaz — 6 hane kaba kuvvetle denenebilirdi', async () => {
+    await assertFails(getDoc(doc(ownerDb, 'invites', 'X7B9Q2')));
+  });
+
+  it('davet edilen kişi kodu okuyup projeyi bulamaz (callable şart)', async () => {
+    await assertFails(getDoc(doc(strangerDb, 'invites', 'X7B9Q2')));
+  });
+
+  it('davetler listelenemez', async () => {
+    await assertFails(getDocs(collection(ownerDb, 'invites')));
+  });
+
+  it('kodu SAHİBİ DAHİ harcanmış işaretleyemez — o yetki işlevin', async () => {
+    await assertFails(updateDoc(doc(ownerDb, 'invites', 'X7B9Q2'), {
+      usedAt: new Date(), usedByUid: STRANGER,
+    }));
+  });
+
+  it('davet silinemez', async () => {
+    await assertFails(deleteDoc(doc(ownerDb, 'invites', 'X7B9Q2')));
+  });
+
+  it('aynı kod ikinci kez üretilemez — başkasının daveti çalınamaz', async () => {
+    // `create` yalnızca belge yokken geçerli; ikincisi `update` sayılır ve kapalı.
+    await assertFails(setDoc(doc(strangerDb, 'invites', 'X7B9Q2'), {
+      projectId: P2, createdAt: new Date(), expiresAt: future(), usedAt: null,
+    }));
+  });
+
+  it('projectId olmadan davet üretilemez', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'invites', 'DDDDDD'), {
+      createdAt: new Date(), expiresAt: future(), usedAt: null,
+    }));
   });
 });
 

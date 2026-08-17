@@ -3,6 +3,12 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "functions": {
+    "source": "functions",
+    "codebase": "default",
+    "predeploy": ["npm --prefix functions run build"],
+    "ignore": ["node_modules", ".git", "*.local"]
+  },
   "emulators": {
     "firestore": {
       "port": 8080
@@ -10,9 +16,12 @@
     "auth": {
       "port": 9099
     },
+    "functions": {
+      "port": 5001
+    },
     "ui": {
       "enabled": false
     },
-    "singleProjectMode": true
+    "singleProjectMode": false
   }
 }
