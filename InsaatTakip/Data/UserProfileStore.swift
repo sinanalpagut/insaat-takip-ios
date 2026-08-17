@@ -1,4 +1,5 @@
 import Foundation
+import FirebaseFirestore
 
 // MARK: - Kullanıcı profili (users/{uid})
 //
@@ -73,5 +74,56 @@ final class LocalUserProfileStore: UserProfileStore {
         // daha "Adın ne?" ekranıyla karşılaşır. Tek seferlik, küçük ve kimliğe
         // ait bir yazım olduğu için burada beklemek doğru.
         defaults.synchronize()
+    }
+}
+
+// MARK: - Firestore uygulaması
+
+/// `users/{uid}` belgesini Firestore'da tutar, yerel önbelleği de günceller.
+///
+/// İSİM ARTIK SUNUCUDA OLMAK ZORUNDA: `redeemInvite` Cloud Function'ı katılan
+/// kişinin adını buradan okuyor. Yalnızca yerelde kalsaydı işlev adı bulamaz ve
+/// yöneticinin ortak listesinde telefon numarası ya da "Ortak" görünürdü.
+/// İstemciden ad göndermek de çözüm değil: kişi ortak tablosunda istediği adla
+/// görünürdü ve liste doğrulanmamış veri taşırdı.
+///
+/// Güvenlik kuralı bu yolu zaten koruyor ve test edildi: `users/{uid}` yalnızca
+/// kişinin KENDİSİNE açık, uid bilen biri başkasının telefonuna ulaşamıyor.
+@MainActor
+final class FirestoreUserProfileStore: UserProfileStore {
+
+    private let db: Firestore
+    /// Senkron `cachedProfile` ve uzak yazma başarısız olsa bile isim sorulmasın
+    /// diye yerel kopya korunuyor. Firestore'un disk önbelleği yalnızca asenkron
+    /// okunabildiği için protokolün senkron sözü ancak böyle tutulabiliyor.
+    private let local: LocalUserProfileStore
+
+    /// `local` varsayılanı gövdede kuruluyor: `LocalUserProfileStore` ana
+    /// aktörde olduğu için varsayılan argüman ifadesi olarak yazılamıyor
+    /// (çağrı yerinde, izole olmayan bağlamda değerlendirilirdi). Aynı kalıp
+    /// `ProjectViewModel.init`'te de var.
+    init(db: Firestore = Firestore.firestore(), local: LocalUserProfileStore? = nil) {
+        self.db = db
+        self.local = local ?? LocalUserProfileStore()
+    }
+
+    func cachedProfile(uid: String) -> UserProfile? { local.cachedProfile(uid: uid) }
+
+    func fetch(uid: String) async throws -> UserProfile? {
+        let snapshot = try await db.collection("users").document(uid).getDocument()
+        guard snapshot.exists else { return nil }
+        let profile = try snapshot.data(as: UserProfile.self)
+        // Uzaktan gelen kayıt önbelleğe de yazılır: yeni cihazda ikinci açılışta
+        // ağ beklemeden isim hazır olsun.
+        try? await local.save(profile)
+        return profile
+    }
+
+    func save(_ profile: UserProfile) async throws {
+        // ÖNCE yerel: uzak yazma başarısız olsa bile kullanıcıya isim bir daha
+        // sorulmaz. Sıra bilinçli — tersi olsa ağ hatası ismi kaybettirirdi.
+        try await local.save(profile)
+        try await db.collection("users").document(profile.uid)
+            .setData(try Firestore.Encoder().encode(profile))
     }
 }

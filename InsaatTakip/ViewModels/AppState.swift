@@ -23,7 +23,12 @@ final class AppState: ObservableObject {
         // Parametre adı `auth`, `self.auth`'u gölgeliyor; doğrudan `auth`
         // yazılırsa varsayılan çağrıda (auth: nil) oturum HİÇ geri yüklenmez.
         let service = auth ?? Self.makeAuthService()
-        let store = profiles ?? LocalUserProfileStore()
+        // Firestore devredeyse profil SUNUCUDA olmak zorunda: `redeemInvite`
+        // Cloud Function'ı katılan kişinin adını `users/{uid}`'den okuyor.
+        // Yalnızca yerelde kalsa yöneticinin ortak listesinde "Ortak" görünürdü.
+        let store = profiles ?? (LaunchConfig.usesFirestore
+                                 ? FirestoreUserProfileStore()
+                                 : LocalUserProfileStore())
         self.auth = service
         self.profiles = store
 

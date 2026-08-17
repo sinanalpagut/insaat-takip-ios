@@ -1,6 +1,7 @@
 import FirebaseAuth
 import FirebaseCore
 import FirebaseFirestore
+import FirebaseFunctions
 import UIKit
 
 // MARK: - App delegate (yalnızca Firebase telefon doğrulaması için)
@@ -57,11 +58,19 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         let name = String(parts.first ?? "127.0.0.1")
         let port = parts.count > 1 ? Int(parts[1]) ?? 8080 : 8080
 
-        let settings = Firestore.firestore().settings
-        settings.host = "\(name):\(port)"
-        settings.cacheSettings = MemoryCacheSettings()
-        settings.isSSLEnabled = false
-        Firestore.firestore().settings = settings
+        // `useEmulator` KULLANILIYOR, elle `settings.host` DEĞİL.
+        //
+        // Önce `settings.host` + `isSSLEnabled = false` yazıyordum ve sessizce
+        // çalışmıyordu: emülatörün Firestore günlüğünde uygulamadan hiç gRPC
+        // bağlantısı görünmedi, yazmalar sunucu onayı bekleyip kuyrukta kaldı.
+        // `batch.commit()` yalnızca onay gelince döndüğü için hata da
+        // ÜRETİLMEDİ — ekranda veri vardı, veritabanında yoktu.
+        //
+        // Ayrıca `MemoryCacheSettings` KALDIRILDI: bellek önbelleğiyle kuyrukta
+        // bekleyen yazmalar uygulama kapanınca yok oluyor. Varsayılan kalıcı
+        // önbellek, bağlantı geri geldiğinde yazmayı tamamlıyor — çevrimdışı
+        // şantiyede çalışan bir uygulamada bu bir lüks değil, gereklilik.
+        Firestore.firestore().useEmulator(withHost: name, port: port)
 
         // Auth emülatörü 9099'da. Firestore kuralları `request.auth.uid` istiyor;
         // gerçek Auth'a bağlı kalınırsa emülatördeki Firestore o jetonu
@@ -74,7 +83,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // olduğunun tek bakışta okunması için.
         Auth.auth().settings?.appVerificationDisabledForTesting = true
 
-        print("[emulator] Firestore \(name):\(port) · Auth \(name):9099")
+        // Cloud Functions emülatörü 5001'de. Bölge, `functions/src/index.ts` ve
+        // `FirebaseInviteService.region` ile AYNI olmak zorunda — farklı olsa
+        // çağrı 404 döner ve hata "işlev yok" gibi görünür.
+        Functions.functions(region: FirebaseInviteService.region)
+            .useEmulator(withHost: name, port: 5001)
+
+        print("[emulator] Firestore \(name):\(port) · Auth \(name):9099 · Functions \(name):5001")
         #endif
     }
 

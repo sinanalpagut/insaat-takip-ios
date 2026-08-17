@@ -13,6 +13,9 @@ struct JoinWithCodeView: View {
     @State private var code = ""
     @FocusState private var fieldFocused: Bool
     @State private var showInvalid = false
+    /// Katılma artık ağ işi (Cloud Function). Bu bayrak olmadan kullanıcı
+    /// düğmeye üst üste basar ve aynı kod için birden fazla çağrı gider.
+    @State private var isBusy = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -54,13 +57,17 @@ struct JoinWithCodeView: View {
             Button {
                 submit()
             } label: {
-                Text("Projeye Katıl")
-                    .font(.manrope(15, .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(code.count == 6 ? Palette.accent : Palette.accent.opacity(0.5))
-                    .cornerRadius(14)
+                HStack(spacing: 9) {
+                    if isBusy { ProgressView().tint(.white) }
+                    Text(isBusy ? "Katılıyor…" : "Projeye Katıl")
+                        .font(.manrope(15, .bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(code.count == 6 && !isBusy
+                            ? Palette.accent : Palette.accent.opacity(0.5))
+                .cornerRadius(14)
             }
             .padding(.top, 24)
 
@@ -162,22 +169,33 @@ struct JoinWithCodeView: View {
             viewModel.flash("Önce telefonla giriş yap")
             return
         }
-        switch viewModel.redeemInvite(code: code, user: user) {
-        case .success(let projectTitle):
-            dismiss()
-            viewModel.flash("\(projectTitle) · salt okunur erişim")
-        case .notFound:
-            showInvalid = true
-            viewModel.flash("Böyle bir davet kodu yok")
-        case .expired:
-            showInvalid = true
-            viewModel.flash("Kodun süresi dolmuş · yöneticiden yeni kod iste")
-        case .alreadyUsed:
-            showInvalid = true
-            viewModel.flash("Bu kod daha önce kullanılmış")
-        case .alreadyMember:
-            dismiss()
-            viewModel.flash("Bu projenin zaten ortağısın")
+        // Firestore devredeyse bu bir Cloud Function çağrısı, yani AĞ İŞİ.
+        // `isBusy` olmadan kullanıcı düğmeye üst üste basar ve aynı kod için
+        // birden fazla çağrı gider.
+        guard !isBusy else { return }
+        isBusy = true
+
+        Task {
+            defer { isBusy = false }
+            switch await viewModel.joinProject(code: code, user: user) {
+            case .success(let projectTitle):
+                dismiss()
+                viewModel.flash("\(projectTitle) · salt okunur erişim")
+            case .notFound:
+                showInvalid = true
+                // Gerçek neden ağ/bozuk davet olabilir; o durumda ViewModel
+                // kendi toast'ını gösterdi, üzerine yazmıyoruz.
+                if viewModel.toast == nil { viewModel.flash("Böyle bir davet kodu yok") }
+            case .expired:
+                showInvalid = true
+                viewModel.flash("Kodun süresi dolmuş · yöneticiden yeni kod iste")
+            case .alreadyUsed:
+                showInvalid = true
+                viewModel.flash("Bu kod daha önce kullanılmış")
+            case .alreadyMember:
+                dismiss()
+                viewModel.flash("Bu projenin zaten ortağısın")
+            }
         }
     }
 

@@ -48,9 +48,14 @@ final class ProjectViewModel: ObservableObject {
     /// Varsayılan `nil`: `InMemoryProjectRepository()` ana aktörde olduğu için
     /// varsayılan argüman ifadesi olarak yazılamıyor (çağrı yerinde, izole
     /// olmayan bağlamda değerlendirilirdi). Gövdede kurmak aynı sonucu verir.
-    init(repository: ProjectRepository? = nil) {
+    /// Davet akışı. `nil` = demo verisi (yerel mantık yeterli, sunucu yok).
+    /// Firestore devredeyse dolu: davet kullanma bir Cloud Function çağrısı.
+    private let invites: InviteService?
+
+    init(repository: ProjectRepository? = nil, invites: InviteService? = nil) {
         let source = repository ?? Self.makeRepository()
         self.repository = source
+        self.invites = invites ?? (LaunchConfig.usesFirestore ? FirebaseInviteService() : nil)
         // Açılışta BEKLEME YOK: önbellek senkron okunur. `load()` async olsaydı
         // ekran bir kare boş görünür, yani kullanıcı bir fark görürdü.
         apply(source.cachedSnapshot())
@@ -1190,7 +1195,42 @@ final class ProjectViewModel: ObservableObject {
             attempts += 1
         }
         projects[index].invite = Invite(code: code, createdAt: Date())
-        persist([.project(projects[index])], failureNote: "Davet kodu")
+
+        guard let invites else {
+            // Demo verisi: kod yalnızca projenin içinde yaşar.
+            persist([.project(projects[index])], failureNote: "Davet kodu")
+            return
+        }
+
+        // Firestore: `invites/{KOD}` otorite kaydı ile proje aynası TEK PARTİDE
+        // yazılır. `persist` KULLANILMIYOR çünkü `invites` koleksiyonu
+        // `DocumentChange`'in bilmediği bir yol — repository yalnızca proje
+        // ağacını tanıyor ve davet o ağacın dışında (bilerek: kod okuma herkese
+        // kapalı olmalı, proje belgesinin içinde olsa üyeler de görürdü).
+        let projectId = projects[index].id
+        let ownerUid = projects[index].ownerUid
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                // Sunucunun ürettiği kod kazanır: çakışma olursa servis yeniden
+                // dener ve elimizdeki yerel kod geçersiz kalırdı.
+                let serverCode = try await invites.createInvite(projectId: projectId,
+                                                               ownerUid: ownerUid)
+                if let i = self.projects.firstIndex(where: { $0.id == projectId }) {
+                    self.projects[i].invite = Invite(code: serverCode, createdAt: Date())
+                }
+            } catch {
+                #if DEBUG
+                print("[invite] üretilemedi: \(error)")
+                #endif
+                // Yerel kodu geri al: ekranda kullanılamayacak bir kod
+                // göstermek, kod göstermemekten kötü.
+                if let i = self.projects.firstIndex(where: { $0.id == projectId }) {
+                    self.projects[i].invite = nil
+                }
+                self.flash("Davet kodu üretilemedi")
+            }
+        }
     }
 
     /// Davet kodunu kullanır: kodu GERÇEK bir projeyle eşler, süresini ve tek
@@ -1202,6 +1242,44 @@ final class ProjectViewModel: ObservableObject {
         case expired         // 48 saat dolmuş
         case alreadyUsed     // kod harcanmış
         case alreadyMember   // kullanıcı zaten bu projenin ortağı
+    }
+
+    /// Davet kodunu kullanır — hangi yoldan gideceğine BURADA karar verilir.
+    ///
+    /// Firestore devredeyse Cloud Function çağrılır: davet edilen kişi üyesi
+    /// olmadığı projeyi okuyamadığı için kodu istemcide doğrulamak imkânsız ve
+    /// `memberUids`'e yazma kurala göre yalnızca sahibe açık. Demo verisinde ise
+    /// yerel mantık çalışır (aşağıdaki `redeemInvite`).
+    ///
+    /// Bu ayrımın ViewModel'de olması bilinçli: `JoinWithCodeView` hangi arka
+    /// ucun devrede olduğunu bilmemeli, tek bir çağrı görmeli.
+    func joinProject(code rawCode: String, user: User) async -> JoinResult {
+        guard let invites else { return redeemInvite(code: rawCode, user: user) }
+
+        do {
+            let redemption = try await invites.redeem(code: InviteCode.sanitize(rawCode))
+            // Sunucu üyeliği yazdı; ekranın onu görmesi için yeniden yükleme
+            // şart — yeni proje yerel kopyada henüz yok.
+            await refresh()
+            return redemption.alreadyMember
+                ? .alreadyMember
+                : .success(projectTitle: redemption.projectTitle)
+        } catch let error as InviteError {
+            switch error {
+            case .notFound, .badFormat, .notSignedIn: return .notFound
+            case .expired:                            return .expired
+            case .alreadyUsed:                        return .alreadyUsed
+            case .inviteBroken, .network, .unknown:
+                // Ayrı bir JoinResult durumu YOK; kullanıcıya gerçek nedeni
+                // toast ile söylüyoruz, aksi halde "böyle bir kod yok" diyerek
+                // yanlış yönlendirmiş olurduk.
+                flash(error.errorDescription ?? "Projeye katılınamadı")
+                return .notFound
+            }
+        } catch {
+            flash("Projeye katılınamadı")
+            return .notFound
+        }
     }
 
     func redeemInvite(code rawCode: String, user: User) -> JoinResult {
