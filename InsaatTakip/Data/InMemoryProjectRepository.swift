@@ -68,12 +68,15 @@ final class InMemoryProjectRepository: ProjectRepository {
         case .sitePhoto(let value):      upsert(value, into: &sitePhotos, newestFirst: true)
         case .apartmentPhoto(let value): upsert(value, into: &apartmentPhotos)
 
-        case .deleteMaterialLog(let id):     materialLogs.removeAll { $0.id == id }
-        case .deleteExpense(let id):         expenses.removeAll { $0.id == id }
-        case .deletePayment(let id):         payments.removeAll { $0.id == id }
-        case .deleteApartmentPhoto(let id):  apartmentPhotos.removeAll { $0.id == id }
-        case .deletePayments(let apartmentId):
-            payments.removeAll { $0.apartmentId == apartmentId }
+        // Bellek içinde proje kimliğine gerek yok (kimlik tek başına benzersiz);
+        // Firestore uygulamasında doküman YOLUNU kurmak için kullanılacak.
+        case .deleteMaterialLog(let id, _):     materialLogs.removeAll { $0.id == id }
+        case .deleteExpense(let id, _):         expenses.removeAll { $0.id == id }
+        case .deletePayment(let id, _):         payments.removeAll { $0.id == id }
+        case .deleteApartmentPhoto(let id, _):  apartmentPhotos.removeAll { $0.id == id }
+        case .deletePayments(let ids, _):
+            let dropped = Set(ids)
+            payments.removeAll { dropped.contains($0.id) }
         }
     }
 

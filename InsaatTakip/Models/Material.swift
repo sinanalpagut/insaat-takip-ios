@@ -13,20 +13,9 @@ struct Material: Codable, Identifiable, Equatable {
     var unit: String          // "kg", "m³", "torba", "adet", "m²", "ton"
     var unitPrice: Kurus      // Güncel/son alış birim fiyatı — yalnızca gösterim ve ön dolum
 
-    // MARK: Türetilen toplamlar
-    // Aşağıdaki üç alan ViewModel dışında ASLA yazılmaz; tek yazma noktası
-    // recalculateMaterial'dır. Önceden `accruedCost += ...` ile birikiyordu
-    // ve bunu geri alan hiçbir kod yolu yoktu: yanlış girilen bir fiş
-    // maliyette kalıcı olarak duruyordu.
-    var totalIn: Double       // Toplam giren = devir + giriş fişleri
-    var totalOut: Double      // Toplam kullanılan = devir + çıkış fişleri
     var step: Double          // Fiş formunda hızlı artış adımı
-    /// Fiilen ödenen toplam tutar; her giriş kendi tarihindeki fiyatıyla sayılır.
-    /// Hesaplanan (totalIn × güncel fiyat) yerine hareket bazlı bir toplamdır:
-    /// aksi halde yeni bir fiyat girmek geçmişteki tüm stoğu yeniden fiyatlandırırdı.
-    var accruedCost: Kurus
 
-    // MARK: Devir (açılış) bakiyesi
+    // MARK: Devir (açılış) bakiyesi — KALICI
     // Bir proje uygulamaya girdiğinde şantiyede zaten malzeme vardır ve o
     // günün öncesine ait fiş yoktur. Toplamlar hareketlerden türetildiği için
     // kayıtlı hareketlerle açıklanamayan kısım burada durur; devir olmasaydı
@@ -34,6 +23,36 @@ struct Material: Codable, Identifiable, Equatable {
     var openingIn: Double = 0
     var openingOut: Double = 0
     var openingCost: Kurus = .zero
+
+    // MARK: Türetilen toplamlar — KALICI DEĞİL (bkz. CodingKeys)
+    //
+    // Bu üç alan devir + kayıtlı hareketlerden hesaplanır ve BİLİNÇLİ olarak
+    // kodlanmaz. ANALIZ.md madde 19 "stok toplamlarında atomik güncelleme
+    // (FieldValue.increment)" diyordu; o maddenin hedeflediği `accruedCost += ...`
+    // deseni Faz 1/13'te kalktı, ama sorun kılık değiştirerek duruyordu:
+    // alanlar kalıcı olduğu sürece her fiş işlemi tam dokümanı yazıyor, yani
+    // Firestore'da `setData` → SON YAZAN KAZANIR. İki cihaz aynı anda fiş
+    // girdiğinde iki hareket de yaşıyor (doğruluk kaynağı sağlam) ama
+    // materials/{id}.totalIn birinin değerinde kalıyor ve sapma doğrudan
+    // "Malzeme" ile "Net" rakamına gidiyordu.
+    //
+    // Çözüm increment DEĞİL: yazmamak. Yazılmayan alanın çakışacak bir şeyi yok
+    // ve `recalculate(from:)` her yüklemede zaten üretiyor. Bu aynı zamanda
+    // doküman boyutunu ve yazma sayısını düşürüyor.
+    var totalIn: Double = 0       // Toplam giren = devir + giriş fişleri
+    var totalOut: Double = 0      // Toplam kullanılan = devir + çıkış fişleri
+    /// Fiilen ödenen toplam tutar; her giriş kendi tarihindeki fiyatıyla sayılır.
+    /// Hesaplanan (totalIn × güncel fiyat) yerine hareket bazlı bir toplamdır:
+    /// aksi halde yeni bir fiyat girmek geçmişteki tüm stoğu yeniden fiyatlandırırdı.
+    var accruedCost: Kurus = .zero
+
+    /// Kalıcılığa YALNIZCA bu alanlar gider. totalIn/totalOut/accruedCost listede
+    /// yok — türetildikleri için kodlanmıyor, çözülürken de varsayılan 0 ile gelip
+    /// hemen ardından `recalculate(from:)` ile doldurulur.
+    enum CodingKeys: String, CodingKey {
+        case id, projectId, code, name, subtitle, unit, unitPrice, step
+        case openingIn, openingOut, openingCost
+    }
 
     /// Kalan stok.
     var currentStock: Double { totalIn - totalOut }
@@ -82,6 +101,10 @@ struct MaterialLog: Codable, Identifiable, Equatable {
     }
 
     let id: UUID
+    /// Firestore'da her yazma bir YOL ister (projects/{pid}/materialLogs/{id}) ve
+    /// repository bunu materialId'den çıkaramaz — ikinci bir id→proje haritası
+    /// tutmak ikinci doğruluk kaynağı olurdu.
+    let projectId: UUID
     let materialId: UUID
     var type: LogType
     var amount: Double

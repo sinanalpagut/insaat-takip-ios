@@ -101,6 +101,8 @@ struct SitePhoto: Identifiable, Equatable {
 /// görseller ayrı koleksiyonda tutulur (UIImage kodlanamaz).
 struct ApartmentPhoto: Identifiable, Equatable {
     let id: UUID
+    /// Firestore yolu için — bkz. MaterialLog.projectId.
+    let projectId: UUID
     let apartmentId: UUID
     var label: String        // "Salon", "Mutfak", "Görsel 3"…
     var image: UIImage?      // nil = tasarımdaki yer tutucu kare

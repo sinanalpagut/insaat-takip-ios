@@ -374,7 +374,8 @@ final class ProjectViewModel: ObservableObject {
         let note = reference.isEmpty
             ? (type == .entry ? "İrsaliye kaydı" : "Saha kullanımı")
             : reference
-        let log = MaterialLog(id: UUID(), materialId: materialId, type: type,
+        let log = MaterialLog(id: UUID(), projectId: material.projectId,
+                              materialId: materialId, type: type,
                               amount: amount, unitPrice: effectivePrice,
                               date: date,
                               note: note, user: User.admin.name)
@@ -495,7 +496,7 @@ final class ProjectViewModel: ObservableObject {
         }
         receiptImages[logId] = nil
 
-        var writes: [DocumentChange] = [.deleteMaterialLog(id: logId)]
+        var writes: [DocumentChange] = [.deleteMaterialLog(id: logId, projectId: material.projectId)]
         if let refreshed = materials.first(where: { $0.id == material.id }) {
             writes.append(.material(refreshed))
         }
@@ -618,7 +619,8 @@ final class ProjectViewModel: ObservableObject {
                                  newValue: "—"))
         }
         var writes: [DocumentChange] = [.apartment(apartment),
-                                        .deletePayments(apartmentId: apartmentId)]
+                                        .deletePayments(ids: removed.map(\.id),
+                                                        projectId: apartment.projectId)]
         writes += recordAudit(recordId: apartmentId, projectId: apartment.projectId,
                               subject: "Daire No \(apartment.apartmentNumber) satışı",
                               action: .delete, changes: changes)
@@ -745,7 +747,8 @@ final class ProjectViewModel: ObservableObject {
             return false
         }
 
-        let payment = Payment(id: UUID(), apartmentId: apartmentId, amount: amount,
+        let payment = Payment(id: UUID(), projectId: apartment.projectId,
+                              apartmentId: apartmentId, amount: amount,
                               date: date, method: method,
                               note: note.trimmingCharacters(in: .whitespaces),
                               user: User.admin.name)
@@ -772,7 +775,7 @@ final class ProjectViewModel: ObservableObject {
               let apartment = apartments.first(where: { $0.id == payment.apartmentId }) else { return }
         payments.removeAll { $0.id == id }
         receiptImages[id] = nil
-        var writes: [DocumentChange] = [.deletePayment(id: id)]
+        var writes: [DocumentChange] = [.deletePayment(id: id, projectId: apartment.projectId)]
         if let updated = recalculateCollected(for: payment.apartmentId) { writes.append(.apartment(updated)) }
         writes += recordAudit(recordId: id, projectId: apartment.projectId,
                               subject: "Daire No \(apartment.apartmentNumber) tahsilatı", action: .delete,
@@ -844,7 +847,7 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin, let expense = expenses.first(where: { $0.id == id }) else { return }
         expenses.removeAll { $0.id == id }
         receiptImages[id] = nil
-        var writes: [DocumentChange] = [.deleteExpense(id: id)]
+        var writes: [DocumentChange] = [.deleteExpense(id: id, projectId: expense.projectId)]
         writes += recordAudit(recordId: id, projectId: expense.projectId,
                               subject: expense.category.rawValue, action: .delete,
                               changes: [.init(field: expense.detailText.isEmpty ? "Tutar" : expense.detailText,
@@ -884,9 +887,7 @@ final class ProjectViewModel: ObservableObject {
                                 code: uniqueCode, name: trimmedName,
                                 subtitle: subtitle.trimmingCharacters(in: .whitespaces),
                                 unit: trimmedUnit,
-                                unitPrice: Self.parseMoney(unitPriceText),
-                                totalIn: 0, totalOut: 0,
-                                step: 10, accruedCost: .zero)
+                                unitPrice: Self.parseMoney(unitPriceText), step: 10)
         materials.append(material)
         persist([.material(material)], failureNote: "Malzeme")
         flash("\(trimmedName) eklendi")
@@ -947,7 +948,8 @@ final class ProjectViewModel: ObservableObject {
         let target = payment == .tamamlandi ? price : min(price, Self.parseMoney(paidText))
         if isNewSale {
             if target > .zero {
-                let initial = Payment(id: UUID(), apartmentId: apartmentId,
+                let initial = Payment(id: UUID(), projectId: apartment.projectId,
+                                      apartmentId: apartmentId,
                                       amount: target,
                                       date: apartment.saleDate ?? Date(),
                                       method: payment == .tamamlandi ? .havale : .pesinat,
@@ -961,7 +963,8 @@ final class ProjectViewModel: ObservableObject {
             // kadar yeni kayıt açılır — yoksa aynı para iki kez sayılırdı.
             let delta = target - before.paidAmount
             if delta > .zero {
-                let balance = Payment(id: UUID(), apartmentId: apartmentId,
+                let balance = Payment(id: UUID(), projectId: apartment.projectId,
+                                      apartmentId: apartmentId,
                                       amount: delta,
                                       date: apartment.saleDate ?? Date(),
                                       method: payment == .tamamlandi ? .havale : .pesinat,
@@ -1095,8 +1098,7 @@ final class ProjectViewModel: ObservableObject {
         for item in Self.materialCatalog {
             let material = Material(id: UUID(), projectId: project.id,
                                     code: item.code, name: item.name, subtitle: item.subtitle,
-                                    unit: item.unit, unitPrice: item.price,
-                                    totalIn: 0, totalOut: 0, step: item.step, accruedCost: .zero)
+                                    unit: item.unit, unitPrice: item.price, step: item.step)
             materials.append(material)
             writes.append(.material(material))
         }
@@ -1243,10 +1245,12 @@ final class ProjectViewModel: ObservableObject {
     /// Daireye (küçültülmüş) görsel ekler — galeriden veya kameradan.
     func addApartmentPhotos(role: UserRole, apartmentId: UUID, images: [UIImage]) {
         guard role == .admin, !images.isEmpty else { return }
+        guard let apartment = apartments.first(where: { $0.id == apartmentId }) else { return }
         let existing = photos(forApartment: apartmentId).count
         var writes: [DocumentChange] = []
         for (offset, image) in images.enumerated() {
-            let photo = ApartmentPhoto(id: UUID(), apartmentId: apartmentId,
+            let photo = ApartmentPhoto(id: UUID(), projectId: apartment.projectId,
+                                       apartmentId: apartmentId,
                                        label: "Görsel \(existing + offset + 1)",
                                        image: image)
             apartmentPhotos.append(photo)
@@ -1258,9 +1262,11 @@ final class ProjectViewModel: ObservableObject {
 
     /// Daire görselini siler (yalnızca yönetici).
     func removeApartmentPhoto(role: UserRole, photoId: UUID) {
-        guard role == .admin else { return }
+        guard role == .admin,
+              let photo = apartmentPhotos.first(where: { $0.id == photoId }) else { return }
         apartmentPhotos.removeAll { $0.id == photoId }
-        persist([.deleteApartmentPhoto(id: photoId)], failureNote: "Görsel silme")
+        persist([.deleteApartmentPhoto(id: photoId, projectId: photo.projectId)],
+                failureNote: "Görsel silme")
         flash("Görsel silindi")
     }
 

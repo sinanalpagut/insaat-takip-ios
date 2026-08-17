@@ -48,15 +48,19 @@ enum DocumentChange {
     case apartmentPhoto(ApartmentPhoto)
     case audit(AuditEntry)
 
-    case deleteMaterialLog(id: UUID)
-    case deleteExpense(id: UUID)
-    case deletePayment(id: UUID)
-    case deleteApartmentPhoto(id: UUID)
+    // Silmeler de YOL ister; proje kimliği olmadan doküman adresi kurulamaz.
+    case deleteMaterialLog(id: UUID, projectId: UUID)
+    case deleteExpense(id: UUID, projectId: UUID)
+    case deletePayment(id: UUID, projectId: UUID)
+    case deleteApartmentPhoto(id: UUID, projectId: UUID)
 
-    /// Satış iptalinde o dairenin TÜM tahsilatları birlikte düşer. Kaç kayıt
-    /// olduğu çağrı anında bilinmediği için tek tek kimlik yerine kuralı taşıyoruz;
-    /// Firestore'da bu bir sorgu + toplu silme olacak.
-    case deletePayments(apartmentId: UUID)
+    /// Satış iptalinde o dairenin TÜM tahsilatları birlikte düşer.
+    /// Kimlik LİSTESİ taşınır, `apartmentId` değil: Firestore'da sorgu bir
+    /// WriteBatch'in parçası olamaz, dolayısıyla "önce sorgula sonra sil"
+    /// deseni bu enum'un atomiklik sözünü tutamazdı. Çağıran hangi kayıtları
+    /// düşürdüğünü zaten biliyor (cancelSale'deki `removed`), o yüzden liste
+    /// geçirmek işlemi gerçekten tek partiye indiriyor.
+    case deletePayments(ids: [UUID], projectId: UUID)
 }
 
 /// @MainActor bilinçli: `SitePhoto` ve `ApartmentPhoto` birer `UIImage` taşıdığı

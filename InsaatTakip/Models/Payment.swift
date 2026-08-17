@@ -32,6 +32,8 @@ struct Payment: Codable, Identifiable, Equatable {
     }
 
     let id: UUID
+    /// Firestore yolu için — bkz. MaterialLog.projectId.
+    let projectId: UUID
     let apartmentId: UUID
     var amount: Kurus
     var date: Date

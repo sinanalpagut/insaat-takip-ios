@@ -73,11 +73,14 @@ extension InMemoryProjectRepository {
                 let scaledIn = (totalIn * factor).rounded()
                 materials.append(Material(id: UUID(), projectId: project.id,
                                           code: code, name: name, subtitle: subtitle, unit: unit,
-                                          unitPrice: price,
-                                          totalIn: scaledIn,
-                                          totalOut: (totalOut * factor).rounded(),
-                                          step: step,
-                                          accruedCost: Kurus.cost(quantity: scaledIn, unitPrice: price)))
+                                          unitPrice: price, step: step,
+                                          // Devir: demo verisinde toplamlar elle yazılı, hareket
+                                          // geçmişi yalnızca son birkaç fişi içeriyor. Fark bir
+                                          // kereye mahsus devir olarak yazılır (seedOpeningBalances
+                                          // bunu fişlerden çıkarıp yeniden dengeler).
+                                          openingIn: scaledIn,
+                                          openingOut: (totalOut * factor).rounded(),
+                                          openingCost: Kurus.cost(quantity: scaledIn, unitPrice: price)))
             }
         }
 
@@ -100,9 +103,9 @@ extension InMemoryProjectRepository {
         for (code, name, subtitle, unit, price, totalIn, totalOut, step) in karsMaterials {
             materials.append(Material(id: UUID(), projectId: DemoID.kars309,
                                       code: code, name: name, subtitle: subtitle, unit: unit,
-                                      unitPrice: price, totalIn: totalIn, totalOut: totalOut,
-                                      step: step,
-                                      accruedCost: Kurus.cost(quantity: totalIn, unitPrice: price)))
+                                      unitPrice: price, step: step,
+                                      openingIn: totalIn, openingOut: totalOut,
+                                      openingCost: Kurus.cost(quantity: totalIn, unitPrice: price)))
         }
 
         // kars327 GB Blok 1 malzemeleri — aynı katsayılarla tahmin:
@@ -121,9 +124,9 @@ extension InMemoryProjectRepository {
         for (code, name, subtitle, unit, price, totalIn, totalOut, step) in kars327Materials {
             materials.append(Material(id: UUID(), projectId: DemoID.kars327,
                                       code: code, name: name, subtitle: subtitle, unit: unit,
-                                      unitPrice: price, totalIn: totalIn, totalOut: totalOut,
-                                      step: step,
-                                      accruedCost: Kurus.cost(quantity: totalIn, unitPrice: price)))
+                                      unitPrice: price, step: step,
+                                      openingIn: totalIn, openingOut: totalOut,
+                                      openingCost: Kurus.cost(quantity: totalIn, unitPrice: price)))
         }
 
         // ---- Malzeme hareket geçmişi ----------------------------------------
@@ -133,15 +136,15 @@ extension InMemoryProjectRepository {
         for material in materials where material.projectId == DemoID.cayirova {
             if material.code == "Ø12" {
                 materialLogs.append(contentsOf: [
-                    MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: 6_800,
+                    MaterialLog(id: UUID(), projectId: material.projectId, materialId: material.id, type: .exit, amount: 6_800,
                                 unitPrice: material.unitPrice, date: Fmt.makeDate(2, 8, 2026), note: "5. kat perde donatısı", user: admin),
-                    MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: 12_500,
+                    MaterialLog(id: UUID(), projectId: material.projectId, materialId: material.id, type: .entry, amount: 12_500,
                                 unitPrice: material.unitPrice, date: Fmt.makeDate(28, 7, 2026), note: "İrsaliye #4471 · Yılmaz Yapı", user: admin),
-                    MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: 4_600,
+                    MaterialLog(id: UUID(), projectId: material.projectId, materialId: material.id, type: .exit, amount: 4_600,
                                 unitPrice: material.unitPrice, date: Fmt.makeDate(21, 7, 2026), note: "4. kat döşeme imalatı", user: admin),
-                    MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: 14_000,
+                    MaterialLog(id: UUID(), projectId: material.projectId, materialId: material.id, type: .entry, amount: 14_000,
                                 unitPrice: material.unitPrice, date: Fmt.makeDate(14, 7, 2026), note: "İrsaliye #4398 · Ege Yapı", user: admin),
-                    MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: 3_900,
+                    MaterialLog(id: UUID(), projectId: material.projectId, materialId: material.id, type: .exit, amount: 3_900,
                                 unitPrice: material.unitPrice, date: Fmt.makeDate(6, 7, 2026), note: "3. kat kolon donatısı", user: admin),
                 ])
             } else {
@@ -150,15 +153,15 @@ extension InMemoryProjectRepository {
                     return max(unitStep, (value / unitStep).rounded() * unitStep)
                 }
                 materialLogs.append(contentsOf: [
-                    MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: round(material.totalOut * 0.16),
+                    MaterialLog(id: UUID(), projectId: material.projectId, materialId: material.id, type: .exit, amount: round(material.totalOut * 0.16),
                                 unitPrice: material.unitPrice, date: Fmt.makeDate(2, 8, 2026), note: "5. kat imalatı", user: admin),
-                    MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: round(material.totalIn * 0.21),
+                    MaterialLog(id: UUID(), projectId: material.projectId, materialId: material.id, type: .entry, amount: round(material.totalIn * 0.21),
                                 unitPrice: material.unitPrice, date: Fmt.makeDate(28, 7, 2026), note: "İrsaliye #4471 · Yılmaz Yapı", user: admin),
-                    MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: round(material.totalOut * 0.11),
+                    MaterialLog(id: UUID(), projectId: material.projectId, materialId: material.id, type: .exit, amount: round(material.totalOut * 0.11),
                                 unitPrice: material.unitPrice, date: Fmt.makeDate(21, 7, 2026), note: "4. kat imalatı", user: admin),
-                    MaterialLog(id: UUID(), materialId: material.id, type: .entry, amount: round(material.totalIn * 0.28),
+                    MaterialLog(id: UUID(), projectId: material.projectId, materialId: material.id, type: .entry, amount: round(material.totalIn * 0.28),
                                 unitPrice: material.unitPrice, date: Fmt.makeDate(14, 7, 2026), note: "İrsaliye #4398 · Ege Yapı", user: admin),
-                    MaterialLog(id: UUID(), materialId: material.id, type: .exit, amount: round(material.totalOut * 0.09),
+                    MaterialLog(id: UUID(), projectId: material.projectId, materialId: material.id, type: .exit, amount: round(material.totalOut * 0.09),
                                 unitPrice: material.unitPrice, date: Fmt.makeDate(6, 7, 2026), note: "3. kat imalatı", user: admin),
                 ])
             }
@@ -178,7 +181,7 @@ extension InMemoryProjectRepository {
         ]
         for (projectId, code, type, amount, price, date, note) in karsLogs {
             guard let materialId = material(in: projectId, code: code)?.id else { continue }
-            materialLogs.append(MaterialLog(id: UUID(), materialId: materialId, type: type,
+            materialLogs.append(MaterialLog(id: UUID(), projectId: projectId, materialId: materialId, type: type,
                                             amount: amount, unitPrice: price, date: date,
                                             note: note, user: admin))
         }
@@ -267,7 +270,7 @@ extension InMemoryProjectRepository {
         for (number, labels) in [(7, ["Salon", "Mutfak"]), (1, ["Salon"])] {
             guard let apartmentId = apartment(in: DemoID.cayirova, number: number)?.id else { continue }
             for label in labels {
-                apartmentPhotos.append(ApartmentPhoto(id: UUID(), apartmentId: apartmentId,
+                apartmentPhotos.append(ApartmentPhoto(id: UUID(), projectId: DemoID.cayirova, apartmentId: apartmentId,
                                                       label: label, image: nil))
             }
         }
@@ -449,14 +452,14 @@ extension InMemoryProjectRepository {
             let paid = apartment.paidAmount
 
             if apartment.paymentStatus == .tamamlandi {
-                payments.append(Payment(id: UUID(), apartmentId: apartment.id, amount: paid,
+                payments.append(Payment(id: UUID(), projectId: apartment.projectId, apartmentId: apartment.id, amount: paid,
                                         date: saleDate, method: .havale,
                                         note: "Satış bedeli", user: admin))
                 continue
             }
 
             if apartment.paymentStatus == .kapora {
-                payments.append(Payment(id: UUID(), apartmentId: apartment.id, amount: paid,
+                payments.append(Payment(id: UUID(), projectId: apartment.projectId, apartmentId: apartment.id, amount: paid,
                                         date: saleDate, method: .pesinat,
                                         note: "Kapora", user: admin))
                 continue
@@ -464,7 +467,7 @@ extension InMemoryProjectRepository {
 
             // Taksitli: %10 peşinat + kalanı eşit aylık taksitlere bölünür.
             let downPayment = min(paid, Kurus.cost(quantity: 0.10, unitPrice: apartment.price))
-            payments.append(Payment(id: UUID(), apartmentId: apartment.id, amount: downPayment,
+            payments.append(Payment(id: UUID(), projectId: apartment.projectId, apartmentId: apartment.id, amount: downPayment,
                                     date: saleDate, method: .pesinat,
                                     note: "Sözleşme peşinatı", user: admin))
 
@@ -482,7 +485,7 @@ extension InMemoryProjectRepository {
                 // Son taksit kuruş farkını kapatır.
                 let amount = (month == monthsElapsed) ? (remaining - written) : installment
                 guard amount > .zero else { break }
-                payments.append(Payment(id: UUID(), apartmentId: apartment.id, amount: amount,
+                payments.append(Payment(id: UUID(), projectId: apartment.projectId, apartmentId: apartment.id, amount: amount,
                                         date: date, method: .taksit,
                                         note: "\(month). taksit", user: admin))
                 written += amount
@@ -565,9 +568,11 @@ extension InMemoryProjectRepository {
             let loggedCost = logs.filter { $0.type == .entry }.reduce(Kurus.zero) {
                 $0 + Kurus.cost(quantity: $1.amount, unitPrice: $1.unitPrice)
             }
-            materials[index].openingIn = max(0, materials[index].totalIn - loggedIn)
-            materials[index].openingOut = max(0, materials[index].totalOut - loggedOut)
-            materials[index].openingCost = max(.zero, materials[index].accruedCost - loggedCost)
+            // Devir alanları şu an elle yazılan TOPLAMI taşıyor; fişlerle
+            // açıklanan kısım düşülünce geriye gerçek devir kalıyor.
+            materials[index].openingIn = max(0, materials[index].openingIn - loggedIn)
+            materials[index].openingOut = max(0, materials[index].openingOut - loggedOut)
+            materials[index].openingCost = max(.zero, materials[index].openingCost - loggedCost)
             materials[index].recalculate(from: materialLogs)
         }
     }

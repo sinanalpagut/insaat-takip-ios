@@ -61,7 +61,15 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
         Gerektirdikleri: APNs kurulumu, SMS kotası sonrası ücret, test numaraları.
 - [ ] 17. Storage (fiş/daire/belge görselleri, `storagePath`, `uploadState`)
 - [ ] 18. Gizliliğin sorgu düzeyinde uygulanması
-- [ ] 19. Stok toplamlarında atomik güncelleme (`FieldValue.increment`)
+- [x] 19. Stok toplamlarında atomik güncelleme — **çözüm değişti, sorun kapandı**
+      Maddenin önerdiği `FieldValue.increment`'in hedeflediği `accruedCost += ...`
+      deseni Faz 1/13'te kalktı; toplamlar hareketlerden türetiliyor. Ama sorun
+      kılık değiştirmişti: alanlar KALICI olduğu sürece her fiş işlemi tam
+      dokümanı yazıyor, Firestore'da bu `setData` → son yazan kazanır. İki cihaz
+      eşzamanlı fiş girince iki hareket de yaşıyor (doğruluk kaynağı sağlam) ama
+      `materials/{id}.totalIn` birinde kalıyor ve sapma "Malzeme" ile "Net"e
+      gidiyordu. Çözüm increment değil: türetilen alanları KODLAMAMAK
+      (`Material.CodingKeys`). Yazılmayan alanın çakışacak bir şeyi yok.
 
 ### Faz 3 — Ürün değeri
 
