@@ -72,7 +72,36 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
             numarayı kanıtlar ama isim VERMEZ; bir yere yazılmazsa dönen
             kullanıcı her açılışta "Adın ne?" ekranıyla karşılaşır. Bugün yerel
             önbellek tek kaynak; uzak kopya Firestore ile bağlanacak.
-      - [ ] 16e. `FirestoreProjectRepository` (kalıcılığın kendisi)
+      - [x] 16e. `FirestoreProjectRepository` (commit `7e9ad0c`) — emülatörde
+            uçtan uca kanıtlı: iki proje, her birinde 12 daire + 9 malzeme + 1
+            ortak; `ownerUid` gerçek 28 karakterlik Firebase uid'i; her alt
+            belgenin `projectId`'si yolla tutarlı; `Kurus` **integerValue**
+            olarak yazılmış (Double değil — kuruş kararı diskte de tutuyor).
+            Yeniden başlatmada veri Firestore'dan geri geldi, okuma yolu da
+            çalışıyor. Uygulama `-backend firestore -emulator 127.0.0.1:8080`
+            ile gerçek kurallara karşı çalıştırılabiliyor.
+            · YOL AÇILIRKEN ÇIKAN KUSURLAR — hepsi simülatörde sahte servis
+              kullanıldığı için gizliydi, yani "giriş akışı doğrulandı" demek
+              yalnızca sahte yolu doğrulamıştı:
+              1. Telefon girişi GERÇEK CİHAZDA ÇÖKÜYORDU. Üç eksik: Info.plist'te
+                 geri çağrı URL şeması yok (`verifyPhoneNumber` nil unwrap ile
+                 çöküyor, hata döndürmüyor); app delegate yok (Firebase sessiz
+                 push denetimini test bayrağından ÖNCE yapıyor, atlanamıyor);
+                 `FirebaseApp.configure()` `App.init()`teydi ve SwiftUI delegate'i
+                 henüz kurmamışken swizzler bağlanamıyordu. Üçü de düzeltildi;
+                 ayrıca `sendCode` şemayı önceden denetliyor — yanlış yapılandırma
+                 çökme yerine Türkçe hata veriyor.
+              2. GERÇEK KİMLİKLE HİÇ KİMSE PROJE KURAMIYORDU: `addProject`
+                 sahipliği `User.admin.id`'ye sabitliyordu. Kural yazmayı
+                 reddediyor (`ownerUid != request.auth.uid`) ve proje kuranın
+                 listesinde görünmüyordu. Artık `user` alıyor.
+              3. `apply()` iç kopyayı güncellemiyordu → DEBUG'daki `verifySeam`
+                 her yazmada yanlış alarm veriyordu.
+              4. `persist` hatayı yutuyordu; DEBUG'da ham hata basılıyor artık.
+            · BİLİNEN SINIR: `refresh()` yerel durumu yüklenen kopyayla
+              değiştiriyor; yazma uçuştayken çalışırsa iyimser güncelleme
+              silinebilir. Pencere dar (`.task` yalnızca kimlik değişiminde)
+              ama kapalı değil.
             · KISIT (16f testiyle sabitlendi): proje kurulumu İKİ AŞAMALI olmak
               zorunda — önce `projects/{pid}`, sonra alt belgeler tek parti.
               Alt koleksiyon yazması üst belgeyi `get()` ile doğruluyor ve kural
