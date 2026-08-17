@@ -8,8 +8,9 @@
     "test": "sh scripts/with-java.sh firebase emulators:exec --only firestore --project demo-insaattakip \"node --test tests/*.test.mjs\"",
     "emulator": "sh scripts/with-java.sh firebase emulators:start --only firestore --project demo-insaattakip",
     "java:install": "sh scripts/install-java.sh",
-    "rules:deploy": "firebase deploy --only firestore:rules",
-    "indexes:deploy": "firebase deploy --only firestore:indexes"
+    "login": "npx firebase login",
+    "rules:deploy": "sh scripts/firebase.sh deploy --only firestore:rules,firestore:indexes",
+    "rules:current": "sh scripts/firebase.sh firestore:databases:list"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
