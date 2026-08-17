@@ -135,12 +135,32 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
               kendini `memberUids`'e ekleyemez (aksi halde herkes her projeye
               kendini ekleyebilirdi), projeyi okuyup kodu da doğrulayamaz.
               → `redeemInvite` Cloud Function şart (yeni madde 16g).
-            · YAYINA ALINMADI: `firebase deploy` oturum açmış hesap istiyor.
-              Firestore konsoldan "test modu" ile kurulduysa veritabanı 30 gün
-              boyunca API anahtarını bilen herkese açık; bu kuralları yayına
-              almak o pencereyi kapatır. Uygulama Firestore'a henüz hiç
-              dokunmadığı için yayına almak mevcut davranışı bozmaz.
+            · YAYINA ALINDI (17 Ağu 2026) — `npm run rules:deploy`. Doğrulama
+              tahminle değil denemeyle yapıldı: production Firestore'a kimliksiz
+              okuma isteği gönderildi, `projects` ve `users` ikisi de
+              `403 PERMISSION_DENIED` döndü. Kapı kapalı.
+              Geri dönüş yolu: Firebase konsolu kural geçmişini tutuyor
+              (Firestore → Rules → eski sürüm).
+      - [x] 16h. APNs kurulumu (17 Ağu 2026). Telefon doğrulaması uygulamanın
+            gerçekliğini sessiz push ile kanıtlıyor; anahtar olmadan Firebase
+            Google'ın Türkçe OLMAYAN reCAPTCHA ekranına düşüyor.
+            · Xcode'da **Push Notifications** yeteneği eklendi →
+              `InsaatTakip.entitlements` (`aps-environment = development`).
+              Yetenek Xcode üzerinden eklendi, elle pbxproj düzenlemesiyle değil:
+              Xcode aynı anda Apple portalındaki App ID'yi de güncelliyor,
+              entitlements dosyası tek başına yeterli olmazdı.
+            · APNs anahtarı: Key ID `WL72654D5U`, Team ID `36HVD2S94X`,
+              kapsam **Sandbox & Production** + **Team Scoped (All Topics)**.
+              Firebase'e development VE production satırlarına aynı dosya yüklendi.
+              Apple bu kapsam ayarını kaydettikten sonra DEĞİŞTİRMİYOR; yalnızca
+              Sandbox seçilse anahtar TestFlight'ta sessizce ölürdü.
+            · Özel anahtar (`*.p8`) gitignore'da — kimlik bilgisi, repoya girmez.
+            · HENÜZ GERÇEK CİHAZDA DENENMEDİ: simülatörde push hiç çalışmıyor,
+              bu ayarın işe yaradığı yalnızca fiziksel telefonda görülür.
       - [ ] 16g. `redeemInvite` Cloud Function — davet akışının tek yolu.
+            · ENGEL: proje **Spark (ücretsiz)** planında, Cloud Functions **Blaze**
+              istiyor. Aylık sabit ücret yok (kullanım kadar, ayda 2M çağrı
+              ücretsiz kota) ama kredi kartı gerekiyor → kullanıcı kararı.
             Kod doğrulama, süre/tek kullanım denetimi ve `memberUids` yazması
             yönetici adına işlevde yapılacak. 16f olmadan gerekliliği
             görünmüyordu; kurallar yazıldığı an zorunlu hale geldi.
