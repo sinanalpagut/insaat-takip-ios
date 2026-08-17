@@ -73,7 +73,48 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
             kullanıcı her açılışta "Adın ne?" ekranıyla karşılaşır. Bugün yerel
             önbellek tek kaynak; uzak kopya Firestore ile bağlanacak.
       - [ ] 16e. `FirestoreProjectRepository` (kalıcılığın kendisi)
-      - [ ] 16f. `firestore.rules` + bileşik indeksler
+            · KISIT (16f testiyle sabitlendi): proje kurulumu İKİ AŞAMALI olmak
+              zorunda — önce `projects/{pid}`, sonra alt belgeler tek parti.
+              Alt koleksiyon yazması üst belgeyi `get()` ile doğruluyor ve kural
+              değerlendirmesi aynı partideki işlenmemiş yazmaları GÖRMEZ.
+              `addProject` bugün proje + ~20 daire + 9 malzemeyi tek partide
+              veriyor. Kurulum dışındaki eylemlerde atomiklik sözü bozulmuyor.
+            · KISIT: ortağın belge sorgusu `whereField("partnerVisible",
+              isEqualTo: true)` biçiminde kurulmak zorunda. Kurallar süzgeç
+              değildir; süzgeçsiz sorgu tek tek belgeleri saklamaz, sorgunun
+              TAMAMINI reddeder ve ekran boş kalır.
+      - [x] 16f. `firestore.rules` + bileşik indeksler (commit `47484ad`)
+            · Yetki artık SUNUCUDA ve PROJE BAŞINA: kişi kendi projesinde
+              yönetici, davet edildiği projede yalnızca okuyucu. İstemcinin
+              global rolü artık sadece arayüz ipucu — yani madde 16'nın "bilinen
+              sınır"ı güvenlik açısından kapandı, geriye arayüz tutarsızlığı
+              kaldı (ortak görünümünde yazma düğmeleri hâlâ görünüyor, yazma
+              sunucuda reddedilecek).
+            · Hareket akışı ve denetim defteri EKLE-ONLY: sahip DAHİ geçmişi
+              düzeltemez. Şeffaflık iddiasının dayanağı bu ve istemci bunu kendi
+              başına sağlayamaz.
+            · `partnerVisible: false` belge ortağın cihazına İNMEZ — madde 18'in
+              "gizle ama indir" sızıntısı kapandı.
+            · 96 test, Firestore emülatörü (`npm test`). Aynı kalıbı paylaşan
+              sekiz alt koleksiyonun her biri ayrı denetleniyor; tekrarlanan
+              kuralda tekrarlanan yazım hatası gözle farkedilmezdi.
+            · Testlerin dişi İKİ MUTASYONLA doğrulandı: belge gizliliğini
+              kaldırmak 3, proje okuma üyelik denetimini kaldırmak 3 testi
+              düşürüyor. Geçen bir takım, yakalayabildiğini kanıtlamadan
+              güvence sayılmaz.
+            · BİLİNÇLİ SONUÇ: davet akışı istemciden ÇALIŞMAZ. Davet edilen kişi
+              kendini `memberUids`'e ekleyemez (aksi halde herkes her projeye
+              kendini ekleyebilirdi), projeyi okuyup kodu da doğrulayamaz.
+              → `redeemInvite` Cloud Function şart (yeni madde 16g).
+            · YAYINA ALINMADI: `firebase deploy` oturum açmış hesap istiyor.
+              Firestore konsoldan "test modu" ile kurulduysa veritabanı 30 gün
+              boyunca API anahtarını bilen herkese açık; bu kuralları yayına
+              almak o pencereyi kapatır. Uygulama Firestore'a henüz hiç
+              dokunmadığı için yayına almak mevcut davranışı bozmaz.
+      - [ ] 16g. `redeemInvite` Cloud Function — davet akışının tek yolu.
+            Kod doğrulama, süre/tek kullanım denetimi ve `memberUids` yazması
+            yönetici adına işlevde yapılacak. 16f olmadan gerekliliği
+            görünmüyordu; kurallar yazıldığı an zorunlu hale geldi.
       · Yol açılırken çıkan ve düzeltilen dört kusur — hepsi kimlik doğrulaması
         gelmeden ERİŞİLEMEZ olduğu için gizliydi:
         1. `AppState.init` parametre `auth`'u kullanıyordu, `self.auth`'u değil:
