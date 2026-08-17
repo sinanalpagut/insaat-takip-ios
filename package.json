@@ -1,0 +1,19 @@
+{
+  "name": "insaattakip-firestore-rules",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "İnşaat Takip — Firestore güvenlik kuralları ve kural testleri. iOS uygulamasının kendisi Xcode ile derlenir; burada yalnızca sunucu tarafı kurallar var.",
+  "scripts": {
+    "test": "sh scripts/with-java.sh firebase emulators:exec --only firestore --project demo-insaattakip \"node --test tests/*.test.mjs\"",
+    "emulator": "sh scripts/with-java.sh firebase emulators:start --only firestore --project demo-insaattakip",
+    "java:install": "sh scripts/install-java.sh",
+    "rules:deploy": "firebase deploy --only firestore:rules",
+    "indexes:deploy": "firebase deploy --only firestore:indexes"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.0",
+    "firebase-tools": "^13.29.1"
+  }
+}

@@ -1,0 +1,248 @@
+rules_version = '2';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// İnşaat Takip — Firestore güvenlik kuralları
+//
+// TEMEL İLKE: yetki BURADA belirlenir, istemcide değil. Uygulamadaki rol
+// bugün kullanıcı başına global (bkz. AppState — bilinen sınır) ama bu kurallar
+// yetkiyi PROJE BAŞINA çözüyor: bir kişi kendi projesinde yönetici, davet
+// edildiği projede yalnızca okuyucudur. İstemcinin global rolü artık sadece
+// arayüz ipucu; sunucu doğru modeli uyguluyor.
+//
+// KURALLAR SÜZGEÇ DEĞİLDİR. Bir kural belgeyi doğrular, sorguya kapsam VERMEZ.
+// `partnerVisible == false` belgeler için bu şu demek: ortağın sorgusu
+// `whereField("partnerVisible", isEqualTo: true)` biçiminde kurulmak ZORUNDA;
+// aksi halde kural tek tek belgeleri gizlemez, sorgunun TAMAMINI reddeder ve
+// ekran boş kalır. (ANALIZ.md madde 18)
+//
+// ─── Şema sözleşmesi (FirestoreProjectRepository bunlara uymak zorunda) ───
+//
+//   users/{uid}                              → profil (ad, telefon)
+//   projects/{pid}                           → ownerUid, memberUids[], invite
+//   projects/{pid}/materials/{id}
+//   projects/{pid}/materialLogs/{id}
+//   projects/{pid}/apartments/{id}
+//   projects/{pid}/partners/{id}
+//   projects/{pid}/documents/{id}            → partnerVisible: Bool
+//   projects/{pid}/activities/{id}           → EKLE-ONLY
+//   projects/{pid}/sitePhotos/{id}
+//   projects/{pid}/expenses/{id}
+//   projects/{pid}/payments/{id}
+//   projects/{pid}/apartmentPhotos/{id}
+//   projects/{pid}/auditEntries/{id}         → EKLE-ONLY
+//
+//   · Belge kimliği = modeldeki `id.uuidString`.
+//   · Alt koleksiyondaki her belge `projectId` taşır ve bu, üst yolun `pid`'ine
+//     EŞİT olmalı. Aksi halde bir belge başka bir projeye aitmiş gibi görünüp
+//     istemcinin süzgeçlerini şaşırtabilirdi.
+//
+// ─── İKİ AŞAMALI PROJE KURULUMU (zorunlu) ───
+//
+// Alt koleksiyon yazmaları üst proje belgesini `get()` ile doğruluyor. Firestore
+// kural değerlendirmesi, AYNI partideki henüz işlenmemiş yazmaları GÖRMEZ. Yani
+// `projects/{pid}` ile `projects/{pid}/apartments/{id}` tek `WriteBatch` içinde
+// gönderilirse alt belgeler REDDEDİLİR (üst belge o an mevcut değil).
+//
+// Bugünkü `ProjectViewModel.addProject` proje + ~20 daire + 9 malzemeyi tek
+// partide veriyor. `FirestoreProjectRepository` bunu İKİ aşamaya bölmek zorunda:
+//   1) `projects/{pid}` tek başına işlenir,
+//   2) daireler/malzemeler tek parti olarak işlenir.
+// Bu kısıt `tests/rules.test.mjs` içinde bir testle sabitlendi ("aynı partide
+// proje + daire reddedilir") — yorumla değil, çalışan bir denetimle.
+//
+// Kurulum DIŞINDAKİ her eylemde (fiş, satış iptali, düzenleme…) üst belge zaten
+// var, dolayısıyla `apply([DocumentChange])`ın atomiklik sözü BOZULMUYOR.
+// ═══════════════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────── Yardımcılar ───────────────────────────
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    /// Üst proje belgesi. Belge yoksa `get()` null döner, `.data` hata verir ve
+    /// kural REDDE düşer — güvenli yön.
+    function projectData(pid) {
+      return get(/databases/$(database)/documents/projects/$(pid)).data;
+    }
+
+    /// Projeyi kuran kişi. Yazma yetkisinin TEK kaynağı.
+    function isOwner(pid) {
+      return signedIn() && projectData(pid).ownerUid == uid();
+    }
+
+    /// Projeyi görebilenler (sahip dahil). Salt okuma yetkisi.
+    function isMember(pid) {
+      return signedIn() && uid() in projectData(pid).memberUids;
+    }
+
+    /// Alt koleksiyon belgesi doğru projeye mi yazılıyor?
+    function pathBound(pid) {
+      return request.resource.data.projectId == pid;
+    }
+
+    /// Yöneticinin alt koleksiyona yazma izni + yol tutarlılığı.
+    function ownerWrite(pid) {
+      return isOwner(pid) && pathBound(pid);
+    }
+
+    // ─────────────────────────── Kullanıcı profili ───────────────────────────
+    //
+    // Yalnızca kişinin KENDİSİ. Başka kullanıcıların profilini okumaya gerek yok:
+    // ortak listesinde görünen ad `projects/{pid}/partners/{id}.name` alanında,
+    // yani projenin içinde duruyor. Profilleri herkese açmak, uid bilen birinin
+    // telefon numarasına ulaşması demek olurdu.
+    match /users/{userId} {
+      allow read: if signedIn() && uid() == userId;
+      // Belgedeki `uid` alanı yolla tutarlı olmalı; aksi halde kayıt başka bir
+      // kimliğe aitmiş gibi okunabilirdi.
+      allow create, update: if signedIn() && uid() == userId
+                            && request.resource.data.uid == userId;
+      // Hesap silme akışı (Faz 4 / madde 28) Cloud Function ile yapılacak:
+      // profil silinirken projelerdeki üyeliğin de temizlenmesi gerekiyor ve
+      // istemci başkasının projesindeki `memberUids`e dokunamaz.
+      allow delete: if false;
+    }
+
+    // ─────────────────────────── Proje belgesi ───────────────────────────
+
+    match /projects/{pid} {
+
+      // Üye olmayan projeyi GÖREMEZ. `list` için istemci sorgusu
+      // `whereField("memberUids", arrayContains: uid)` olmak zorunda.
+      allow read: if signedIn() && uid() in resource.data.memberUids;
+
+      // Kuran kişi kendini sahip VE ilk üye olarak yazmalı. `ownerUid`'i
+      // başkasına ayarlayıp proje "hediye etmek" ya da kendini üye listesine
+      // koymadan proje kurup sonra okuyamamak mümkün olmasın.
+      allow create: if signedIn()
+                    && request.resource.data.ownerUid == uid()
+                    && uid() in request.resource.data.memberUids;
+
+      // Sahiplik DEVREDİLEMEZ ve kimse kendini sahip yapamaz.
+      //
+      // `memberUids` yalnızca sahip tarafından değiştirilebilir. Sonucu:
+      // DAVET AKIŞI İSTEMCİDEN ÇALIŞMAZ — davet edilen kişi ne üye ne sahip
+      // olduğu için projeyi okuyup kodu doğrulayamaz, `memberUids`e kendini de
+      // ekleyemez. Bu bilinçli: aksi halde herkes herhangi bir projeye
+      // kendini ekleyebilirdi. Katılma bir Cloud Function (`redeemInvite`) ile
+      // yapılacak; işlev kodu doğrular ve üyeliği yönetici adına yazar.
+      allow update: if isOwner(pid)
+                    && request.resource.data.ownerUid == resource.data.ownerUid
+                    && uid() in request.resource.data.memberUids;
+
+      // Proje silme henüz hiçbir ekranda yok; açıldığında alt koleksiyonların da
+      // temizlenmesi gerekir (istemci bunu atomik yapamaz) → Cloud Function.
+      allow delete: if false;
+
+      // ─────────────── Yöneticinin yazdığı, üyenin okuduğu veri ───────────────
+      //
+      // Malzeme, hareket kaydı, daire, ortak, şantiye fotoğrafı, gider,
+      // tahsilat, daire fotoğrafı: aynı kalıp. Ortak SALT OKUR.
+      //
+      // NOT — gizlilik kapsamı: bugün üye olan biri alıcı adlarını, bedelleri ve
+      // tahsilatları görebiliyor. ANALIZ.md (madde 18 / satır 355) bunun KVKK
+      // veri minimizasyonu açısından savunulması zor olduğunu söylüyor ve
+      // finansal/kişisel veriye de `partnerVisible` benzeri bir ayrım öneriyor.
+      // O ayrım MODELDE henüz yok; kural veri modelinin taşımadığı bir ayrımı
+      // uygulayamaz. Alan eklendiğinde buradaki `read` koşulu da daralacak.
+      match /materials/{docId} {
+        allow read: if isMember(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
+      match /materialLogs/{docId} {
+        allow read: if isMember(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
+      match /apartments/{docId} {
+        allow read: if isMember(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
+      match /partners/{docId} {
+        allow read: if isMember(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
+      match /sitePhotos/{docId} {
+        allow read: if isMember(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
+      match /expenses/{docId} {
+        allow read: if isMember(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
+      match /payments/{docId} {
+        allow read: if isMember(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
+      match /apartmentPhotos/{docId} {
+        allow read: if isMember(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
+      // ─────────────── Belgeler: ortak görünürlüğü ───────────────
+      //
+      // Tek `read` kuralı `get` ve `list`i birlikte kapsıyor:
+      //  · sahip → hepsini okur (sorgu kısıtı gerekmez),
+      //  · üye   → yalnızca `partnerVisible == true`; sorgu bunu GARANTİ
+      //            etmiyorsa Firestore sorgunun tamamını reddeder.
+      // "Gizle ama indir" deseni böylece imkânsız: gizli belge ortağın yerel
+      // önbelleğine hiç inmez.
+      match /documents/{docId} {
+        allow read: if isMember(pid)
+                    && (isOwner(pid) || resource.data.partnerVisible == true);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
+      // ─────────────── Hareket akışı ve denetim defteri: EKLE-ONLY ───────────────
+      //
+      // İkisi de uygulamanın şeffaflık iddiasının dayanağı. Geçmişin sonradan
+      // düzeltilebilmesi o iddiayı boşa çıkarırdı: yönetici yanlış bir satışı
+      // iptal ettiğinde izin denetim defterinde kalması gerekiyor, silinebilmesi
+      // değil. `update`/`delete` istemciden KAPALI — bu, istemcinin kendi
+      // başına sağlayamayacağı bir garanti.
+      match /activities/{docId} {
+        allow read: if isMember(pid);
+        allow create: if ownerWrite(pid);
+        allow update, delete: if false;
+      }
+
+      match /auditEntries/{docId} {
+        allow read: if isMember(pid);
+        allow create: if ownerWrite(pid);
+        allow update, delete: if false;
+      }
+    }
+
+    // ─────────────────────────── Varsayılan: RED ───────────────────────────
+    //
+    // Yukarıda açıkça izin verilmeyen her yol kapalı. Yeni bir koleksiyon
+    // eklendiğinde sessizce dünyaya açılmaması için bu satır bilinçli olarak
+    // en sonda ve açıkça yazılı.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

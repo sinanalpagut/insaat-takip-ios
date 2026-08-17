@@ -34,3 +34,13 @@ DemoAssets/
 
 # Firebase yapılandırması — proje kimliği ve API anahtarı taşır, repoya girmez
 GoogleService-Info.plist
+
+# Firestore kural testleri (npm)
+node_modules/
+npm-debug.log*
+.firebase/
+firebase-debug*.log
+firestore-debug.log
+
+# Yerel Java çalışma zamanı (Firestore emülatörü için; sisteme kurulmaz)
+.tools/

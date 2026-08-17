@@ -1,0 +1,39 @@
+{
+  "//": [
+    "Bileşik indeksler. Firestore tek alanlı sorguları kendiliğinden indeksler;",
+    "buradakiler bir dizi üyeliği (arrayContains) ya da eşitlik ile BAŞKA bir",
+    "alana göre sıralamayı birleştiren sorgular. Bu indeks yoksa sorgu çalışma",
+    "anında hata verir — yani eksik indeks, testte değil kullanıcıda görünür.",
+    "",
+    "Kaynak sorgular (FirestoreProjectRepository'de kurulacak):",
+    " 1) Dashboard: üye olduğum projeler, yeniden eskiye",
+    "    projects.where(memberUids array-contains uid).order(createdAt desc)",
+    " 2) Ortağın belge listesi: yalnızca görünür olanlar, tarihe göre",
+    "    projects/{pid}/documents.where(partnerVisible == true).order(date desc)",
+    "    (Yönetici bu kısıt olmadan sorgular; kural sahibe tam okuma veriyor.)",
+    "",
+    "Hareket akışı proje BAŞINA sorgulanıyor (timestamp tek alan → otomatik",
+    "indeks). Koleksiyon grubu sorgusu bilinçli olarak kullanılmıyor: alt",
+    "koleksiyon belgeleri `memberUids` taşımıyor, dolayısıyla tek bir gruba",
+    "sorgu üyelikle sınırlandırılamazdı."
+  ],
+  "indexes": [
+    {
+      "collectionGroup": "projects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "memberUids", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "documents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "partnerVisible", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
