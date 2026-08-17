@@ -155,10 +155,16 @@ struct JoinWithCodeView: View {
         }
 
         // Kod artık gerçek bir projeyle eşleşiyor; süresi ve tek kullanım kuralı denetleniyor.
-        switch viewModel.redeemInvite(code: code, user: .partner) {
+        // Kullanıcı ARTIK oturum açmış olmak zorunda: davet, kimliği bilinen bir
+        // kişiyi projeye ekliyor. Giriş öncesi katılma yolu kaldırıldı çünkü
+        // `memberUids`'e yazılacak bir uid olmadan üyelik kurulamaz.
+        guard let user = appState.currentUser else {
+            viewModel.flash("Önce telefonla giriş yap")
+            return
+        }
+        switch viewModel.redeemInvite(code: code, user: user) {
         case .success(let projectTitle):
             dismiss()
-            appState.joinAsPartner()
             viewModel.flash("\(projectTitle) · salt okunur erişim")
         case .notFound:
             showInvalid = true
@@ -171,7 +177,6 @@ struct JoinWithCodeView: View {
             viewModel.flash("Bu kod daha önce kullanılmış")
         case .alreadyMember:
             dismiss()
-            appState.joinAsPartner()
             viewModel.flash("Bu projenin zaten ortağısın")
         }
     }

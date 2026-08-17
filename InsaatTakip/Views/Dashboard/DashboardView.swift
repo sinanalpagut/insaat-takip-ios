@@ -38,6 +38,10 @@ struct DashboardView: View {
                     }
                     .padding(.top, 18)
 
+                    if visibleProjects.isEmpty {
+                        emptyState
+                    }
+
                     ForEach(visibleProjects) { project in
                         NavigationLink(value: Route.project(project.id)) {
                             ProjectCardView(project: project)
@@ -45,10 +49,14 @@ struct DashboardView: View {
                         .buttonStyle(.plain)
                     }
 
-                    // Ortak: yeni projeye yalnızca davet koduyla katılabilir.
-                    if !isAdmin {
-                        joinCard
-                    }
+                    // Davet kartı ROLDEN BAĞIMSIZ. Eskiden `!isAdmin` koşuluyla
+                    // gösteriliyordu; kimlik doğrulaması geldikten sonra her yeni
+                    // hesap `.admin` açıldığı için davet edilen ortak elindeki
+                    // kodu girecek hiçbir yer bulamıyordu — özellik ölü doğmuştu.
+                    // Ayrıca kendi projesinin yöneticisi olan biri, başkasının
+                    // projesine ortak olarak davet edilebilir; bu kartı role
+                    // bağlamak o durumu da imkânsız kılıyordu.
+                    joinCard
 
                     Spacer().frame(height: 90)
                 }
@@ -152,7 +160,44 @@ struct DashboardView: View {
         )
     }
 
-    // MARK: Ortak katılım kartı
+    // MARK: Boş durum
+
+    /// Hiç proje yokken görünen karşılama. Kimlik doğrulaması gelene kadar bu
+    /// hâle ulaşılamıyordu (her kullanıcı demo verisiyle açılıyordu); artık her
+    /// YENİ HESABIN gördüğü ilk ekran bu. Boş bırakılırsa kullanıcı, davet
+    /// koduyla mı katılacağını yoksa proje mi kuracağını anlamadan bomboş bir
+    /// sayfayla karşılaşıyordu.
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "building.2")
+                .font(.system(size: 22, weight: .regular))
+                .foregroundColor(Palette.accent)
+                .frame(width: 54, height: 54)
+                .background(Palette.accentTint)
+                .cornerRadius(17)
+
+            Text("Henüz projen yok")
+                .font(.sora(17, .bold))
+                .foregroundColor(Palette.ink)
+                .padding(.top, 4)
+
+            Text(isAdmin
+                 ? "Kendi projeni kurmak için “Yeni Proje”ye dokun. Ortak olarak davet edildiysen aşağıdaki koddan katıl."
+                 : "Yöneticiden aldığın 6 haneli davet kodunu aşağıdan girerek projeye katıl.")
+                .font(.manrope(12.5, .medium))
+                .foregroundColor(Palette.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .padding(.horizontal, 12)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 30)
+        .background(Palette.surface)
+        .cornerRadius(18)
+        .padding(.top, 4)
+    }
+
+    // MARK: Davet kodu kartı
 
     private var joinCard: some View {
         Button {

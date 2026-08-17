@@ -12,37 +12,17 @@ struct AccountSheet: View {
 
     private var user: User? { appState.currentUser }
 
+    @State private var isEditingName = false
+    @State private var draftName = ""
+    @FocusState private var nameFocused: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetHeader(title: "Hesap",
                         subtitle: "Görünümü değiştir veya oturumu kapat") { dismiss() }
 
-            // Profil kartı — koyu zemin, avatar + ad + aktif rol
-            HStack(spacing: 13) {
-                Text(user?.initials ?? "")
-                    .font(.manrope(16, .extraBold))
-                    .foregroundColor(.white)
-                    .frame(width: 52, height: 52)
-                    .background(Palette.accent)
-                    .clipShape(Circle())
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(user?.name ?? "")
-                        .font(.sora(17, .bold))
-                        .foregroundColor(.white)
-                    Text(appState.isAdmin
-                         ? "Yönetici · tüm verileri düzenleyebilir"
-                         : "İzleyici · salt okunur erişim")
-                        .font(.manrope(11.5, .medium))
-                        .foregroundColor(.white.opacity(0.55))
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.ink)
-            .cornerRadius(16)
-            .padding(.top, 18)
+            profileCard
+                .padding(.top, 18)
 
             // Rol değiştirme yalnızca GELİŞTİRME derlemesinde. Yayın sürümünde açık
             // kalsaydı, salt okunur olması gereken ortak kendini iki dokunuşta
@@ -91,6 +71,84 @@ struct AccountSheet: View {
         .sheetHeight(0.62)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
+    }
+
+    // MARK: Profil kartı
+
+    /// Koyu zemin, avatar + ad + telefon + aktif rol. Ad yerinde düzenlenir:
+    /// isim ekranı "sonradan değiştirebilirsin" diyor, karşılığı burası.
+    /// Telefon de burada gösteriliyor — kimliğin kendisi o numara, kullanıcının
+    /// hangi numarayla girdiğini görebileceği başka bir yer yok.
+    private var profileCard: some View {
+        HStack(spacing: 13) {
+            Text(user?.initials ?? "")
+                .font(.manrope(16, .extraBold))
+                .foregroundColor(.white)
+                .frame(width: 52, height: 52)
+                .background(Palette.accent)
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 4) {
+                if isEditingName {
+                    TextField("", text: $draftName,
+                              prompt: Text("Ad Soyad").foregroundColor(.white.opacity(0.3)))
+                        .textContentType(.name)
+                        .autocorrectionDisabled()
+                        .submitLabel(.done)
+                        .focused($nameFocused)
+                        .font(.sora(17, .bold))
+                        .foregroundColor(.white)
+                        .onSubmit { commitName() }
+                } else {
+                    Text(user?.name ?? "")
+                        .font(.sora(17, .bold))
+                        .foregroundColor(.white)
+                }
+
+                if let phone = user?.phone, !phone.isEmpty {
+                    Text(PhoneFormat.pretty(phone))
+                        .font(.manrope(11.5, .semiBold))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+
+                Text(appState.isAdmin
+                     ? "Yönetici · tüm verileri düzenleyebilir"
+                     : "İzleyici · salt okunur erişim")
+                    .font(.manrope(11.5, .medium))
+                    .foregroundColor(.white.opacity(0.55))
+            }
+            Spacer(minLength: 4)
+
+            Button {
+                if isEditingName {
+                    commitName()
+                } else {
+                    draftName = user?.name ?? ""
+                    isEditingName = true
+                    nameFocused = true
+                }
+            } label: {
+                Image(systemName: isEditingName ? "checkmark" : "pencil")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.75))
+                    .frame(width: 36, height: 36)
+                    .background(Color.white.opacity(0.09))
+                    .cornerRadius(12)
+            }
+            .disabled(isEditingName && draftName.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.ink)
+        .cornerRadius(16)
+    }
+
+    /// Boş ad kaydedilmez: alan boş bırakılıp onaylanırsa eski ad korunur ve
+    /// düzenleme kapanır — aksi halde avatar baş harfleri boşalırdı.
+    private func commitName() {
+        appState.updateName(draftName)
+        isEditingName = false
+        nameFocused = false
     }
 
     /// Seçilebilir rol satırı; aktif olan bakır tik ile işaretlenir.

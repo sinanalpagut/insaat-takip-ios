@@ -20,7 +20,11 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if appState.currentUser == nil {
+            if appState.pendingNameSession != nil {
+                // Telefon doğrulandı, isim bekleniyor: bu adım atlanırsa ortak
+                // listesinde ve hareket akışında telefon numarası görünürdü.
+                NameStepView()
+            } else if appState.currentUser == nil {
                 WelcomeView()
                     .toastOverlay(viewModel.toast)
                     // Oturum kapanınca gezinme yığını sıfırlanır; yeniden girişte

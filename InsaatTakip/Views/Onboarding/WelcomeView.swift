@@ -7,6 +7,7 @@ import SwiftUI
 struct WelcomeView: View {
     @EnvironmentObject private var appState: AppState
     @State private var showJoin = false
+    @State private var showPhoneSignIn = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -27,11 +28,13 @@ struct WelcomeView: View {
 
             Spacer()
 
-            // Yönetici girişi — veri girme yetkisi olan tek rol.
+            // Telefon + SMS girişi. "Yönetici olarak gir" düğmesi kaldırıldı:
+            // rol artık seçilmiyor, kimlik doğrulanıyor. Kendi projesini kuran
+            // kişi zaten o projenin yöneticisi (Project.ownerUid).
             Button {
-                appState.signInAsAdmin()
+                showPhoneSignIn = true
             } label: {
-                Text("Yönetici Olarak Giriş Yap")
+                Text("Telefonla Giriş Yap")
                     .font(.manrope(15, .bold))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
@@ -40,32 +43,15 @@ struct WelcomeView: View {
                     .cornerRadius(14)
             }
 
-            HStack(spacing: 12) {
-                Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
-                Text("veya")
-                    .font(.manrope(11.5, .semiBold))
-                    .foregroundColor(.white.opacity(0.4))
-                Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
-            }
-            .padding(.vertical, 18)
-
-            // Ortak katılımı — salt okunur erişim.
-            Button {
-                showJoin = true
-            } label: {
-                Text("Davet Kodu ile Projeye Katıl")
-                    .font(.manrope(14.5, .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(Color.clear)
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.22), lineWidth: 1))
-            }
-
-            Text("Ortaklar verileri yalnızca görüntüleyebilir.")
+            // Davet girişi buradan KALDIRILDI: projeye katılmak için önce
+            // kimlik gerekiyor (memberUids'e yazılacak bir uid olmalı). Ortak da
+            // aynı telefon girişinden geçiyor, koda dashboard'dan ulaşıyor.
+            Text("Ortak olarak davet edildiysen de telefonunla giriş yap; davet kodunu girişten sonra kullanacaksın.")
                 .font(.manrope(11, .medium))
                 .foregroundColor(.white.opacity(0.35))
+                .lineSpacing(3)
                 .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
                 .padding(.top, 20)
                 .padding(.bottom, 12)
         }
@@ -74,6 +60,9 @@ struct WelcomeView: View {
         .background(Palette.ink.ignoresSafeArea())
         .fullScreenCover(isPresented: $showJoin) {
             JoinWithCodeView()
+        }
+        .fullScreenCover(isPresented: $showPhoneSignIn) {
+            PhoneSignInView()
         }
         .onAppear {
             // DEBUG: "-screen join" ile kod ekranını doğrudan aç
