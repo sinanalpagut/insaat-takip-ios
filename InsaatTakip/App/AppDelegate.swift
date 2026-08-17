@@ -70,7 +70,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // bekleyen yazmalar uygulama kapanınca yok oluyor. Varsayılan kalıcı
         // önbellek, bağlantı geri geldiğinde yazmayı tamamlıyor — çevrimdışı
         // şantiyede çalışan bir uygulamada bu bir lüks değil, gereklilik.
-        Firestore.firestore().useEmulator(withHost: name, port: port)
+        let db = Firestore.firestore()
+        db.useEmulator(withHost: name, port: port)
+
+        // SSL'i AÇIKÇA kapat ve sonucu yazdır.
+        //
+        // `useEmulator` bunu yapmalı ama yapmıyordu: SDK günlüğünde emülatöre
+        // TLS el sıkışması denendiği ve `WRONG_VERSION_NUMBER` ile düştüğü
+        // görüldü (emülatör düz metin konuşuyor). Sonuç sessiz veri kaybıydı —
+        // yazma artan aralıklarla sonsuza dek yeniden denenip hata üretmiyordu.
+        let settings = db.settings
+        settings.isSSLEnabled = false
+        db.settings = settings
+
+        Firestore.enableLogging(true)
+        print("[emulator] Firestore ayarı → host=\(db.settings.host) ssl=\(db.settings.isSSLEnabled)")
 
         // Auth emülatörü 9099'da. Firestore kuralları `request.auth.uid` istiyor;
         // gerçek Auth'a bağlı kalınırsa emülatördeki Firestore o jetonu
