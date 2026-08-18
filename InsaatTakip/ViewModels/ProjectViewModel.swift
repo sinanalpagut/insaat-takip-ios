@@ -712,7 +712,7 @@ final class ProjectViewModel: ObservableObject {
               apartments[index].isCommitted else { return false }
 
         var apartment = apartments[index]
-        let buyer = apartment.buyerName ?? ""
+        let hadBuyer = apartment.buyerName != nil
         let price = apartment.price
         let collected = apartment.paidAmount
         let wasReserved = apartment.status == .reserved
@@ -737,7 +737,8 @@ final class ProjectViewModel: ObservableObject {
             .init(field: "Durum",
                   oldValue: wasReserved ? "Rezerve" : "Satıldı",
                   newValue: "Boş"),
-            .init(field: "Alıcı", oldValue: buyer.isEmpty ? "—" : buyer, newValue: "kaydı kaldırıldı"),
+            // Ad bilerek YOK — defter ortağa açık (bkz. saveSale'deki not).
+            .init(field: "Alıcı kaydı", oldValue: hadBuyer ? "kayıtlı" : "—", newValue: "kaldırıldı"),
             .init(field: "Bedel", oldValue: Fmt.money(price), newValue: "—"),
         ]
         if collected > .zero {
@@ -746,6 +747,10 @@ final class ProjectViewModel: ObservableObject {
                                  newValue: "—"))
         }
         var writes: [DocumentChange] = [.apartment(apartment),
+                                        // Kimlik, gereklilik bitince silinir
+                                        // (veri minimizasyonu).
+                                        .deleteBuyer(apartmentId: apartmentId,
+                                                     projectId: apartment.projectId),
                                         .deletePayments(ids: removed.map(\.id),
                                                         projectId: apartment.projectId)]
         writes += recordAudit(recordId: apartmentId, projectId: apartment.projectId,
@@ -757,7 +762,7 @@ final class ProjectViewModel: ObservableObject {
         writes.append(pushActivity(
             ActivityItem(id: UUID(), projectId: apartment.projectId, kind: .sale,
                          title: "Daire No \(apartment.apartmentNumber) \(wasReserved ? "rezervi kaldırıldı" : "satışı iptal edildi")",
-                         meta: "\(projectTitle) · \(buyer) · \(Fmt.compactMoney(price))",
+                         meta: "\(projectTitle) · \(Fmt.compactMoney(price))",
                          timestamp: Date())))
         persist(writes, failureNote: "Satış iptali")
         flash(wasReserved ? "Rezerv kaldırıldı" : "Satış iptal edildi")
@@ -833,6 +838,11 @@ final class ProjectViewModel: ObservableObject {
             return true
         }
         var writes: [DocumentChange] = [.apartment(apartment)]
+        if before.buyerName != nil, apartment.buyerName == nil {
+            // Kat karşılığına çevrilen dairenin alıcı belgesi yetim kalmasın.
+            writes.append(.deleteBuyer(apartmentId: apartmentId,
+                                       projectId: apartment.projectId))
+        }
         writes += recordAudit(recordId: apartmentId, projectId: apartment.projectId,
                               subject: "Daire No \(apartment.apartmentNumber)",
                               action: .update, changes: changes)
@@ -1068,7 +1078,14 @@ final class ProjectViewModel: ObservableObject {
         apartment.paymentStatus = payment
         apartment.saleDate = saleDate ?? apartment.saleDate ?? Date()
         apartments[index] = apartment
-        var writes: [DocumentChange] = []
+        var writes: [DocumentChange] = [
+            // Kimlik daire belgesine DEĞİL, yalnızca yöneticinin okuyabildiği
+            // buyers/{apartmentId} belgesine yazılır (madde 18). Dairedeki
+            // buyerName alanı CodingKeys dışı — Firestore'a hiç çıkmıyor.
+            .buyer(ApartmentBuyer(apartmentId: apartmentId,
+                                  projectId: apartment.projectId,
+                                  name: trimmedBuyer)),
+        ]
 
         // İlk tahsilat da bir kayıt olarak defterde durur; `paidAmount` artık
         // doğrudan yazılmıyor, ödeme kayıtlarından hesaplanıyor.
@@ -1117,9 +1134,12 @@ final class ProjectViewModel: ObservableObject {
                                      newValue: after.status.label))
             }
             if before.buyerName != after.buyerName {
-                changes.append(.init(field: "Alıcı",
-                                     oldValue: before.buyerName ?? "—",
-                                     newValue: after.buyerName ?? "—"))
+                // Denetim defteri ORTAĞA AÇIK; ad buraya yazılırsa gizlilik
+                // sınırı (buyers yalnızca yönetici) defterden delinir. Defter
+                // DEĞİŞİMİ söyler, kimliği söylemez — kimlik buyers belgesinde.
+                changes.append(.init(field: "Alıcı kaydı",
+                                     oldValue: before.buyerName == nil ? "—" : "kayıtlı",
+                                     newValue: "güncellendi"))
             }
             if before.price != after.price {
                 changes.append(.init(field: "Satış bedeli",
@@ -1164,7 +1184,9 @@ final class ProjectViewModel: ObservableObject {
             writes.append(pushActivity(
                 ActivityItem(id: UUID(), projectId: apartment.projectId, kind: .sale,
                              title: "Daire No \(apartment.apartmentNumber) \(prefix) — \(Fmt.compactMoney(price))",
-                             meta: "\(projectTitle) · \(trimmedBuyer) · \(payNote)",
+                             // Alıcı adı bilerek YOK: hareket akışı ortağa
+                             // açık ve ciro bilgisi ad olmadan da tam.
+                             meta: "\(projectTitle) · \(payNote)",
                              timestamp: Date())))
         }
         persist(writes, failureNote: "Satış")

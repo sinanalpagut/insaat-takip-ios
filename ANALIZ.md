@@ -264,7 +264,7 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
             · 18. maddenin ÖN KOŞULUYDU: "ortak alıcı adını görmesin" ancak
               "bu projede kim ortak" cevaplanınca yazılabilir.
 - [ ] 17. Storage (fiş/daire/belge görselleri, `storagePath`, `uploadState`)
-- [ ] 18. Gizliliğin sorgu düzeyinde uygulanması — **sunucu tarafı hazır (18 Ağu 2026)**
+- [x] 18. Gizliliğin sorgu düzeyinde uygulanması — **TAMAM (18 Ağu 2026), uçtan uca kanıtlı**
       · KARAR: ortak bir YATIRIMCI. Payını hesaplamak için daire durumunu,
         bedeli, tahsil edilen tutarı ve satış tarihini görmesi gerekiyor —
         bunlar açık kalıyor. ALICININ KİMLİĞİ gizleniyor: hiçbir yatırım
@@ -283,10 +283,20 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
       · KAPSAM DIŞI bırakıldı: serbest metin notları (`Payment.note`,
         `MaterialLog.note`) yapısal olarak korunamaz, kullanıcı ne yazarsa
         yazar. Bu bir politika/arayüz konusu, şema konusu değil.
-      · KALAN İŞ (istemci): `Apartment.CodingKeys`ten `buyerName` çıkarılacak
-        (türetilen malzeme toplamlarıyla aynı desen), satışta daire + alıcı
-        belgesi tek partide yazılacak, `load()`te yalnızca yönetici `buyers`
-        çekip birleştirecek, ortakta ad nil kalacak ve arayüz onu göstermeyecek.
+      · İSTEMCİ TARAFI (commit ile): `Apartment.CodingKeys` buyerName'i dışarıda
+        bırakıyor (malzeme toplamlarıyla aynı desen — bellekte bütün, kodlama
+        sınırında ayrık); satış `.buyer` yazıyor, iptal ve kat karşılığına
+        çevirme `.deleteBuyer` ile kimliği SİLİYOR (veri minimizasyonu);
+        `load()` buyers'ı YALNIZCA sahibin projesinde çekiyor — ortak için
+        sorguyu atmamak şart, kural reddedince tüm yükleme düşerdi.
+      · SIZINTI TARAMASI: ad, hareket akışı metasından ve denetim defterinden
+        de çıkarıldı (ikisi ortağa açık). Defter artık kimliği değil DEĞİŞİMİ
+        söylüyor: "Alıcı kaydı: kayıtlı → kaldırıldı". Para izi eksiksiz.
+      · UÇTAN UCA KANIT (emülatör): satış → daire belgesinde buyerName alanı
+        YOK, ad yalnızca buyers'ta; yeniden başlatma → yönetici adı görüyor
+        (birleştirme çalışıyor); iptal → buyers belgesi silindi; ortağın
+        okuyabildiği hiçbir belgede ad geçmiyor. Gecikmiş iptal yazmasını
+        16i'nin şeridi anında görünür kıldı — şerit ilk gerçek işini yaptı.
 - [x] 19. Stok toplamlarında atomik güncelleme — **çözüm değişti, sorun kapandı**
       Maddenin önerdiği `FieldValue.increment`'in hedeflediği `accruedCost += ...`
       deseni Faz 1/13'te kalktı; toplamlar hareketlerden türetiliyor. Ama sorun

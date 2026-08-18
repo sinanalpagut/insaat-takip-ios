@@ -57,12 +57,24 @@ struct Apartment: Codable, Identifiable, Equatable {
     var type: String            // "2+1" / "3+1"
     var area: String            // "95 m²"
     var status: Status
-    var buyerName: String?      // Satıldıysa alıcı
+    /// Satıldıysa alıcı. KODLANMAZ (CodingKeys dışı): kural alan gizleyemediği
+    /// için ad daire belgesinde durdukça ortağın cihazına inerdi. Kimlik
+    /// `buyers/{apartmentId}` belgesinde yaşar (yalnızca yönetici okur);
+    /// yüklemede yalnızca sahibin projelerinde geri birleştirilir, ortakta nil
+    /// kalır. Malzemenin türetilen toplamlarıyla aynı desen: bellekte bütün,
+    /// kodlama sınırında ayrık.
+    var buyerName: String? = nil
     var price: Kurus            // Satış bedeli (satıldıysa)
     var paidAmount: Kurus       // Tahsil edilen tutar
     var paymentStatus: PaymentStatus?
     var saleDate: Date?         // Sözleşme / satış tarihi
     var deliveryNote: String    // "Anahtar teslim bekliyor" vb.
+
+    enum CodingKeys: String, CodingKey {
+        case id, projectId, apartmentNumber, floor, type, area, status
+        case price, paidAmount, paymentStatus, saleDate, deliveryNote
+        // buyerName BİLİNÇLİ olarak yok — gerekçesi alanın üzerinde.
+    }
 
     // MARK: Durumdan türeyen kovalar
     // Tek bir `isSold` yerine dört ayrı soru: her hesap hangi daireleri
@@ -124,4 +136,19 @@ struct Apartment: Codable, Identifiable, Equatable {
                 : "Kalan \(Fmt.compactMoney(remainingAmount))"
         }
     }
+}
+
+// MARK: - Alıcı kimliği (yalnızca yönetici)
+
+/// `projects/{pid}/buyers/{apartmentId}` belgesi. Daireden AYRI, çünkü güvenlik
+/// kuralı alan gizleyemez — belgeye izin verir ya da vermez. Ortak daireyi
+/// (durum, bedel, tahsilat) okur; bu belgeyi YALNIZCA sahip okur.
+/// Belge kimliği = daire kimliği: sahip tek sorguyla tüm alıcıları çekip
+/// dairelerle eşleştirir.
+struct ApartmentBuyer: Codable, Identifiable, Equatable {
+    let apartmentId: UUID
+    let projectId: UUID
+    var name: String
+
+    var id: UUID { apartmentId }
 }

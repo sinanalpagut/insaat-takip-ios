@@ -68,6 +68,17 @@ final class InMemoryProjectRepository: ProjectRepository {
         case .sitePhoto(let value):      upsert(value, into: &sitePhotos, newestFirst: true)
         case .apartmentPhoto(let value): upsert(value, into: &apartmentPhotos)
 
+        // Bellekte ayrı alıcı dizisi YOK: kimlik doğrudan dairenin alanına
+        // işlenir. Ayrım yalnızca kodlama/yol sınırında (Firestore) gerekli.
+        case .buyer(let value):
+            if let index = apartments.firstIndex(where: { $0.id == value.apartmentId }) {
+                apartments[index].buyerName = value.name
+            }
+        case .deleteBuyer(let apartmentId, _):
+            if let index = apartments.firstIndex(where: { $0.id == apartmentId }) {
+                apartments[index].buyerName = nil
+            }
+
         // Bellek içinde proje kimliğine gerek yok (kimlik tek başına benzersiz);
         // Firestore uygulamasında doküman YOLUNU kurmak için kullanılacak.
         case .deleteMaterialLog(let id, _):     materialLogs.removeAll { $0.id == id }

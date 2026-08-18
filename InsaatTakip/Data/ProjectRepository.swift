@@ -47,12 +47,19 @@ enum DocumentChange {
     case payment(Payment)
     case apartmentPhoto(ApartmentPhoto)
     case audit(AuditEntry)
+    /// Alıcının kimliği — daire belgesinden AYRI (madde 18): kural alan
+    /// gizleyemez, belge gizler. Yol: `buyers/{apartmentId}`, yalnızca yönetici.
+    case buyer(ApartmentBuyer)
 
     // Silmeler de YOL ister; proje kimliği olmadan doküman adresi kurulamaz.
     case deleteMaterialLog(id: UUID, projectId: UUID)
     case deleteExpense(id: UUID, projectId: UUID)
     case deletePayment(id: UUID, projectId: UUID)
     case deleteApartmentPhoto(id: UUID, projectId: UUID)
+    /// Satış iptali / kat karşılığına çevirme: kimlik, gereklilik bitince
+    /// SİLİNİR (veri minimizasyonu) — daire .available olurken alıcı belgesi
+    /// yetim kalmasın.
+    case deleteBuyer(apartmentId: UUID, projectId: UUID)
 
     /// Satış iptalinde o dairenin TÜM tahsilatları birlikte düşer.
     /// Kimlik LİSTESİ taşınır, `apartmentId` değil: Firestore'da sorgu bir

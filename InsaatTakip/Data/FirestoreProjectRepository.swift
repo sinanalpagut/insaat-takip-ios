@@ -47,6 +47,7 @@ final class FirestoreProjectRepository: ProjectRepository {
         case payments
         case apartmentPhotos
         case auditEntries
+        case buyers
     }
 
     private let db: Firestore
@@ -120,6 +121,20 @@ final class FirestoreProjectRepository: ProjectRepository {
             result.auditEntries += try await audits
             result.sitePhotos += try await sitePhotos
             result.apartmentPhotos += try await apartmentPhotos
+
+            // Alıcı kimlikleri YALNIZCA sahibin projesinde çekilir. Ortak için
+            // sorguyu ATMAMAK şart: kural okumayı reddeder, `getDocuments`
+            // fırlatır ve TÜM yükleme düşerdi — belgelerdeki role göre sorgu
+            // dersinin aynısı. Ortakta `buyerName` nil kalır; arayüz zaten nil
+            // adla başa çıkıyor.
+            if isOwner {
+                let buyers = try await fetch(ApartmentBuyer.self, .buyers, pid)
+                let names = Dictionary(uniqueKeysWithValues: buyers.map { ($0.apartmentId, $0.name) })
+                for index in result.apartments.indices
+                where result.apartments[index].projectId == pid {
+                    result.apartments[index].buyerName = names[result.apartments[index].id]
+                }
+            }
         }
 
         // Malzeme toplamları KAYITLI DEĞİL (madde 19): `Material.CodingKeys`
@@ -193,6 +208,14 @@ final class FirestoreProjectRepository: ProjectRepository {
             case .apartmentPhoto(let p): upsert(p, into: &latest.apartmentPhotos)
             case .audit(let a):          upsert(a, into: &latest.auditEntries)
 
+            case .buyer(let b):
+                if let i = latest.apartments.firstIndex(where: { $0.id == b.apartmentId }) {
+                    latest.apartments[i].buyerName = b.name
+                }
+            case .deleteBuyer(let apartmentId, _):
+                if let i = latest.apartments.firstIndex(where: { $0.id == apartmentId }) {
+                    latest.apartments[i].buyerName = nil
+                }
             case .deleteMaterialLog(let id, _):
                 latest.materialLogs.removeAll { $0.id == id }
             case .deleteExpense(let id, _):
@@ -263,6 +286,11 @@ final class FirestoreProjectRepository: ProjectRepository {
             batch.setData(fields(of: p), forDocument: ref(.sitePhotos, p.projectId, p.id))
         case .apartmentPhoto(let p):
             batch.setData(fields(of: p), forDocument: ref(.apartmentPhotos, p.projectId, p.id))
+
+        case .buyer(let b):
+            batch.setData(try encode(b), forDocument: ref(.buyers, b.projectId, b.apartmentId))
+        case .deleteBuyer(let apartmentId, let pid):
+            batch.deleteDocument(ref(.buyers, pid, apartmentId))
 
         case .deleteMaterialLog(let id, let pid):
             batch.deleteDocument(ref(.materialLogs, pid, id))
