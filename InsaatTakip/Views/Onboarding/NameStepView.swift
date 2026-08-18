@@ -64,6 +64,27 @@ struct NameStepView: View {
             .disabled(trimmed.isEmpty)
             .padding(.top, 22)
 
+            // ÇIKIŞ YOLU. Bu ekranda daha önce ne geri ne çıkış vardı ve buraya
+            // düşen kullanıcı KİLİTLİ kalıyordu: telefon doğrulaması bitmiş
+            // (yani oturum açık) ama profil yok, dolayısıyla uygulama her
+            // açılışta buraya dönüyor. Yanlış numarayla giren biri geri
+            // dönemiyordu.
+            //
+            // Uygulamayı silmek de kurtarmıyor — Firebase oturumu KEYCHAIN'de
+            // duruyor ve keychain uygulama silinince temizlenmiyor. Gerçek
+            // cihazda birebir bu yaşandı: uygulama kaldırılıp yeniden kuruldu,
+            // eski oturum geri geldi ve ekran yine burası oldu.
+            Button {
+                appState.signOut()
+            } label: {
+                Text("Farklı numarayla giriş yap")
+                    .font(.manrope(13.5, .semiBold))
+                    .foregroundColor(.white.opacity(0.55))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+            }
+            .padding(.top, 4)
+
             Spacer()
         }
         .padding(.horizontal, 24)
