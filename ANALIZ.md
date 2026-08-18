@@ -263,7 +263,45 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
               başkasının projesindeki yetkiyi belirlemiyor.
             · 18. maddenin ÖN KOŞULUYDU: "ortak alıcı adını görmesin" ancak
               "bu projede kim ortak" cevaplanınca yazılabilir.
-- [ ] 17. Storage (fiş/daire/belge görselleri, `storagePath`, `uploadState`)
+- [~] 17. Storage (fiş/daire/belge görselleri, `storagePath`) — **2/3 TAMAM (18 Ağu 2026)**
+      · (1/3) `storage.rules` + 15 emülatör testi. Yetki FIRESTORE'UN AYNASI:
+        kurallar çapraz servis `firestore.get()` ile `projects/{pid}` belgesine
+        bakıyor. Yetki iki yerde tekrarlansaydı biri güncellenip diğeri
+        unutulurdu. Yalnızca image/jpeg, 4 MB tavan, kova beyaz listesi,
+        varsayılan RED.
+      · (2/3) Şantiye + daire görselleri: `ImageStore` (DİSK önce, BULUT
+        arkada), modellerde `storagePath`, yüklemeler bekleyen-yazma sayacına
+        dahil. `uploadState` diye bir ALAN YOK — "yükleniyor" cihaza özgü bir
+        durum, belgeye yazılsaydı iki cihaz birbirinin durumunu ezerdi.
+        Yolun varlığı = buluttaki tek gerçek.
+      · Uçtan uca kanıt (emülatör): yükle → nesne + `storagePath`; yeniden
+        başlat → diskten; SİL+YENİDEN KUR → buluttan indi, diske aynı
+        baytlarla yazıldı; görseli sil → Storage + Firestore temizlendi.
+      · YAZILDIKTAN SONRA DENETİM (4 mercek, 21 iddia, 9'u doğrulandı) — hepsi
+        kapatıldı. Üçü kritikti ve üçü de "yazdım, çalıştı" ile yakalanamazdı:
+        - Alıcı kimliği Storage'dan sızıyordu: tahsilat dekontu gönderenin
+          adını taşıyor, `receipts` kovası ortağa açıktı. 18. maddede
+          kapatılan sızıntı buradan geri açılıyordu. Dekont ayrı
+          `paymentReceipts` kovasına alındı, okuma yalnızca yöneticide.
+        - Disk yazımı başarısız olursa fotoğraf kalıcı kayboluyordu; üstelik
+          "sonra yeniden denenecek" deniyordu, oysa yeniden deneme diskteki
+          dosyayı arıyordu ve o dosya hiç oluşmamıştı. Bellek yedeği eklendi.
+        - Ortak daire görseli ekleyebiliyordu: sheet global rolü okuyordu
+          (16j'den sonra her oturum `.admin`). Rol proje bazlısıyla değişti.
+        - Uçuş kaydı yoktu (çift yükleme + şerit iki kat), silme sırasında
+          uçuştaki yükleme yetim nesne bırakıyordu, açılışta bütün projelerin
+          bütün görselleri sınırsız iniyordu (indirme artık ekrandaki hücreye
+          bağlı).
+      · KALAN (3/3): fiş görselleri — `materialLogs`, `payments`, `expenses`
+        üç kayıt türü de `receiptImages` sözlüğünü paylaşıyor. Tahsilat
+        dekontu `paymentReceipts` kovasına, malzeme/gider fişi `receipts`
+        kovasına gidecek (kural ve testler hazır, istemci yok).
+      · ERTELENDİ → madde 23: BELGE baytları (PDF/DWG). Bugün `documents`
+        yalnızca üst veri tutuyor; asıl engel dosya seçicide güvenlik
+        kapsamlı URL'in seçim anında bırakılması — ayrı bir iş.
+      · YAPILMADI: `storage.rules` yayına ÇIKMADI. Yayındaki sürüm eski
+        (dekont ortağa açık). Fiş istemcisi (3/3) gelmeden önce
+        `npm run rules:deploy` çalıştırılmalı.
 - [x] 18. Gizliliğin sorgu düzeyinde uygulanması — **TAMAM (18 Ağu 2026), uçtan uca kanıtlı**
       · KARAR: ortak bir YATIRIMCI. Payını hesaplamak için daire durumunu,
         bedeli, tahsil edilen tutarı ve satış tarihini görmesi gerekiyor —
@@ -307,7 +345,40 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
       gidiyordu. Çözüm increment değil: türetilen alanları KODLAMAMAK
       (`Material.CodingKeys`). Yazılmayan alanın çakışacak bir şeyi yok.
 
-### Faz 3 — Ürün değeri
+#
+---
+
+## Gerçek cihaz turu — simülatörde KANITLANAMAYAN işler
+
+Simülatör hızlı döngü için doğru araç: arayüz, iş mantığı ve sunucu kuralları
+(kurallar zaten emülatörde, yani SUNUCUDA koşuyor — cihazın markası kuralı
+değiştirmez) orada gerçekten sınanıyor. Ama simülatörün YAPISAL olarak
+gösteremediği ve bugüne kadar HİÇ çalıştırılmamış kod yolları var. Bunlar
+"muhtemelen çalışır" değil, "hiç denenmedi" kutusunda:
+
+- **Telefon + SMS girişi (gerçek yol).** Simülatörde push HİÇ çalışmıyor; bu
+  yüzden emülatör + `appVerificationDisabledForTesting` kullanılıyor. Yani
+  APNs sessiz doğrulaması, reCAPTCHA'ya düşme dalı ve yüklenen APNs
+  anahtarının (Key `WL72654D5U`) işe yarayıp yaramadığı BİLİNMİYOR. Gerçek
+  kullanıcının gördüğü İLK ekran bu.
+- **"Fotoğraf Çek" (kamera).** Simülatörde kamera yok; `CameraPicker` kod yolu
+  bir kez bile koşmadı. Şantiyede en çok kullanılacak giriş bu olacak.
+- **Gerçek fotoğraf boyutları.** Galeriye konan örnekler ~1-2 MP; iPhone 12-48
+  MP HEIC üretiyor. Küçültme (madde 13) ve bellek davranışı gerçek karede
+  ölçülmeli.
+- **Şantiye ağı.** Kesintili/çok yavaş bağlantıda bekleyen-yazma şeridi,
+  yeniden deneme ve uygulama arka plana alınınca yüklemenin askıya alınması.
+  Simülatörde ağ her zaman mükemmel.
+- **Depolama dolu.** Denetimde bulunan "disk yazılamazsa" dalı gerçek bir
+  cihazda gerçek bir koşul.
+
+Kurulum hazır: `sh scripts/emulator-device.sh` emülatörü yerel ağ arayüzünde
+açıyor ve ekrana Mac'in IP'sini yazıyor; cihaz derlemesine `-emulator <IP>:8080`
+verilince iPhone aynı emülatöre bağlanıyor (iPhone ve Mac aynı Wi-Fi'da olmalı).
+Telefon girişinin GERÇEK yolunu denemek içinse emülatör değil, gerçek Firebase
+projesi kullanılmalı — kurallar zaten yayında.
+
+## Faz 3 — Ürün değeri
 
 - [ ] 20. Ortak cari hesabı (`sharePercent` ile pay hesabı)
 - [ ] 21. Vade hatırlatıcı + gecikmiş tahsilat listesi
