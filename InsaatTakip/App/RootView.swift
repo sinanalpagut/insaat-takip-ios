@@ -54,7 +54,13 @@ struct RootView: View {
                 // gerçek veriyi getiriyor. Oturum açıldıktan SONRA çalışması
                 // şart: Firestore sorgusu `request.auth.uid` istiyor, o yüzden
                 // burada (giriş yapılmış dalda) duruyor.
-                .task(id: appState.currentUser?.id) { await viewModel.refresh() }
+                .task(id: appState.currentUser?.id) {
+                    // Kayıtlardaki "kim" alanının kaynağı. Yenilemeden ÖNCE
+                    // atanıyor: refresh sırasında oluşan bir yazma da doğru
+                    // kişiyi taşısın.
+                    viewModel.actingUser = appState.currentUser
+                    await viewModel.refresh()
+                }
             }
         }
     }

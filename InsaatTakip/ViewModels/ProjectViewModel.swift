@@ -64,6 +64,20 @@ final class ProjectViewModel: ObservableObject {
     /// sınıfı olurdu.
     private var transfersInFlight: Set<String> = []
 
+    /// İşlemi YAPAN kişi — kayıtlardaki "kim" alanı buradan gelir.
+    ///
+    /// Önceden her kayda sabit `User.admin.name` yazılıyordu, yani gerçek bir
+    /// projede fişi kim girerse girsin denetim izinde hep aynı demo adı
+    /// görünüyordu. Uygulamanın şeffaflık iddiası "kim, ne zaman" cevabına
+    /// dayanıyor; o cevap yanlışsa iz bir kanıt değil süstür.
+    ///
+    /// `RootView` oturum değiştikçe burayı günceller.
+    var actingUser: User?
+
+    /// Kayıtlara yazılacak ad. Sahte veri/demo yolunda oturum yoksa eski
+    /// davranış korunur.
+    private var actorName: String { actingUser?.name ?? User.admin.name }
+
     init(repository: ProjectRepository? = nil, invites: InviteService? = nil,
          images: ImageStore? = nil) {
         let source = repository ?? Self.makeRepository()
@@ -821,7 +835,7 @@ final class ProjectViewModel: ObservableObject {
                               materialId: materialId, type: type,
                               amount: amount, unitPrice: effectivePrice,
                               date: date,
-                              note: note, user: User.admin.name)
+                              note: note, user: actorName)
         materialLogs.insert(log, at: 0)
         // Kamerayla çekilen fiş görseli: diske ANINDA, buluta arkadan.
         // Önceden yalnızca sözlüğe konuyordu — "Fiş kaydedildi" deniyor ama
@@ -1006,7 +1020,7 @@ final class ProjectViewModel: ObservableObject {
                              changes: [AuditEntry.Change]) -> [DocumentChange] {
         let entry = AuditEntry(id: UUID(), recordId: recordId, projectId: projectId,
                                subject: subject, action: action, changes: changes,
-                               user: User.admin.name, date: Date())
+                               user: actorName, date: Date())
         auditEntries.insert(entry, at: 0)
 
         let projectTitle = projects.first { $0.id == projectId }?.title ?? ""
@@ -1241,7 +1255,7 @@ final class ProjectViewModel: ObservableObject {
                               apartmentId: apartmentId, amount: amount,
                               date: date, method: method,
                               note: note.trimmingCharacters(in: .whitespaces),
-                              user: User.admin.name)
+                              user: actorName)
         payments.append(payment)
         // Dekont AYRI kovada: üstünde gönderenin adı yazıyor, yani madde
         // 18'de ortaktan ayrılan alıcı kimliği. `receipts` kovasında dursaydı
@@ -1323,7 +1337,7 @@ final class ProjectViewModel: ObservableObject {
                               amount: amount, date: date,
                               payee: payee.trimmingCharacters(in: .whitespaces),
                               note: note.trimmingCharacters(in: .whitespaces),
-                              user: User.admin.name)
+                              user: actorName)
         expenses.insert(expense, at: 0)
         if let receiptImage {
             storeReceipt(receiptImage, bucket: .receipts,
@@ -1462,7 +1476,7 @@ final class ProjectViewModel: ObservableObject {
                                       date: apartment.saleDate ?? Date(),
                                       method: payment == .tamamlandi ? .havale : .pesinat,
                                       note: payment == .tamamlandi ? "Satış bedeli" : "Sözleşme peşinatı",
-                                      user: User.admin.name)
+                                      user: actorName)
                 payments.append(initial)
                 writes.append(.payment(initial))
             }
@@ -1477,7 +1491,7 @@ final class ProjectViewModel: ObservableObject {
                                       date: apartment.saleDate ?? Date(),
                                       method: payment == .tamamlandi ? .havale : .pesinat,
                                       note: "Sözleşme bakiyesi (kapora sonrası)",
-                                      user: User.admin.name)
+                                      user: actorName)
                 payments.append(balance)
                 writes.append(.payment(balance))
             }
@@ -1636,6 +1650,111 @@ final class ProjectViewModel: ObservableObject {
         persist(writes, failureNote: "Proje")
         flash("Proje oluşturuldu")
         return project
+    }
+
+    // MARK: - Ortak hissesi (madde 20)
+
+    /// Bir ortağın projedeki payı — dört rakam, hiçbiri saklanmaz.
+    ///
+    /// NEDEN TEK BİR "PAYIN ŞU KADAR" RAKAMI YOK:
+    /// `netAmount` geliri TAHAKKUK esasıyla alıyor (satılan dairenin TAM bedeli,
+    /// tahsil edilmemiş olsa da) ama gideri BUGÜNE KADAR girilmiş kayıtlardan
+    /// topluyor. Maketten satışta para önce girer, inşaat maliyeti sonra çıkar;
+    /// yarısı bitmiş bir projede tek satırlık "payın 7,2 M ₺" ortağa kasada
+    /// olmayan ve bir kısmı daha harcanacak olan parayı "hakkın" diye söyler.
+    /// Bu, madde 1'de "Net" etiketiyle kapatılan hatanın kişiselleşmiş hâli
+    /// olurdu — orada rakam projeye aitti, burada doğrudan kişinin cebine.
+    ///
+    /// Onun yerine projenin ZATEN gösterdiği dört rakamın paya bölünmüş hâli
+    /// yan yana duruyor; hangisinin kasada olduğu ekranda ayrı yazılı.
+    struct PartnerShare {
+        let percent: Int
+        /// Satılan dairelerin bedelinden pay (tahakkuk).
+        let sales: Kurus
+        /// Girilen malzeme + diğer giderlerden pay.
+        let cost: Kurus
+        /// İkisinin farkı. "Kâr" DEĞİL: kalan inşaat maliyeti düşülmedi.
+        let difference: Kurus
+        /// Kasaya GİRMİŞ paradan pay.
+        let collected: Kurus
+        /// Henüz tahsil edilmemiş alacaktan pay.
+        let outstanding: Kurus
+    }
+
+    /// Ortağın payı. Paylar TÜM ortaklar üzerinden birlikte bölünür ki
+    /// toplamları proje rakamına birebir eşit kalsın (bkz. `Kurus.split`).
+    /// Hisse tanımlı değilse (yeni katılan ortak %0 ile geliyor) `nil` döner —
+    /// sıfırlarla dolu bir kart, tanımsız hisseyi "payın yok" diye gösterirdi.
+    func share(of partner: Partner) -> PartnerShare? {
+        guard partner.sharePercent > 0 else { return nil }
+        let roster = partners(for: partner.projectId)
+        guard let index = roster.firstIndex(where: { $0.id == partner.id }) else { return nil }
+        let percents = roster.map(\.sharePercent)
+        let pid = partner.projectId
+
+        func slice(_ total: Kurus) -> Kurus { Kurus.split(total, byPercents: percents)[index] }
+
+        return PartnerShare(percent: partner.sharePercent,
+                            sales: slice(totalSales(for: pid)),
+                            cost: slice(totalCost(for: pid)),
+                            difference: slice(netAmount(for: pid)),
+                            collected: slice(collectedAmount(for: pid)),
+                            outstanding: slice(outstandingAmount(for: pid)))
+    }
+
+    /// Oturumu açan kişinin BU PROJEDEKİ ortak kaydı. Bağ `userUid` üzerinden:
+    /// yönetici hisseyi tanımlamış ama kişi henüz katılmamış olabilir, o yüzden
+    /// `Partner` kaydı üyelikten ayrı yaşıyor.
+    func partnerRecord(in projectId: UUID, for user: User?) -> Partner? {
+        guard let uid = user?.id else { return nil }
+        return partners(for: projectId).first { $0.userUid == uid }
+    }
+
+
+    /// Bir ortağın hisse yüzdesini değiştirir (yalnızca yönetici).
+    ///
+    /// Bu yol AÇILANA KADAR `sharePercent` ölü veriydi: kurucuya sabit %100,
+    /// davetle katılana %0 yazılıyordu ve değiştirecek ne ekran ne fonksiyon
+    /// vardı. Yani gerçek bir projede davet edilen her ortak, düzeltemeyeceği
+    /// bir "%0" görüyordu — pay hesabı yazılsaydı da herkesin payı 0 ₺ çıkardı.
+    ///
+    /// TOPLAM %100'Ü AŞAMAZ. Aşan bir dağılım, ortağa gerçekte var olmayan bir
+    /// pay vaat etmek olurdu; bu uygulamada rakamın dürüstlüğü kapıda durur,
+    /// ekranda uyarı olarak değil.
+    ///
+    /// Değişiklik denetim izine yazılır: ortağın payı, ortağın haberi olmadan
+    /// sessizce küçültülebilecek bir şey değil.
+    @discardableResult
+    func updatePartnerShare(role: UserRole, partnerId: UUID, percent: Int) -> Bool {
+        guard role == .admin else { return false }
+        guard let index = partners.firstIndex(where: { $0.id == partnerId }) else { return false }
+        let partner = partners[index]
+        let clamped = max(0, min(100, percent))
+        guard clamped != partner.sharePercent else { return true }
+
+        let othersTotal = partners
+            .filter { $0.projectId == partner.projectId && $0.id != partnerId }
+            .reduce(0) { $0 + $1.sharePercent }
+        guard othersTotal + clamped <= 100 else {
+            flash("Toplam hisse %100'ü aşamaz · kalan %\(100 - othersTotal)")
+            return false
+        }
+
+        partners[index].sharePercent = clamped
+        var writes: [DocumentChange] = [.partner(partners[index])]
+        writes += recordAudit(recordId: partnerId, projectId: partner.projectId,
+                              subject: "\(partner.name) hissesi", action: .update,
+                              changes: [.init(field: "Hisse",
+                                              oldValue: "%\(partner.sharePercent)",
+                                              newValue: "%\(clamped)")])
+        persist(writes, failureNote: "Hisse")
+        flash("Hisse güncellendi")
+        return true
+    }
+
+    /// Bu projede henüz dağıtılmamış hisse yüzdesi.
+    func unassignedSharePercent(for projectId: UUID) -> Int {
+        100 - partners(for: projectId).reduce(0) { $0 + $1.sharePercent }
     }
 
     /// Yeni projelerde açılan standart malzeme kalemleri (mock verideki katalogla aynı).

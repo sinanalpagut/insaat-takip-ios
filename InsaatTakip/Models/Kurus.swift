@@ -64,6 +64,53 @@ struct Kurus: Codable, Equatable, Hashable, Comparable, AdditiveArithmetic {
     /// oran ürettiği gözden kaçmasın.
     var liraValue: Double { Double(raw) / 100 }
 
+    /// Bir tutarı yüzde paylara böler. **Payların toplamı tutarın kendisine
+    /// EŞİTTİR** — bir kuruş bile kaybolmaz ya da türemez.
+    ///
+    /// Neden ayrı bir işlem: her payı tek tek `tutar × yüzde / 100` diye
+    /// yuvarlamak toplamı bozar. %33 / %33 / %34'lük bir dağılımda üç pay
+    /// ayrı ayrı yuvarlandığında toplamları tutardan 1-2 kuruş sapar ve
+    /// yönetici ekranda "toplamı tutmayan üç rakam" görür. Bu uygulamada
+    /// rakamın dürüstlüğü bir üslup tercihi değil ("Net" etiketi tam da bu
+    /// yüzden düzeltilmişti), o yüzden dağıtım EN BÜYÜK KALAN yöntemiyle
+    /// yapılıyor: önce taban paylar verilir, artan kuruşlar kesirli kısmı en
+    /// büyük olan paydan başlayarak birer birer dağıtılır.
+    ///
+    /// `cost(quantity:unitPrice:)`'tan sonraki İKİNCİ yuvarlama noktası —
+    /// üçüncüsü olmamalı.
+    ///
+    /// Yüzdeler toplamı 100 olmak zorunda DEĞİL: %60 tanımlıysa tutarın
+    /// yalnızca %60'ı dağıtılır, kalanı çağıranın sorunudur (ekranda
+    /// "%40 tanımsız" diye görünür).
+    static func split(_ total: Kurus, byPercents percents: [Int]) -> [Kurus] {
+        guard !percents.isEmpty else { return [] }
+        // Negatif tutar (zarardaki proje) da bölünebilmeli. İşareti ayırıp
+        // büyüklük üzerinden dağıtıyoruz: aksi halde tam sayı bölmesinin
+        // sıfıra doğru kırpması zararı ortaklar arasında asimetrik dağıtırdı.
+        let sign: Int64 = total.raw < 0 ? -1 : 1
+        let magnitude = abs(total.raw)
+
+        // Taban pay ve kalan: her ikisi de tam sayı, kayan nokta yok.
+        var shares = percents.map { Kurus(raw: sign * (magnitude * Int64($0) / 100)) }
+        let remainders = percents.map { (magnitude * Int64($0)) % 100 }
+
+        let distributed = shares.reduce(Int64(0)) { $0 + abs($1.raw) }
+        var leftover = (magnitude * Int64(percents.reduce(0, +)) / 100) - distributed
+
+        // Kalanı büyükten küçüğe dağıt; eşitlikte sıradaki ilk pay kazanır ki
+        // sonuç ÇAĞRIDAN ÇAĞRIYA AYNI olsun (rastgelelik yok).
+        let order = remainders.enumerated()
+            .sorted { $0.element == $1.element ? $0.offset < $1.offset : $0.element > $1.element }
+            .map(\.offset)
+        var i = 0
+        while leftover > 0, i < order.count {
+            shares[order[i]] = Kurus(raw: shares[order[i]].raw + sign)
+            leftover -= 1
+            i += 1
+        }
+        return shares
+    }
+
     // MARK: Aritmetik
 
     static func + (lhs: Kurus, rhs: Kurus) -> Kurus { Kurus(raw: lhs.raw + rhs.raw) }

@@ -49,14 +49,22 @@ function sanitizeCode(raw: unknown): string {
 
 /// Katılan kişinin ortak listesinde görünecek adı.
 ///
-/// Kaynak SUNUCU: `users/{uid}` profili, yoksa jetondaki telefon numarası.
-/// İstemciden ad ALINMIYOR — alınsaydı kişi ortak tablosunda istediği adla
-/// görünürdü ve yöneticinin gördüğü liste doğrulanmamış veri olurdu.
-async function displayName(uid: string, phone: string | undefined): Promise<string> {
+/// Kaynak SUNUCU: `users/{uid}` profili. İstemciden ad ALINMIYOR — alınsaydı
+/// kişi ortak tablosunda istediği adla görünürdü ve yöneticinin gördüğü liste
+/// doğrulanmamış veri olurdu.
+///
+/// TELEFON NUMARASI YEDEK DEĞİL. Önce numaraya düşülüyordu; `partners/{id}`
+/// belgesi ise projenin TÜM üyelerine açık (`allow read: if isMember(pid)`),
+/// yani profilini doldurmadan katılan kişinin telefonu diğer ortakların
+/// cihazına iniyordu. Numara KVKK kapsamında kişisel veri ve kişi onu
+/// ortaklara göstermeye rıza vermedi; kimlik doğrulaması için verdi.
+/// Adı olmayan kişi "Yeni ortak" görünür, katıldıktan sonra kendi adını
+/// girdiğinde düzelir.
+async function displayName(uid: string, _phone: string | undefined): Promise<string> {
   const profile = await db.collection("users").doc(uid).get();
   const name = profile.get("name");
   if (typeof name === "string" && name.trim().length > 0) return name.trim();
-  return phone && phone.length > 0 ? phone : "Ortak";
+  return "Yeni ortak";
 }
 
 interface RedeemResult {
