@@ -22,6 +22,9 @@ struct ApartmentDetailSheet: View {
     @State private var showCancelConfirm = false
     @State private var showPayment = false
 
+    /// Tam ekranda açılan dekont.
+    @State private var previewedReceipt: SharePayloadImage?
+
     private var apartment: Apartment? {
         viewModel.apartments.first { $0.id == apartmentId }
     }
@@ -117,6 +120,7 @@ struct ApartmentDetailSheet: View {
         } message: {
             Text("Daire No \(apartment?.apartmentNumber ?? 0) tekrar boş duruma dönecek; alıcı ve tahsilat kayıtları silinecek. İşlem, silinen tutarın anlık görüntüsüyle değişiklik defterine yazılır ve ortakların akışında görünür.")
         }
+        .receiptPreview($previewedReceipt)
         .sheet(isPresented: $showPayment) {
             PaymentSheet(apartmentId: apartmentId)
         }
@@ -470,6 +474,18 @@ struct ApartmentDetailSheet: View {
 
             Spacer()
 
+            // Dekont YALNIZCA YÖNETİCİDE. Üstünde gönderenin adı (çoğu kez
+            // IBAN'ı da) yazıyor; `storage.rules` de bu yüzden `paymentReceipts`
+            // kovasını ortağa kapatıyor. Kapı burada, `imageNeeded`
+            // ÇAĞRILMADAN önce: ortak yer tutucuyu bile görmemeli — "göremediğin
+            // bir dekont var" demek, gizlenen şeyin varlığını ilan etmektir.
+            // Kapı unutulsaydı ortak sonsuza kadar 403 alan bir indirme döngüsüne
+            // girerdi (her yeniden çizimde bir istek, üstelik kuralın çapraz
+            // servis sorgusu yüzünden fatura da yazardı).
+            if isAdmin, payment.receiptPath != nil || viewModel.receiptImages[payment.id] != nil {
+                paymentReceiptButton(payment)
+            }
+
             Text(Fmt.compactMoney(payment.amount))
                 .font(.sora(13, .bold))
                 .foregroundColor(Palette.success)
@@ -483,6 +499,31 @@ struct ApartmentDetailSheet: View {
                     Label("Tahsilatı sil", systemImage: "trash")
                 }
             }
+        }
+    }
+
+    /// Dekont küçük resmi. Piksel elde yoksa yer tutucu çizilir ve indirme
+    /// EKRANDA GÖRÜNDÜĞÜ AN istenir.
+    @ViewBuilder
+    private func paymentReceiptButton(_ payment: Payment) -> some View {
+        if let receipt = viewModel.receiptImages[payment.id] {
+            Image(uiImage: receipt)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 30, height: 30)
+                .clipped()
+                .cornerRadius(8)
+                .onTapGesture { previewedReceipt = SharePayloadImage(image: receipt) }
+        } else {
+            Image(systemName: "doc.text")
+                .font(.system(size: 12, weight: .light))
+                .foregroundColor(Palette.textTertiary)
+                .frame(width: 30, height: 30)
+                .background(Palette.fillMuted)
+                .cornerRadius(8)
+                .task(id: payment.id) {
+                    viewModel.imageNeeded(bucket: .paymentReceipts, photoId: payment.id)
+                }
         }
     }
 

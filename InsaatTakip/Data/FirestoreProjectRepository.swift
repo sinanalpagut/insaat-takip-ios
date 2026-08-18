@@ -279,9 +279,10 @@ final class FirestoreProjectRepository: ProjectRepository {
             batch.setData(try encode(a), forDocument: ref(.activities, pid, a.id))
 
         // Görselli iki model `Codable` DEĞİL (`UIImage` taşıyorlar). Belge olarak
-        // yalnızca üst veri yazılıyor; görselin kendisi Storage'a gidecek
-        // (`storagePath` / `uploadState` — madde 17). Bugün diskten dönen
-        // fotoğrafın `image`i nil olur ve ekranda tasarımdaki yer tutucu görünür.
+        // yalnızca üst veri yazılıyor; görselin kendisi Storage'da ve belgede
+        // `storagePath` ile işaretli (madde 17). "Yükleniyor" diye bir ALAN YOK:
+        // o durum cihaza özgü ve diskte dosya var + belgede yol yok ile ifade
+        // ediliyor; belgeye yazılsaydı iki cihaz birbirinin durumunu ezerdi.
         case .sitePhoto(let p):
             batch.setData(fields(of: p), forDocument: ref(.sitePhotos, p.projectId, p.id))
         case .apartmentPhoto(let p):

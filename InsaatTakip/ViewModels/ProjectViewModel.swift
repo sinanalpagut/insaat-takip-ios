@@ -180,6 +180,30 @@ final class ProjectViewModel: ObservableObject {
         for photo in apartmentPhotos where photo.storagePath == nil && photo.image != nil {
             uploadImage(bucket: .apartmentPhotos, projectId: photo.projectId, id: photo.id)
         }
+
+        hydrateReceipts(images)
+    }
+
+    /// Fişlerin yarım kalmış yüklemeleri.
+    ///
+    /// Ölçüt fotoğraflardan FARKLI olmak zorunda: fiş pikseli `receiptImages`
+    /// sözlüğünde yaşıyor ve o sözlük yeniden açılışta BOŞ, yani "elde görsel
+    /// var" hiçbir zaman doğru olmaz. Ölçüt "diskte dosya var + belgede yol
+    /// yok". Dizin taraması pikselleri okumadan yalnızca dosya adlarına bakıyor;
+    /// `upload` da zaten diskten okuduğu için görseli belleğe almaya gerek yok.
+    private func hydrateReceipts(_ images: ImageStore) {
+        var pendingShared = Set(materialLogs.filter { $0.receiptPath == nil }.map(\.id))
+        pendingShared.formUnion(expenses.filter { $0.receiptPath == nil }.map(\.id))
+        for entry in images.localEntries(bucket: .receipts)
+        where pendingShared.contains(entry.id) {
+            uploadImage(bucket: .receipts, projectId: entry.projectId, id: entry.id)
+        }
+
+        let pendingPayments = Set(payments.filter { $0.receiptPath == nil }.map(\.id))
+        for entry in images.localEntries(bucket: .paymentReceipts)
+        where pendingPayments.contains(entry.id) {
+            uploadImage(bucket: .paymentReceipts, projectId: entry.projectId, id: entry.id)
+        }
     }
 
     /// Ekranda çizilen bir fotoğraf hücresi pikselini burada ister. Diskte
@@ -199,7 +223,84 @@ final class ProjectViewModel: ObservableObject {
             downloadImage(bucket: .apartmentPhotos, projectId: photo.projectId,
                           id: photo.id, path: path)
         case .receipts, .paymentReceipts:
-            break   // fişler madde 17'nin 3. parçasında
+            guard let target = receiptTarget(bucket: bucket, id: photoId),
+                  receiptImages[photoId] == nil else { return }
+            // Önce disk: aynı cihazda çekilen fiş zaten burada, ağa çıkmaya gerek yok.
+            if let cached = images?.cached(bucket: bucket, projectId: target.projectId,
+                                           id: photoId) {
+                receiptImages[photoId] = cached
+                return
+            }
+            guard let path = target.path else { return }
+            downloadImage(bucket: bucket, projectId: target.projectId, id: photoId, path: path)
+        }
+    }
+
+    // MARK: Fiş görselleri (madde 17'nin 3. parçası)
+
+    /// Düzenlemede fiş görseline ne yapılacağı.
+    ///
+    /// `UIImage?` YETMİYOR: nil hem "kullanıcı dokunmadı" hem "kullanıcı
+    /// kaldırdı" demek olurdu ve kod ikincisini birincisi sanıyordu — formdaki
+    /// X düğmesine basılıp kaydedilen fiş sessizce geri geliyordu. Buluta
+    /// taşındıktan sonra aynı kusur, kullanıcının sildiği görselin hem Storage'da
+    /// hem `receiptPath` alanında yaşamaya devam etmesi demekti.
+    enum ReceiptEdit {
+        case unchanged
+        case replaced(UIImage)
+        case cleared
+
+        var isCleared: Bool { if case .cleared = self { return true } else { return false } }
+    }
+
+    /// Bir fiş kimliğinin hangi kovaya, hangi projeye ve hangi yola ait olduğunu
+    /// çözer. TEK YERDE: yanlış kova seçmek yetki sızıntısı demek — tahsilat
+    /// dekontu `paymentReceipts`te yalnızca yöneticiye açık, malzeme/gider fişi
+    /// `receipts`te ortağa da açık. Bu çözüm her çağrı yerinde tekrar yazılsaydı
+    /// biri unutulduğunda dekont ortağın okuyabildiği kovaya düşerdi.
+    ///
+    /// `.receipts` İKİ koleksiyona birden hizmet ediyor (malzeme fişi + gider
+    /// fişi); ikisi de aynı kovada çünkü ortak ikisini de görebilmeli.
+    private func receiptTarget(bucket: ImageBucket,
+                               id: UUID) -> (projectId: UUID, path: String?)? {
+        switch bucket {
+        case .paymentReceipts:
+            guard let p = payments.first(where: { $0.id == id }) else { return nil }
+            return (p.projectId, p.receiptPath)
+        case .receipts:
+            if let l = materialLogs.first(where: { $0.id == id }) {
+                return (l.projectId, l.receiptPath)
+            }
+            if let e = expenses.first(where: { $0.id == id }) {
+                return (e.projectId, e.receiptPath)
+            }
+            return nil
+        case .sitePhotos, .apartmentPhotos:
+            return nil
+        }
+    }
+
+    /// Fiş görselini diske yazar ve yüklemeyi başlatır. Üç ekleme yolunun
+    /// (malzeme fişi, tahsilat dekontu, gider fişi) ortak sonu.
+    private func storeReceipt(_ image: UIImage, bucket: ImageBucket,
+                              projectId: UUID, id: UUID) {
+        receiptImages[id] = image
+        images?.cache(image, bucket: bucket, projectId: projectId, id: id)
+        uploadImage(bucket: bucket, projectId: projectId, id: id)
+    }
+
+    /// Fiş görselini diskten, buluttan ve bellekten siler.
+    ///
+    /// KOŞULSUZ: "elde görsel var mı" diye BAKILMAZ. `receiptImages` yeniden
+    /// açılışta boş olduğu için koşullansaydı, uygulamayı kapatıp açtıktan
+    /// sonraki her silme nesneyi bulutta bırakırdı. `ImageStore.delete` yolu
+    /// belirlenimci hesapladığı için yol belgede yazılı olmasa da çalışır.
+    private func discardReceipt(bucket: ImageBucket, projectId: UUID,
+                                id: UUID, path: String?) {
+        receiptImages[id] = nil
+        Task { [images] in
+            await images?.delete(bucket: bucket, projectId: projectId,
+                                 id: id, storagePath: path)
         }
     }
 
@@ -275,8 +376,27 @@ final class ProjectViewModel: ObservableObject {
                     } else {
                         await self.discardOrphan(bucket, projectId, id, path)
                     }
-                case .receipts, .paymentReceipts:
-                    break   // fişler ayrı adımda (madde 17'nin 3. parçası)
+                case .receipts:
+                    if let i = self.materialLogs.firstIndex(where: { $0.id == id }) {
+                        self.materialLogs[i].receiptPath = path
+                        self.persist([.materialLog(self.materialLogs[i])], failureNote: "Fiş yolu")
+                    } else if let i = self.expenses.firstIndex(where: { $0.id == id }) {
+                        self.expenses[i].receiptPath = path
+                        self.persist([.expense(self.expenses[i])], failureNote: "Fiş yolu")
+                    } else {
+                        // İKİ diziye de bakmak ŞART: `.receipts` hem malzeme
+                        // fişine hem gider fişine hizmet ediyor. Biri unutulsa,
+                        // silinen kaydın nesnesi projenin HER üyesinin
+                        // okuyabildiği bir yetim olarak kalırdı.
+                        await self.discardOrphan(bucket, projectId, id, path)
+                    }
+                case .paymentReceipts:
+                    if let i = self.payments.firstIndex(where: { $0.id == id }) {
+                        self.payments[i].receiptPath = path
+                        self.persist([.payment(self.payments[i])], failureNote: "Dekont yolu")
+                    } else {
+                        await self.discardOrphan(bucket, projectId, id, path)
+                    }
                 }
             } catch {
                 #if DEBUG
@@ -703,8 +823,13 @@ final class ProjectViewModel: ObservableObject {
                               date: date,
                               note: note, user: User.admin.name)
         materialLogs.insert(log, at: 0)
-        // Kamerayla çekilen fiş görseli hareketle birlikte saklanır.
-        if let receiptImage { receiptImages[log.id] = receiptImage }
+        // Kamerayla çekilen fiş görseli: diske ANINDA, buluta arkadan.
+        // Önceden yalnızca sözlüğe konuyordu — "Fiş kaydedildi" deniyor ama
+        // piksel uygulama kapanınca uçuyordu.
+        if let receiptImage {
+            storeReceipt(receiptImage, bucket: .receipts,
+                         projectId: material.projectId, id: log.id)
+        }
         // Stok ve maliyet toplamları hareketlerden yeniden türetilir.
         var changes: [DocumentChange] = [.materialLog(log)]
         if let updated = recalculateMaterial(materialId) { changes.append(.material(updated)) }
@@ -729,7 +854,7 @@ final class ProjectViewModel: ObservableObject {
     @discardableResult
     func updateReceipt(role: UserRole, logId: UUID, type: MaterialLog.LogType,
                        amountText: String, unitPriceText: String, reference: String,
-                       date: Date, receiptImage: UIImage? = nil) -> Bool {
+                       date: Date, receipt: ReceiptEdit = .unchanged) -> Bool {
         guard role == .admin else { return false }
         guard let logIndex = materialLogs.firstIndex(where: { $0.id == logId }),
               let material = materials.first(where: { $0.id == materialLogs[logIndex].materialId })
@@ -760,7 +885,23 @@ final class ProjectViewModel: ObservableObject {
             flash("Bu düzeltme stoğu eksiye düşürür")
             return false
         }
-        if let receiptImage { receiptImages[logId] = receiptImage }
+        // Fiş görseli: üç durum ayrı ayrı işleniyor (bkz. ReceiptEdit).
+        var receiptChanged = false
+        switch receipt {
+        case .unchanged:
+            break
+        case .replaced(let image):
+            // Yol belirlenimci olduğu için yeni görsel eskisinin ÜZERİNE yazar;
+            // yetim doğmaz. Yol zaten yazılıysa yeniden yazılması da zararsız.
+            storeReceipt(image, bucket: .receipts,
+                         projectId: materialLogs[logIndex].projectId, id: logId)
+            receiptChanged = true
+        case .cleared:
+            discardReceipt(bucket: .receipts, projectId: materialLogs[logIndex].projectId,
+                           id: logId, path: materialLogs[logIndex].receiptPath)
+            materialLogs[logIndex].receiptPath = nil
+            receiptChanged = true
+        }
 
         // Neyin değiştiğini alan alan yaz.
         var changes: [AuditEntry.Change] = []
@@ -785,11 +926,18 @@ final class ProjectViewModel: ObservableObject {
         if old.note != updated.note {
             changes.append(.init(field: "Açıklama", oldValue: old.note, newValue: updated.note))
         }
+        if receiptChanged {
+            changes.append(.init(field: "Fiş fotoğrafı",
+                                 oldValue: old.receiptPath == nil ? "yok" : "vardı",
+                                 newValue: receipt.isCleared ? "kaldırıldı" : "değiştirildi"))
+        }
         guard !changes.isEmpty else {
             flash("Değişiklik yok")
             return true
         }
-        var writes: [DocumentChange] = [.materialLog(updated)]
+        // Görsel kaldırıldıysa `receiptPath` yukarıda nil'lendi; yazılacak kayıt
+        // diziden TAZE alınmalı, yoksa yol belgede yaşamaya devam ederdi.
+        var writes: [DocumentChange] = [.materialLog(materialLogs[logIndex])]
         if let refreshed = materials.first(where: { $0.id == material.id }) {
             writes.append(.material(refreshed))
         }
@@ -817,7 +965,10 @@ final class ProjectViewModel: ObservableObject {
             flash("Bu fiş silinirse stok eksiye düşer")
             return false
         }
-        receiptImages[logId] = nil
+        // Silme, YUKARIDAKİ geri alma dalından SONRA: reddedilen bir silme
+        // hâlâ yaşayan bir fişin bulut nesnesini yok etmemeli.
+        discardReceipt(bucket: .receipts, projectId: material.projectId,
+                       id: logId, path: removed.receiptPath)
 
         var writes: [DocumentChange] = [.deleteMaterialLog(id: logId, projectId: material.projectId)]
         if let refreshed = materials.first(where: { $0.id == material.id }) {
@@ -922,7 +1073,13 @@ final class ProjectViewModel: ObservableObject {
 
         // Satış iptal edilince o daireye ait tahsilat kayıtları da düşer.
         let removed = payments.filter { $0.apartmentId == apartmentId }
-        removed.forEach { receiptImages[$0.id] = nil }
+        // N adet dekont: belgeler silindikten sonra bu kimlikler hiçbir yerden
+        // geri gelmez — nesneleri şimdi silinmezse bulutta sonsuza dek kalır ve
+        // her biri alıcının adını taşır.
+        for payment in removed {
+            discardReceipt(bucket: .paymentReceipts, projectId: payment.projectId,
+                           id: payment.id, path: payment.receiptPath)
+        }
         payments.removeAll { $0.apartmentId == apartmentId }
 
         // İptal, silinen tahsilatın ANLIK GÖRÜNTÜSÜYLE deftere yazılır.
@@ -1086,7 +1243,13 @@ final class ProjectViewModel: ObservableObject {
                               note: note.trimmingCharacters(in: .whitespaces),
                               user: User.admin.name)
         payments.append(payment)
-        if let receiptImage { receiptImages[payment.id] = receiptImage }
+        // Dekont AYRI kovada: üstünde gönderenin adı yazıyor, yani madde
+        // 18'de ortaktan ayrılan alıcı kimliği. `receipts` kovasında dursaydı
+        // Firestore'da kapatılan sızıntı Storage'dan geri açılırdı.
+        if let receiptImage {
+            storeReceipt(receiptImage, bucket: .paymentReceipts,
+                         projectId: payment.projectId, id: payment.id)
+        }
         var writes: [DocumentChange] = [.payment(payment)]
         if let updated = recalculateCollected(for: apartmentId) { writes.append(.apartment(updated)) }
 
@@ -1107,7 +1270,8 @@ final class ProjectViewModel: ObservableObject {
               let payment = payments.first(where: { $0.id == id }),
               let apartment = apartments.first(where: { $0.id == payment.apartmentId }) else { return }
         payments.removeAll { $0.id == id }
-        receiptImages[id] = nil
+        discardReceipt(bucket: .paymentReceipts, projectId: payment.projectId,
+                       id: id, path: payment.receiptPath)
         var writes: [DocumentChange] = [.deletePayment(id: id, projectId: apartment.projectId)]
         if let updated = recalculateCollected(for: payment.apartmentId) { writes.append(.apartment(updated)) }
         writes += recordAudit(recordId: id, projectId: apartment.projectId,
@@ -1161,7 +1325,10 @@ final class ProjectViewModel: ObservableObject {
                               note: note.trimmingCharacters(in: .whitespaces),
                               user: User.admin.name)
         expenses.insert(expense, at: 0)
-        if let receiptImage { receiptImages[expense.id] = receiptImage }
+        if let receiptImage {
+            storeReceipt(receiptImage, bucket: .receipts,
+                         projectId: expense.projectId, id: expense.id)
+        }
 
         let projectTitle = projects.first { $0.id == projectId }?.title ?? ""
         let activity = pushActivity(
@@ -1179,7 +1346,8 @@ final class ProjectViewModel: ObservableObject {
     func deleteExpense(role: UserRole, id: UUID) {
         guard role == .admin, let expense = expenses.first(where: { $0.id == id }) else { return }
         expenses.removeAll { $0.id == id }
-        receiptImages[id] = nil
+        discardReceipt(bucket: .receipts, projectId: expense.projectId,
+                       id: id, path: expense.receiptPath)
         var writes: [DocumentChange] = [.deleteExpense(id: id, projectId: expense.projectId)]
         writes += recordAudit(recordId: id, projectId: expense.projectId,
                               subject: expense.category.rawValue, action: .delete,

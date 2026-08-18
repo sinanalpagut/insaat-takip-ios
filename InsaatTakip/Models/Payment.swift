@@ -41,6 +41,12 @@ struct Payment: Codable, Identifiable, Equatable {
     var note: String        // "3. taksit", "Konut kredisi kullanımı"
     var user: String
 
+    /// Fiş görselinin Storage yolu. DOLU olması, görselin buluta yazıldığının
+    /// tek kanıtı — "yükleniyor" cihaza özgü bir durum ve belgeye YAZILMAZ
+    /// (iki cihaz birbirinin durumunu ezerdi). Görselin kendisi burada değil:
+    /// `projects/{projectId}/{kova}/{id}.jpg` yolunda duruyor.
+    var receiptPath: String? = nil
+
     var dateText: String { Fmt.shortDate(date) }
 
     /// Satır alt metni: "Taksit · 3. taksit · 12 Mar 2026"

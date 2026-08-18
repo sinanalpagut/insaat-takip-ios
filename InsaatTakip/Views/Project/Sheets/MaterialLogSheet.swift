@@ -22,7 +22,16 @@ struct MaterialLogSheet: View {
         viewModel.materials.first { $0.id == materialId }
     }
 
-    private var isAdmin: Bool { appState.currentUser?.role == .admin }
+    /// PROJE BAZLI rol — global rol değil (madde 16j). Global bakılınca davetle
+    /// katılan ORTAK bu ekranda "Düzenle / Sil" menüsünü görüyor, silmeye
+    /// basınca istemci kapısını geçiyor, yazma sunucuda reddediliyor ama fiş
+    /// ekrandan düşmüş oluyordu. Fiş görseli buluta bağlandıktan sonra aynı yol
+    /// Storage silmesine de uzanırdı.
+    private var isAdmin: Bool {
+        guard let material else { return false }
+        return viewModel.role(inProject: material.projectId,
+                              for: appState.currentUser) == .admin
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -162,6 +171,31 @@ struct MaterialLogSheet: View {
 
     /// Hareket satırı: 26px yön rozeti, not, "tarih · kullanıcı", işaretli miktar.
     /// Fiş kamerayla çekildiyse notun yanında küçük bir önizleme çıkar.
+    /// Fiş küçük resmi. Piksel elde yoksa yer tutucu çizilir ve indirme
+    /// EKRANDA GÖRÜNDÜĞÜ AN istenir — açılışta toptan indirme yok.
+    @ViewBuilder
+    private func receiptThumbnail(_ log: MaterialLog) -> some View {
+        if let receipt = viewModel.receiptImages[log.id] {
+            Image(uiImage: receipt)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 34, height: 34)
+                .clipped()
+                .cornerRadius(9)
+                .onTapGesture { previewedReceipt = SharePayloadImage(image: receipt) }
+        } else {
+            Image(systemName: "doc.text")
+                .font(.system(size: 13, weight: .light))
+                .foregroundColor(Palette.textTertiary)
+                .frame(width: 34, height: 34)
+                .background(Palette.fillMuted)
+                .cornerRadius(9)
+                .task(id: log.id) {
+                    viewModel.imageNeeded(bucket: .receipts, photoId: log.id)
+                }
+        }
+    }
+
     private func logRow(_ log: MaterialLog, unit: String) -> some View {
         HStack(spacing: 11) {
             Image(systemName: log.type == .entry ? "arrow.down" : "arrow.up")
@@ -171,14 +205,12 @@ struct MaterialLogSheet: View {
                 .background(log.type == .entry ? Palette.successTint : Palette.fillMuted)
                 .cornerRadius(9)
 
-            if let receipt = viewModel.receiptImages[log.id] {
-                Image(uiImage: receipt)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 34, height: 34)
-                    .clipped()
-                    .cornerRadius(9)
-                    .onTapGesture { previewedReceipt = SharePayloadImage(image: receipt) }
+            // Kapı PİKSEL değil BELGE: `receiptPath` doluysa fiş vardır, piksel
+            // bu cihazda olmasa bile. Önceden piksele bakılıyordu ve ikinci
+            // cihazda fişli kayıt fişsizden ayırt edilemiyordu — üstelik
+            // indirmeyi tetikleyecek bir hücre bile çizilmiyordu.
+            if log.receiptPath != nil || viewModel.receiptImages[log.id] != nil {
+                receiptThumbnail(log)
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -230,7 +262,3 @@ struct MaterialLogSheet: View {
 }
 
 /// Tam ekran fiş önizlemesi için kimlikli sarmalayıcı.
-struct SharePayloadImage: Identifiable {
-    let id = UUID()
-    let image: UIImage
-}

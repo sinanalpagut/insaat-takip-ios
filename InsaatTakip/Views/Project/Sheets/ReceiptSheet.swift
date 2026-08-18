@@ -23,6 +23,13 @@ struct ReceiptSheet: View {
     @State private var date = Date()
     /// Kamerayla çekilen fiş görseli (küçültülmüş).
     @State private var receiptImage: UIImage?
+
+    /// Kullanıcı düzenleme kipinde kayıtlı fişi X ile KALDIRDI mı.
+    ///
+    /// `receiptImage == nil` bunu söyleyemiyor: "hiç yoktu" ile "kaldırdım"
+    /// aynı görünüyor ve ViewModel ikincisini birincisi sanıp kaldırmayı
+    /// sessizce yutuyordu. Niyet ayrı taşınıyor.
+    @State private var receiptCleared = false
     @State private var showCamera = false
     @State private var showNewMaterial = false
     /// Fişten cihaz üstü OCR ile okunanlar (arka planda çalışır).
@@ -184,6 +191,7 @@ struct ReceiptSheet: View {
                                 Button {
                                     self.receiptImage = nil
                                     self.reading = nil
+                                    self.receiptCleared = true
                                 } label: {
                                     Image(systemName: "xmark")
                                         .font(.system(size: 12, weight: .semibold))
@@ -237,16 +245,28 @@ struct ReceiptSheet: View {
                 referenceText = log.note
                 date = log.date
                 receiptImage = viewModel.receiptImages[log.id]
+                // Piksel bellekte olmayabilir (ikinci cihaz, yeniden açılış).
+                // İstek burada başlar; gelince aşağıdaki onChange forma bağlar.
+                viewModel.imageNeeded(bucket: .receipts, photoId: log.id)
                 return
             }
             // Tasarımdaki gibi: seçili malzemenin güncel birim fiyatı hazır gelir.
             if selectedMaterialId == nil { selectedMaterialId = materials.first?.id }
             syncUnitPrice()
         }
+        // İndirme onAppear'dan SONRA tamamlanabilir. `onAppear` tek seferlik
+        // kopya aldığı için bu olmadan form "fiş yok" durumunda kalır ve
+        // kullanıcı fişi yeniden çekmeye yönelirdi. Kullanıcı henüz elle
+        // dokunmadıysa (yeni fotoğraf yok, kaldırma yok) inen görsel bağlanır.
+        .onChange(of: viewModel.receiptImages[editingLogId ?? UUID()]) { incoming in
+            guard receiptImage == nil, !receiptCleared, let incoming else { return }
+            receiptImage = incoming
+        }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker(
                 onCapture: { image in
                     receiptImage = image
+                    receiptCleared = false
                     showCamera = false
                     scanReceipt(image)
                 },
@@ -461,6 +481,12 @@ struct ReceiptSheet: View {
         }
     }
 
+    /// Formdaki fiş durumunun ViewModel'e söylediği niyet.
+    private var receiptEdit: ProjectViewModel.ReceiptEdit {
+        if let receiptImage { return .replaced(receiptImage) }
+        return receiptCleared ? .cleared : .unchanged
+    }
+
     private func save() {
         let role = appState.currentUser?.role ?? .partner
         if let editingLogId {
@@ -470,7 +496,7 @@ struct ReceiptSheet: View {
                                                 unitPriceText: unitPriceText,
                                                 reference: referenceText,
                                                 date: date,
-                                                receiptImage: receiptImage)
+                                                receipt: receiptEdit)
             if saved { dismiss() }
             return
         }

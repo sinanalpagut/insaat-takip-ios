@@ -117,6 +117,12 @@ struct MaterialLog: Codable, Identifiable, Equatable {
     var note: String          // "İrsaliye #4471 · Yılmaz Yapı" / "5. kat perde donatısı"
     var user: String          // Kaydı giren kişi
 
+    /// Fiş görselinin Storage yolu. DOLU olması, görselin buluta yazıldığının
+    /// tek kanıtı — "yükleniyor" cihaza özgü bir durum ve belgeye YAZILMAZ
+    /// (iki cihaz birbirinin durumunu ezerdi). Görselin kendisi burada değil:
+    /// `projects/{projectId}/{kova}/{id}.jpg` yolunda duruyor.
+    var receiptPath: String? = nil
+
     var dateText: String { Fmt.shortDate(date) }
 
     /// "+12.500 kg" / "−6.800 kg"

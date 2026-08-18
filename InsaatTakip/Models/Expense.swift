@@ -54,6 +54,12 @@ struct Expense: Codable, Identifiable, Equatable {
     var note: String            // "3. hakediş", "Şubat SGK"
     var user: String            // Kaydı giren
 
+    /// Fiş görselinin Storage yolu. DOLU olması, görselin buluta yazıldığının
+    /// tek kanıtı — "yükleniyor" cihaza özgü bir durum ve belgeye YAZILMAZ
+    /// (iki cihaz birbirinin durumunu ezerdi). Görselin kendisi burada değil:
+    /// `projects/{projectId}/{kova}/{id}.jpg` yolunda duruyor.
+    var receiptPath: String? = nil
+
     var dateText: String { Fmt.shortDate(date) }
 
     /// Satır alt metni: "Kalıpçı Ekibi · 3. hakediş" (boş olanlar atlanır)

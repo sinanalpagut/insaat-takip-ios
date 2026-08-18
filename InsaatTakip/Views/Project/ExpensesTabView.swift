@@ -8,6 +8,9 @@ struct ExpensesTabView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ProjectViewModel
 
+    /// Tam ekranda açılan gider fişi.
+    @State private var previewedReceipt: SharePayloadImage?
+
     let projectId: UUID
 
     private var expenses: [Expense] { viewModel.expenses(for: projectId) }
@@ -36,8 +39,14 @@ struct ExpensesTabView: View {
                     .padding(.top, 4)
 
                     ForEach(expenses) { expense in
-                        ExpenseRowView(expense: expense,
-                                       hasReceipt: viewModel.receiptImages[expense.id] != nil)
+                        ExpenseRowView(
+                            expense: expense,
+                            hasReceipt: expense.receiptPath != nil,
+                            receipt: viewModel.receiptImages[expense.id],
+                            onReceiptAppear: {
+                                viewModel.imageNeeded(bucket: .receipts, photoId: expense.id)
+                            },
+                            onReceiptTap: { previewedReceipt = SharePayloadImage(image: $0) })
                             .contextMenu {
                                 if isAdmin {
                                     Button(role: .destructive) {
@@ -55,6 +64,7 @@ struct ExpensesTabView: View {
             }
             .padding(.horizontal, 16)
         }
+        .receiptPreview($previewedReceipt)
     }
 
     // MARK: Özet
@@ -159,6 +169,12 @@ struct ExpensesTabView: View {
 struct ExpenseRowView: View {
     let expense: Expense
     var hasReceipt: Bool
+    /// Fiş görseli — elde varsa küçük resim, yoksa yer tutucu.
+    var receipt: UIImage?
+    /// Yer tutucu ekranda göründüğünde indirmeyi ister.
+    var onReceiptAppear: () -> Void = {}
+    /// Fişe dokunulduğunda tam ekran açar.
+    var onReceiptTap: (UIImage) -> Void = { _ in }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -188,6 +204,31 @@ struct ExpenseRowView: View {
             }
 
             Spacer()
+
+            // Fiş görseli ORTAĞA DA AÇIK: `storage.rules` malzeme/gider fişini
+            // üyeye okutuyor ve ortak aynı harcamayı listede zaten görüyor.
+            // Önceden yalnızca bir ataç rozeti vardı, o da BU CİHAZIN belleğine
+            // bakıyordu: fiş bulutta dururken ikinci cihazda ve ortakta "fiş
+            // yok" görünüyordu.
+            if hasReceipt {
+                if let receipt {
+                    Image(uiImage: receipt)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 30, height: 30)
+                        .clipped()
+                        .cornerRadius(8)
+                        .onTapGesture { onReceiptTap(receipt) }
+                } else {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 12, weight: .light))
+                        .foregroundColor(Palette.textTertiary)
+                        .frame(width: 30, height: 30)
+                        .background(Palette.fillMuted)
+                        .cornerRadius(8)
+                        .task(id: expense.id) { onReceiptAppear() }
+                }
+            }
 
             Text(Fmt.compactMoney(expense.amount))
                 .font(.sora(14.5, .bold))
