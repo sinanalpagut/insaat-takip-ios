@@ -369,22 +369,29 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
 #
 ---
 
-## BEKLEYEN — sunucu tarafı (18 Ağu 2026)
+## Sunucu tarafı — TAMAMI YAYINDA (18 Ağu 2026)
 
-**`redeemInvite` Cloud Function'ı YAYINDA DEĞİL — davet akışı yayında hiç
-çalışmadı.** İlk deploy denemesi Google Cloud'un derleme servis hesabı izni
-yüzünden düştü ve geriye `FAILED` durumda (`CloudRunServiceNotFound`) boş bir
-kayıt bıraktı; Firebase o kaydı güncelleyemiyor ("Cannot update a GCFv2
-function without storage"). IAM izni verildi (varsayılan compute servis
-hesabına `Cloud Build Service Account`). Kalan adım bozuk kaydı silmek:
+`firestore.rules`, `firestore.indexes`, `storage.rules` ve `redeemInvite`
+Cloud Function'ı yayında ve bağımsız doğrulandı:
 
-    sh scripts/firebase.sh functions:delete redeemInvite --region europe-west1 --force
-    sh scripts/firebase.sh deploy --only functions
+- Kimliksiz Storage isteği dört yolda da 403 (paymentReceipts, receipts,
+  sitePhotos, ham yükleme).
+- Kimliksiz `redeemInvite` çağrısı HTTP 401 + `signed-in-required` — bu
+  bizim yazdığımız makine-okur hata anahtarı, yani istek işlevin İÇİNE girip
+  kimlik kapısından döndü; genel bir ağ geçidi hatası değil.
 
-Deploy edilecek sürüm ayrıca bir KVKK düzeltmesi taşıyor: `displayName()`
-profilinde ad olmayan kişinin TELEFON NUMARASINI `partners/{id}.name` alanına
-yazıyordu ve o koleksiyon projenin tüm üyelerine açık — numara diğer
-ortakların cihazına iniyordu. Artık "Yeni ortak".
+`redeemInvite` ilk denemede Google Cloud'un derleme servis hesabı izni
+yüzünden düşmüş ve geriye `FAILED` durumda (`CloudRunServiceNotFound`) bir
+kayıt bırakmıştı; Firebase o kaydı güncelleyemiyordu. Çözüm: varsayılan
+compute servis hesabına `Cloud Build Service Account` rolü + bozuk kaydı
+silip yeniden oluşturmak. **Ders:** yeni Firebase projelerinde ilk işlev
+deploy'u bu izin yüzünden düşebiliyor ve hata mesajı asıl sebebi
+("update edilemiyor") ikinci bir kusur gibi gösteriyor.
+
+Yayına çıkan sürüm bir KVKK düzeltmesi taşıyor: `displayName()` profilinde ad
+olmayan kişinin TELEFON NUMARASINI `partners/{id}.name` alanına yazıyordu ve
+o koleksiyon projenin tüm üyelerine açık — numara diğer ortakların cihazına
+iniyordu. Artık "Yeni ortak".
 
 ---
 
