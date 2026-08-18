@@ -10,6 +10,14 @@ struct ReceiptSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let projectId: UUID
+
+    /// PROJE BAZLI rol — global rol DEĞİL. `appState.isAdmin` her gerçek
+    /// oturuma `.admin` veriyor (rol artık projede yaşıyor, kullanıcıda değil —
+    /// madde 16j); global bakılınca davetle katılan ORTAK burada yönetici
+    /// muamelesi görür.
+    private var isAdmin: Bool {
+        viewModel.role(inProject: projectId, for: appState.currentUser) == .admin
+    }
     /// Doluysa form düzenleme kipindedir: yeni fiş açmak yerine bu kaydı düzeltir.
     var editingLogId: UUID? = nil
 
@@ -488,7 +496,7 @@ struct ReceiptSheet: View {
     }
 
     private func save() {
-        let role = appState.currentUser?.role ?? .partner
+        let role: UserRole = isAdmin ? .admin : .partner
         if let editingLogId {
             let saved = viewModel.updateReceipt(role: role, logId: editingLogId,
                                                 type: direction,

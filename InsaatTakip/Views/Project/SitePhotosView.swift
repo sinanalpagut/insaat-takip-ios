@@ -202,7 +202,8 @@ struct SitePhotosView: View {
         guard !pickedItems.isEmpty else { return }
         let items = pickedItems
         pickedItems = []
-        let role = appState.currentUser?.role ?? .partner
+        // Proje bazlı rol; yukarıdaki `isAdmin` ile aynı kaynak.
+        let role: UserRole = isAdmin ? .admin : .partner
 
         Task.detached(priority: .userInitiated) {
             var images: [UIImage] = []

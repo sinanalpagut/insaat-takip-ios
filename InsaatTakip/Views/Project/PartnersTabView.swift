@@ -11,6 +11,14 @@ struct PartnersTabView: View {
 
     let projectId: UUID
 
+    /// PROJE BAZLI rol — global rol DEĞİL. `appState.isAdmin` her gerçek
+    /// oturuma `.admin` veriyor (rol artık projede yaşıyor, kullanıcıda değil —
+    /// madde 16j); global bakılınca davetle katılan ORTAK burada yönetici
+    /// muamelesi görür.
+    private var isAdmin: Bool {
+        viewModel.role(inProject: projectId, for: appState.currentUser) == .admin
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 10) {
@@ -33,7 +41,7 @@ struct PartnersTabView: View {
                 }
 
                 // Ortak görünümü: davet yetkisinin kimde olduğunu açıklayan not.
-                if appState.isPartner {
+                if !isAdmin {
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "info.circle")
                             .font(.system(size: 13, weight: .medium))

@@ -257,7 +257,9 @@ struct ProjectDetailView: View {
                     darkHeaderIcon("ellipsis")
                 }
 
-                Text(appState.currentUser?.role.chipText ?? "")
+                // Rozet BU PROJEDEKİ rolü söylüyor. Global rol yazılsaydı davetle
+                // katılan ortak da başlıkta "YÖNETİCİ" görürdü.
+                Text((isAdmin ? UserRole.admin : UserRole.partner).chipText)
                     .font(.manrope(9.5, .extraBold))
                     .tracking(0.5)
                     .textCase(.uppercase)
@@ -309,7 +311,7 @@ struct ProjectDetailView: View {
             let shareTotal = partners.reduce(0) { $0 + $1.sharePercent }
             return "\(partners.count) ortak · hisse %\(shareTotal) tanımlı"
         case .belgeler:
-            let role = appState.currentUser?.role ?? .partner
+            let role: UserRole = isAdmin ? .admin : .partner
             let docs = viewModel.documents(for: projectId, role: role)
             let totalMB = docs.reduce(0) { $0 + $1.sizeMB }
             var text = "\(docs.count) dosya · \(Fmt.megabytes(totalMB))"

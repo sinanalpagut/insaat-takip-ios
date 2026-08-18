@@ -10,6 +10,14 @@ struct DocumentsTabView: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
 
     let projectId: UUID
+
+    /// PROJE BAZLI rol — global rol DEĞİL. `appState.isAdmin` her gerçek
+    /// oturuma `.admin` veriyor (rol artık projede yaşıyor, kullanıcıda değil —
+    /// madde 16j); global bakılınca davetle katılan ORTAK burada yönetici
+    /// muamelesi görür.
+    private var isAdmin: Bool {
+        viewModel.role(inProject: projectId, for: appState.currentUser) == .admin
+    }
     /// Filtre çipleri bu görünümün içinde; koyu başlık sekmeye göre yükseklik değiştirmesin diye.
     @Binding var filter: Filter
 
@@ -73,7 +81,7 @@ struct DocumentsTabView: View {
                         Text(filter == .tumu ? "Henüz dosya yok" : "Bu kategoride dosya yok")
                             .font(.manrope(13.5, .bold))
                             .foregroundColor(Palette.ink)
-                        Text(appState.isAdmin
+                        Text(isAdmin
                              ? "Plan, ruhsat ve sözleşmeleri \"＋ Dosya Ekle\" ile yükleyebilirsin"
                              : "Yönetici dosya yükledikçe burada görünecek")
                             .font(.manrope(11.5, .medium))
