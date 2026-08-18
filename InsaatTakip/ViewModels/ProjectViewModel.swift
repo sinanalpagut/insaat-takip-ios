@@ -157,6 +157,7 @@ final class ProjectViewModel: ObservableObject {
         // olmasa oturum ortasındaki bir `refresh()` kullanıcının az önce
         // eklediği fotoğrafları bile yer tutucuya çevirirdi.
         hydrateImages()
+        hydrateDocuments()
     }
 
     // MARK: - Görsel canlandırma ve yükleme (madde 17)
@@ -199,6 +200,24 @@ final class ProjectViewModel: ObservableObject {
         }
 
         hydrateReceipts(images)
+    }
+
+    /// Yarım kalmış BELGE yüklemeleri (madde 23).
+    ///
+    /// Ölçüt fişlerdekiyle aynı mantık: belgede yol YOK ama diskte kopya VAR.
+    /// Görsellerdeki gibi "elde piksel var mı" diye bakılamıyor çünkü belge
+    /// baytı belleğe hiç alınmıyor — 50 MB'lık bir dosyayı RAM'de tutmak için
+    /// sebep yok, disk zaten tek doğruluk kaynağı.
+    ///
+    /// Gerçek cihaz turunda bu döngünün yokluğu görüldü: kural eksikken
+    /// reddedilen yükleme bir daha hiç denenmiyordu; kural düzeltildikten
+    /// sonra bile kullanıcının dosyayı yeniden seçmesi gerekiyordu.
+    private func hydrateDocuments() {
+        guard let files else { return }
+        for document in documents where document.storagePath == nil
+            && files.hasLocalCopy(projectId: document.projectId, id: document.id) {
+            uploadDocument(document)
+        }
     }
 
     /// Fişlerin yarım kalmış yüklemeleri.
@@ -2209,6 +2228,13 @@ final class ProjectViewModel: ObservableObject {
                 #if DEBUG
                 print("[document] yükleme başarısız \(document.id): \(error)")
                 #endif
+                // SESSİZ KALMIYOR. Önce yalnızca DEBUG günlüğüne yazılıyordu:
+                // listede satır duruyor, dosyası olmadığı ancak indirmeye
+                // basınca anlaşılıyordu. Gerçek cihaz turunda birebir yaşandı —
+                // kural eksikken yükleme reddedildi ve kullanıcı hiçbir şey
+                // görmedi. Kayıt SİLİNMİYOR: bayt diskte duruyor ve sonraki
+                // açılışta yeniden denenecek (bkz. hydrateDocuments).
+                self.flash("Dosya yüklenemedi · sonra yeniden denenecek")
             }
         }
     }

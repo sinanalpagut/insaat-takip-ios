@@ -606,32 +606,38 @@ projesi kullanılmalı — kurallar zaten yayında.
         kimliği ele verirdi.
       · Durum çipleri SÜZÜLMEMİŞ listeden sayıyor (çipe basmadan önce kaç
         daire olduğu görünsün); aynı çipe ikinci dokunuş süzgeci kaldırıyor.
-- [~] 23. Belgelerin gerçekten açılabilmesi/indirilmesi — **SUNUCU YARISI BİTTİ**
-      · Bugün belge özelliği İKİ UÇTAN DA VİTRİN: `handlePickedFile` güvenlik
-        kapsamlı erişimi açıp yalnızca dosya BOYUTUNU okuyor, kapatıyor ve
-        URL'i atıyor (baytlara bir daha erişilemiyor); ardından `withAnimation`
-        ile SAHTE ilerleme çubuğu oynuyor (kodun yorumu "mock — henüz sunucu
-        yok"). "İndir" düğmesi ise yalnızca `flash("… indiriliyor")` diyor.
-      · **YAPILDI (commit `5dd845f`)**: `documents` için AYRI Storage kural
-        bloğu + 6 emülatör testi. Ayrı olması şart çünkü görsel kalıbına
-        eklemek gizlilik sızıntısı açıyordu — görsellerde yetki KOVA düzeyinde,
-        belgede `partnerVisible` BELGE bazında. Kova düzeyinde açılsaydı
-        ortağın üst verisini göremediği sözleşmenin BAYTLARI okunabilirdi
-        (dekont kararının aynısı). Kural kardeş Firestore belgesine çapraz
-        servis `get()` ile bakıyor. 152/152 test; mutasyonla sınandı.
-      · Nesne adı = Firestore belge kimliği, UZANTI YOK (kural kimliği yoldan
-        çözebilmeli). Gerçek ad ve uzantı Firestore'da duracak.
-      · **KALAN — istemci yarısı:**
-        (a) Baytları kurtar: kapsam AÇIKKEN dosyayı sandbox'a kopyala.
-            `ImageStore` baştan sona `UIImage`/JPEG'e bağlı (jpg soneki,
-            jpegData, contentType sabit) — belge için AYRI depo gerekiyor.
-        (b) `ProjectDocument`'e `storagePath` + gerçek dosya adı/uzantı ekle.
-            Bugün `deletingPathExtension` ile uzantı geri dönülemez biçimde
-            atılıyor; önizleme uzantıya bağlı. `fileType` enum'u yalnızca rozet
-            rengi (bilinmeyen her tür PDF sayılıyor), gerçek MIME değil.
-        (c) Sahte ilerleme çubuğunu gerçek yüklemeye bağla ya da kaldır.
-        (d) Açma/indirme: projede QuickLook/ShareLink/önizleme altyapısı HİÇ
-            yok, sıfırdan gelecek.
+- [x] 23. Belgelerin gerçekten açılabilmesi/indirilmesi — **TAMAM (18 Ağu 2026)**
+      · Özellik İKİ UÇTAN DA VİTRİNDİ: `handlePickedFile` güvenlik kapsamlı
+        erişimi açıp yalnızca BOYUTU okuyor, kapatıyor ve URL'i atıyordu —
+        baytlara bir daha erişilemiyordu; ardından 0,9 saniyede %100'e giden,
+        ağdaki hiçbir şeye bağlı olmayan sahte bir ilerleme çubuğu oynuyordu
+        (kodun kendi yorumu "mock" diyordu); "İndir" düğmesi ise yalnızca
+        "… indiriliyor" yazan bir bildirim gösteriyordu.
+      · `DocumentStore` (yeni): `ImageStore`'un iki katlı deseni ama ayrı tip —
+        `ImageStore` baştan sona UIImage/JPEG'e bağlı, belge PDF/DWG olabiliyor
+        ve 50 MB'a çıkabiliyor. `copyIn` kapsam AÇIKKEN sandbox'a kopyalıyor.
+        Büyük dosya belleğe alınmıyor: `copyItem`, `putFile`, `writeAsync`.
+      · Modele `fileExtension`, `contentType`, `storagePath` eklendi. Uzantı
+        önce geri dönülemez biçimde atılıyordu; önizleme dosyayı ADINDAN
+        tanıyor. `fileType` enum'u yalnızca rozet rengi, gerçek MIME değil.
+      · `storage.rules`'ta AYRI blok: görünürlük KOVA değil BELGE bazlı
+        (`partnerVisible`), kural kardeş Firestore belgesine çapraz servis
+        `get()` ile bakıyor. Kova düzeyinde açılsaydı Firestore'da kapatılan
+        sızıntı Storage'dan geri açılırdı. 152/152 test, mutasyonla sınandı.
+      · `DocumentPreview` (yeni): projedeki İLK önizleme yüzeyi, QuickLook.
+        Paylaşma/yazdırma düğmelerini kendisi getiriyor.
+      · Başarısız yükleme artık GÖRÜNÜR ("sonra yeniden denenecek") ve
+        `hydrateDocuments` açılışta "belgede yol yok + diskte kopya var" olanları
+        yeniden deniyor. İkisinin yokluğu gerçek cihaz turunda görüldü: kural
+        eksikken yükleme sessizce reddedildi ve kullanıcının dosyayı yeniden
+        seçmekten başka çaresi yoktu.
+      · GERÇEK CİHAZDA UÇTAN UCA DOĞRULANDI: PDF seçildi → 232.632 bayt
+        `application/pdf` olarak üretim kovasına indi (nesne adı uzantısız belge
+        kimliği) → indirme okuna basılınca QuickLook'ta GERÇEK DOSYA ADIYLA
+        açıldı. Ad'ın doğru görünmesi uzantı düzeltmesinin doğrudan kanıtı.
+      · TUZAK: kural yazılıp emülatörde test edildi ama YAYINA ÇIKARILMADI;
+        ilk gerçek yükleme bu yüzden reddedildi. Yeni Storage yolu = kural yaz +
+        test et + **deploy et**.
 - [x] 24. ~~Fiş OCR'ı~~ — **tamamlandı** (commit `92f1554`, cihaz üstü Vision)
 - [x] 25. m² maliyeti ve malzeme fiyat geçmişi — **TAMAM (18 Ağu 2026)**
       · **Fiyat geçmişi.** Veri zaten kayıtlıydı (her giriş fişi kendi birim
