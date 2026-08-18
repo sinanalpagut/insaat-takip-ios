@@ -401,7 +401,38 @@ projesi kullanılmalı — kurallar zaten yayında.
 
 ## Faz 3 — Ürün değeri
 
-- [ ] 20. Ortak cari hesabı (`sharePercent` ile pay hesabı)
+- [x] 20. Ortak cari hesabı (`sharePercent` ile pay hesabı) — **TAMAM (18 Ağu 2026)**
+      · `sharePercent` ölü veriydi: hiçbir çarpımda geçmiyordu ve GİRİLEMİYORDU
+        bile — kurucuya sabit %100, davetle katılana %0, değiştirecek ne ekran
+        ne fonksiyon. Pay çarpımı yazılsaydı da her ortağın payı 0 ₺ çıkardı.
+      · YÖNTEM: üç bağımsız tasarım (yeni koleksiyonsuz özet / iki defterli
+        cari hesap / nakit odaklı), dokuz hakem (dürüstlük, gizlilik,
+        gerçekçilik). İki defterli tasarımlar aynı yerde kırıldı: müteahhit
+        sermaye ve çekim kayıtlarını girmezse defter BOŞ kalıyor ve ekran ya
+        yanıltıcı bir sıfır ya da `openingCost` yüzünden yanıltıcı bir büyük
+        eksi üretiyor. En küçük dürüst çözüm seçildi, hakem bulgularıyla
+        sertleştirildi.
+      · TEK SATIRLIK "PAYIN X ₺" YOK, bilerek: `netAmount` geliri TAHAKKUK
+        esasıyla (satılan dairenin tam bedeli), gideri bugüne kadar girilenden
+        alıyor. Maketten satışta para önce girer, maliyet sonra çıkar; yarısı
+        bitmiş projede tek rakam madde 1'deki hatanın KİŞİSELLEŞMİŞ hâli
+        olurdu. Onun yerine dört rakamın paya bölünmüş hâli + kapsam kutusu
+        (kalan inşaat maliyeti, rezerve kaporası, vergi/finansman/tedarikçi
+        vadesi, sermaye-çekim defterinin henüz olmadığı).
+      · `Kurus.split`: paylar EN BÜYÜK KALAN yöntemiyle, toplamları tutara
+        birebir eşit. Tek tek yuvarlansa %33/%33/%34'te toplam bozulur ve
+        yönetici "toplamı tutmayan üç rakam" görürdü.
+      · YAN BULGU 1 — denetim izi YANLIŞ KİŞİYİ yazıyordu: altı kayıt türünün
+        "kim" alanı sabit `User.admin.name` idi, yani gerçek projede fişi kim
+        girerse girsin denetimde demo adı görünüyordu. Şeffaflık iddiası "kim,
+        ne zaman" cevabına dayanıyor; cevap yanlışsa iz kanıt değil süstür.
+      · YAN BULGU 2 — `redeemInvite`, profilinde ad olmayan kişinin TELEFON
+        NUMARASINI `partners/{id}.name` alanına yazıyordu ve o koleksiyon tüm
+        üyelere açık: numara diğer ortakların cihazına iniyordu. Artık
+        "Yeni ortak".
+      · KALAN (madde 20b, istenirse): gerçek cari hesap — ortağın koyduğu
+        sermaye ve çektiği para için ayrı defter. Bugün kapsam kutusunda
+        "henüz tutulmuyor" diye AÇIKÇA yazılı.
 - [ ] 21. Vade hatırlatıcı + gecikmiş tahsilat listesi
 - [ ] 22. Daire/alıcı arama ve filtreleme
 - [ ] 23. Belgelerin gerçekten açılabilmesi/indirilmesi
