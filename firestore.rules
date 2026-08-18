@@ -197,6 +197,30 @@ service cloud.firestore {
         allow delete: if isOwner(pid);
       }
 
+      // ─────────────── Alıcı kimliği: YALNIZCA yöneticiye ───────────────
+      //
+      // `buyers/{apartmentId}` → { apartmentId, projectId, name }
+      //
+      // NEDEN AYRI BELGE: güvenlik kuralı ALAN GİZLEYEMEZ. Bir belgeyi okumaya
+      // izin verir ya da vermez. `buyerName` daire belgesinde kaldığı sürece
+      // ortağın cihazına İNER; ekranda gizlemek yalnızca görüntüyü değiştirir,
+      // sızıntıyı kapatmaz. (Belgelerdeki `partnerVisible` ile aynı ders.)
+      //
+      // NEDEN GİZLİ: ortak bir yatırımcı ve payını hesaplamak için daire
+      // durumunu, bedeli, tahsilatı görmesi gerekiyor — bunlar `apartments`
+      // belgesinde açık. Ama ALICININ KİMLİĞİ hiçbir yatırım amacına hizmet
+      // etmiyor ve o kişi müteahhidin ortaklarına görünmeye rıza vermedi.
+      // KVKK veri minimizasyonu tam olarak bunu söylüyor. Şeffaflık iddiası
+      // zayıflamıyor: iddia para akışı üzerine, alıcı listesi üzerine değil.
+      //
+      // Belge kimliği = daire kimliği: yönetici tek sorguyla projenin tüm
+      // alıcılarını çekip dairelerle eşleştiriyor.
+      match /buyers/{apartmentId} {
+        allow read: if isOwner(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
       match /partners/{docId} {
         allow read: if isMember(pid);
         allow create, update: if ownerWrite(pid);

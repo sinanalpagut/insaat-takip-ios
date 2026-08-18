@@ -379,6 +379,61 @@ describe('alt koleksiyonların tamamı aynı yetki kalıbına uyuyor', () => {
   }
 });
 
+// ═══════════════════════════ Alıcı kimliği ═══════════════════════════
+
+describe('projects/{pid}/buyers — alıcı adı yalnızca yöneticide', () => {
+  before(async () => {
+    await seed();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'projects', P1, 'buyers', 'apt-1'), {
+        apartmentId: 'apt-1', projectId: P1, name: 'Ayşe Tuna',
+      });
+    });
+  });
+
+  it('sahip alıcı adını okur', async () => {
+    await assertSucceeds(getDoc(doc(ownerDb, 'projects', P1, 'buyers', 'apt-1')));
+  });
+
+  it('ORTAK alıcı adını OKUYAMAZ — asıl mesele bu', async () => {
+    // Daire belgesini okuyabiliyor (durum, bedel, tahsilat görmeli) ama
+    // alıcının kimliği ayrı belgede ve kapalı. Kural ALAN gizleyemediği için
+    // ayırmak tek yol: aynı belgede kalsa ortağın cihazına inerdi.
+    await assertFails(getDoc(doc(memberDb, 'projects', P1, 'buyers', 'apt-1')));
+  });
+
+  it('ortak alıcı listesini çekemez', async () => {
+    await assertFails(getDocs(collection(memberDb, 'projects', P1, 'buyers')));
+  });
+
+  it('üye olmayan hiç okuyamaz', async () => {
+    await assertFails(getDoc(doc(strangerDb, 'projects', P1, 'buyers', 'apt-1')));
+  });
+
+  it('ortak DAİREYİ hâlâ okuyabiliyor — gizlenen yalnızca kimlik', async () => {
+    // Gizlilik, ortağın yatırımcı olarak payını hesaplamasını engellememeli.
+    await assertSucceeds(getDoc(doc(memberDb, 'projects', P1, 'apartments', 'apt-1')));
+  });
+
+  it('sahip alıcı adı yazar', async () => {
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'buyers', 'apt-2'), {
+      apartmentId: 'apt-2', projectId: P1, name: 'Mehmet Demir',
+    }));
+  });
+
+  it('ORTAK alıcı adı yazamaz', async () => {
+    await assertFails(setDoc(doc(memberDb, 'projects', P1, 'buyers', 'apt-3'), {
+      apartmentId: 'apt-3', projectId: P1, name: 'uydurma',
+    }));
+  });
+
+  it('yanlış projectId ile yazılamaz', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'projects', P1, 'buyers', 'apt-4'), {
+      apartmentId: 'apt-4', projectId: P2, name: 'Ayşe Tuna',
+    }));
+  });
+});
+
 // ═══════════════════════════ Belge görünürlüğü ═══════════════════════════
 
 describe('projects/{pid}/documents — partnerVisible', () => {

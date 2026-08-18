@@ -264,7 +264,29 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
             · 18. maddenin ÖN KOŞULUYDU: "ortak alıcı adını görmesin" ancak
               "bu projede kim ortak" cevaplanınca yazılabilir.
 - [ ] 17. Storage (fiş/daire/belge görselleri, `storagePath`, `uploadState`)
-- [ ] 18. Gizliliğin sorgu düzeyinde uygulanması
+- [ ] 18. Gizliliğin sorgu düzeyinde uygulanması — **sunucu tarafı hazır (18 Ağu 2026)**
+      · KARAR: ortak bir YATIRIMCI. Payını hesaplamak için daire durumunu,
+        bedeli, tahsil edilen tutarı ve satış tarihini görmesi gerekiyor —
+        bunlar açık kalıyor. ALICININ KİMLİĞİ gizleniyor: hiçbir yatırım
+        amacına hizmet etmiyor ve o kişi müteahhidin ortaklarına görünmeye
+        rıza vermedi. Şeffaflık iddiası zayıflamıyor; iddia PARA AKIŞI
+        üzerine, alıcı listesi üzerine değil.
+      · ŞEMA: `projects/{pid}/buyers/{apartmentId}` → { apartmentId, projectId,
+        name }, yalnızca yöneticiye açık. Belge kimliği = daire kimliği, yani
+        yönetici tek sorguyla tüm alıcıları çekip dairelerle eşleştiriyor.
+      · NEDEN AYRI BELGE: kural ALAN GİZLEYEMEZ, belgeye izin verir ya da
+        vermez. `buyerName` daire belgesinde kaldıkça ortağın CİHAZINA İNER;
+        ekranda gizlemek sızıntıyı kapatmaz. (Belgelerdeki `partnerVisible`
+        ile aynı ders.)
+      · 8 test, mutasyonla sınandı: alıcı okumasını üyelere açınca tam 2 test
+        düşüyor. Ortak daireyi HÂLÂ okuyabiliyor — gizlenen yalnızca kimlik.
+      · KAPSAM DIŞI bırakıldı: serbest metin notları (`Payment.note`,
+        `MaterialLog.note`) yapısal olarak korunamaz, kullanıcı ne yazarsa
+        yazar. Bu bir politika/arayüz konusu, şema konusu değil.
+      · KALAN İŞ (istemci): `Apartment.CodingKeys`ten `buyerName` çıkarılacak
+        (türetilen malzeme toplamlarıyla aynı desen), satışta daire + alıcı
+        belgesi tek partide yazılacak, `load()`te yalnızca yönetici `buyers`
+        çekip birleştirecek, ortakta ad nil kalacak ve arayüz onu göstermeyecek.
 - [x] 19. Stok toplamlarında atomik güncelleme — **çözüm değişti, sorun kapandı**
       Maddenin önerdiği `FieldValue.increment`'in hedeflediği `accruedCost += ...`
       deseni Faz 1/13'te kalktı; toplamlar hareketlerden türetiliyor. Ama sorun
