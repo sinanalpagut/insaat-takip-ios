@@ -121,7 +121,7 @@ struct NewMaterialSheet: View {
     }
 
     private func create() {
-        guard let material = viewModel.addMaterial(role: appState.currentUser?.role ?? .partner,
+        guard let material = viewModel.addMaterial(role: viewModel.role(inProject: projectId, for: appState.currentUser),
                                                    projectId: projectId,
                                                    name: name, subtitle: subtitle,
                                                    unit: unit, unitPriceText: unitPriceText)

@@ -59,7 +59,13 @@ struct ProjectDetailView: View {
     /// Daire detayından "Daire Bilgisini Düzenle" seçilince kapanışta açılacak kayıt.
     @State private var pendingApartmentEdit: UUID?
 
-    private var isAdmin: Bool { appState.isAdmin }
+    /// BU PROJEDEKİ rol — global rol değil. Davet edilen ortak `.admin`
+    /// açıldığı için global rol kullanılsa ortağa yönetici düğmeleri görünür,
+    /// bastığında yazma sunucuda reddedilirdi.
+    private var isAdmin: Bool {
+        viewModel.projects.first { $0.id == projectId }?
+            .role(for: appState.currentUser) == .admin
+    }
 
     private var project: Project? {
         viewModel.projects.first { $0.id == projectId }

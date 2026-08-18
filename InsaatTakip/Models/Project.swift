@@ -47,6 +47,19 @@ struct Project: Codable, Identifiable, Equatable {
     /// Meta satırı: "Çayırova, Kocaeli · 5 Kat / 20 Daire"
     var meta: String { "\(district), \(city) · \(floors) Kat / \(totalApartments) Daire" }
 
+    /// BU PROJEDEKİ rol. Global roldan farklı olabilir ve doğrusu budur:
+    /// kişi kendi projesinde yönetici, davet edildiği projede ortaktır.
+    ///
+    /// Sunucu zaten böyle çalışıyor — güvenlik kuralı yazmayı `ownerUid`e,
+    /// okumayı `memberUids`e bağlıyor. İstemcinin global rol kullanması iki
+    /// modelin ayrışması demekti: davet edilen ortak `.admin` açıldığı için
+    /// ekranda yönetici düğmelerini görüyor, basıyor ve yazma SUNUCUDA
+    /// reddediliyordu — güvenlik açığı değil ama yalan bir arayüz.
+    func role(for user: User?) -> UserRole {
+        guard let user else { return .partner }
+        return ownerUid == user.id ? .admin : .partner
+    }
+
     /// %90 ve üzeri ilerleme yeşil (success) paletine geçer.
     var isNearComplete: Bool { progress >= 90 }
 }

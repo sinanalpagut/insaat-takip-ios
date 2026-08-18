@@ -112,7 +112,7 @@ struct MaterialLogSheet: View {
         ), presenting: pendingDelete) { log in
             Button("Vazgeç", role: .cancel) { }
             Button("Sil", role: .destructive) {
-                viewModel.deleteReceipt(role: appState.currentUser?.role ?? .partner, logId: log.id)
+                viewModel.deleteReceipt(role: isAdmin ? .admin : .partner, logId: log.id)
             }
         } message: { log in
             Text("\(log.signedAmount(unit: material?.unit ?? "")) · \(log.note)\nStok ve maliyet yeniden hesaplanır; işlem değişiklik kaydına geçer.")

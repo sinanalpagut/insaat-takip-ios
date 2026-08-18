@@ -97,7 +97,7 @@ struct ApartmentDetailSheet: View {
             Button(apartment?.status == .reserved ? "Rezervi kaldır" : "Satışı iptal et",
                    role: .destructive) {
                 guard let apartment else { return }
-                viewModel.cancelSale(role: appState.currentUser?.role ?? .partner,
+                viewModel.cancelSale(role: isAdmin ? .admin : .partner,
                                      apartmentId: apartment.id)
                 dismiss()
             }
@@ -112,7 +112,7 @@ struct ApartmentDetailSheet: View {
             CameraPicker(
                 onCapture: { image in
                     if let apartment {
-                        viewModel.addApartmentPhotos(role: appState.currentUser?.role ?? .partner,
+                        viewModel.addApartmentPhotos(role: isAdmin ? .admin : .partner,
                                                      apartmentId: apartment.id, images: [image])
                     }
                     showCamera = false
@@ -308,7 +308,7 @@ struct ApartmentDetailSheet: View {
         .contextMenu {
             if isAdmin {
                 Button(role: .destructive) {
-                    viewModel.removeApartmentPhoto(role: appState.currentUser?.role ?? .partner,
+                    viewModel.removeApartmentPhoto(role: isAdmin ? .admin : .partner,
                                                    photoId: photo.id)
                 } label: {
                     Label("Görseli sil", systemImage: "trash")
@@ -462,7 +462,7 @@ struct ApartmentDetailSheet: View {
         .contextMenu {
             if isAdmin {
                 Button(role: .destructive) {
-                    viewModel.deletePayment(role: appState.currentUser?.role ?? .partner, id: payment.id)
+                    viewModel.deletePayment(role: isAdmin ? .admin : .partner, id: payment.id)
                 } label: {
                     Label("Tahsilatı sil", systemImage: "trash")
                 }

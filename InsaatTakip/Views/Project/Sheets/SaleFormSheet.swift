@@ -261,7 +261,7 @@ struct SaleFormSheet: View {
             viewModel.flash("Daire seçilmedi")
             return
         }
-        let saved = viewModel.saveSale(role: appState.currentUser?.role ?? .partner,
+        let saved = viewModel.saveSale(role: viewModel.role(inProject: projectId, for: appState.currentUser),
                                        apartmentId: apartment.id,
                                        buyerName: buyerName,
                                        priceText: priceText,

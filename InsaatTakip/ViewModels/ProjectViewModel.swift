@@ -242,6 +242,23 @@ final class ProjectViewModel: ObservableObject {
     /// · Ortak    → yalnızca davetle katıldığı projeler (Partner.userId)
     /// Önceden dashboard TÜM projeleri listeliyordu; bir projeye davet edilen
     /// ortak, diğer projelerin alıcı adlarını ve cirosunu da görüyordu.
+    /// Kullanıcının BU PROJEDEKİ rolü. Global rol değil (bkz. Project.role(for:)).
+    ///
+    /// View'lar yetki sorusunu buradan soruyor; `appState.currentUser?.role`
+    /// geçmek davet edilen ortağa yönetici arayüzü göstermek demekti.
+    /// Proje bulunamazsa en kısıtlı rol: bilinmeyen bir projede yazma yetkisi
+    /// varsaymak, yanlış tarafta hata yapmak olurdu.
+    func role(inProject projectId: UUID, for user: User?) -> UserRole {
+        projects.first { $0.id == projectId }?.role(for: user) ?? .partner
+    }
+
+    /// Daire üzerinden aynı soru (sheet'lerin bir kısmı projeyi değil daireyi taşıyor).
+    func role(forApartment apartmentId: UUID, user: User?) -> UserRole {
+        guard let projectId = apartments.first(where: { $0.id == apartmentId })?.projectId
+        else { return .partner }
+        return role(inProject: projectId, for: user)
+    }
+
     func visibleProjects(for user: User?) -> [Project] {
         guard let user else { return [] }
         // Üyelik `memberUids` üzerinden okunur; Partner kaydı üzerinden DEĞİL.

@@ -180,7 +180,7 @@ struct ExpenseSheet: View {
     }
 
     private func save() {
-        let saved = viewModel.addExpense(role: appState.currentUser?.role ?? .partner,
+        let saved = viewModel.addExpense(role: viewModel.role(inProject: projectId, for: appState.currentUser),
                                          projectId: projectId,
                                          category: category,
                                          amountText: amountText,

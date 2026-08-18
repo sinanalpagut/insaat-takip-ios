@@ -217,7 +217,7 @@ struct UploadSheet: View {
             viewModel.flash("Önce dosya seç")
             return
         }
-        viewModel.addDocument(role: appState.currentUser?.role ?? .partner,
+        viewModel.addDocument(role: viewModel.role(inProject: projectId, for: appState.currentUser),
                               projectId: projectId,
                               group: category,
                               fileName: fileName,

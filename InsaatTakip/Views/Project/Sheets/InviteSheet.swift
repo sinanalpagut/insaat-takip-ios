@@ -32,7 +32,7 @@ struct InviteSheet: View {
                         viewModel.copyInviteCode(invite.code)
                     }
                     OutlineButton(title: "Yeni Kod") {
-                        viewModel.generateInviteCode(role: appState.currentUser?.role ?? .partner,
+                        viewModel.generateInviteCode(role: viewModel.role(inProject: projectId, for: appState.currentUser),
                                                     projectId: projectId)
                     }
                 }
@@ -73,7 +73,7 @@ struct InviteSheet: View {
 
             PrimaryButton(title: "Proje Davet Kodu Üret") {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                    viewModel.generateInviteCode(role: appState.currentUser?.role ?? .partner,
+                    viewModel.generateInviteCode(role: viewModel.role(inProject: projectId, for: appState.currentUser),
                                                 projectId: projectId)
                 }
             }

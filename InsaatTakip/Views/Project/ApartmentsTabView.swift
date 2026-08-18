@@ -17,7 +17,11 @@ struct ApartmentsTabView: View {
     /// imkânsızdı — yani düzenleme formu tam olarak var olma sebebine erişemiyordu.
     var onEditInfo: (Apartment) -> Void
 
-    private var isAdmin: Bool { appState.isAdmin }
+    /// Proje bazlı rol (bkz. Project.role(for:)).
+    private var isAdmin: Bool {
+        viewModel.projects.first { $0.id == projectId }?
+            .role(for: appState.currentUser) == .admin
+    }
 
     private var apartments: [Apartment] {
         viewModel.apartments(for: projectId)

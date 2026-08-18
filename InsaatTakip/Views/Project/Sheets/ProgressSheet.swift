@@ -73,7 +73,7 @@ struct ProgressSheet: View {
             .padding(.top, 10)
 
             PrimaryButton(title: "Kaydet") {
-                viewModel.updateProgress(role: appState.currentUser?.role ?? .partner,
+                viewModel.updateProgress(role: viewModel.role(inProject: projectId, for: appState.currentUser),
                                          projectId: projectId,
                                          progress: Int(progress), phase: phase)
                 dismiss()

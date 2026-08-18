@@ -32,7 +32,7 @@ struct DocumentsTabView: View {
 
     /// Görünür belgeler (rol + filtre uygulanmış), grup sırasıyla.
     private var groupedDocuments: [(ProjectDocument.Group, [ProjectDocument])] {
-        let visible = viewModel.documents(for: projectId, role: appState.currentUser?.role ?? .partner)
+        let visible = viewModel.documents(for: projectId, role: viewModel.role(inProject: projectId, for: appState.currentUser))
             .filter { filter.matches($0.group) }
         return ProjectDocument.Group.allCases.compactMap { group in
             let docs = visible.filter { $0.group == group }

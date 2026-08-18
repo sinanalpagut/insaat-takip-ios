@@ -206,7 +206,7 @@ struct ApartmentEditSheet: View {
     }
 
     private func save() {
-        let saved = viewModel.updateApartment(role: appState.currentUser?.role ?? .partner,
+        let saved = viewModel.updateApartment(role: viewModel.role(forApartment: apartmentId, user: appState.currentUser),
                                               apartmentId: apartmentId,
                                               type: type.isEmpty ? "—" : type,
                                               area: area.isEmpty ? "—" : area,

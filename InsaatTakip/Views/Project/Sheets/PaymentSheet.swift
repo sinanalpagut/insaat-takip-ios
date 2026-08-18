@@ -203,7 +203,7 @@ struct PaymentSheet: View {
     }
 
     private func save() {
-        let saved = viewModel.addPayment(role: appState.currentUser?.role ?? .partner,
+        let saved = viewModel.addPayment(role: viewModel.role(forApartment: apartmentId, user: appState.currentUser),
                                          apartmentId: apartmentId,
                                          amountText: amountText,
                                          method: method, note: note,

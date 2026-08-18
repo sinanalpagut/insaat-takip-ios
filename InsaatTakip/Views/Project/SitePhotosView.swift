@@ -19,7 +19,8 @@ struct SitePhotosView: View {
         viewModel.projects.first { $0.id == projectId }
     }
 
-    private var isAdmin: Bool { appState.isAdmin }
+    /// Proje bazlı rol (bkz. Project.role(for:)).
+    private var isAdmin: Bool { project?.role(for: appState.currentUser) == .admin }
 
     private let columns = [
         GridItem(.flexible(), spacing: 7),

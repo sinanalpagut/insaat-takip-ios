@@ -11,7 +11,11 @@ struct ExpensesTabView: View {
     let projectId: UUID
 
     private var expenses: [Expense] { viewModel.expenses(for: projectId) }
-    private var isAdmin: Bool { appState.isAdmin }
+    /// Proje bazlı rol (bkz. Project.role(for:)).
+    private var isAdmin: Bool {
+        viewModel.projects.first { $0.id == projectId }?
+            .role(for: appState.currentUser) == .admin
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -37,7 +41,7 @@ struct ExpensesTabView: View {
                             .contextMenu {
                                 if isAdmin {
                                     Button(role: .destructive) {
-                                        viewModel.deleteExpense(role: appState.currentUser?.role ?? .partner,
+                                        viewModel.deleteExpense(role: isAdmin ? .admin : .partner,
                                                                 id: expense.id)
                                     } label: {
                                         Label("Gideri sil", systemImage: "trash")
