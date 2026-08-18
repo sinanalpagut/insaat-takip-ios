@@ -395,6 +395,57 @@ iniyordu. Artık "Yeni ortak".
 
 ---
 
+## Gerçek cihaz turu — TUR A yarıda (18 Ağu 2026)
+
+iPhone 13 Pro (`51B0D092-721A-5A8C-8C50-3A1D8275EB48`) bağlandı, cihaz
+derlemesi imzalandı ve kuruldu. Tur A (gerçek Firebase, `-emulator` YOK)
+başladı ve iki gerçek bulgu verdi — ikisi de simülatörde YAPISAL olarak
+görünmüyor çünkü orada push hiç çalışmıyor:
+
+1. **`UIBackgroundModes` içinde `remote-notification` yoktu** (düzeltildi,
+   commit `800d6b3`). iOS açılışta uyarıyor ve `content-available`
+   bildirimlerini güvenilir teslim etmiyor; Firebase telefon doğrulaması tam
+   olarak o sessiz push'a dayanıyor.
+2. **Kimlik hataları okunamıyordu** (düzeltildi). "Kod Gönder" 17006 alıyor
+   ama ekranda "Giriş yapılamadı" yazıyordu; kullanıcı bunu "SMS gelmedi" diye
+   okudu. Artık `.providerDisabled` ve `.appVerificationFailed` ayrı durumlar;
+   ikincisi APNs sınıfını topluyor (17054, missingAppToken, appNotVerified,
+   captchaCheckFailed, invalidAppCredential) — bu turun asıl aradığı hata
+   sınıfı o ve eski hâliyle görünmez oluyordu.
+
+**BEKLEYEN — telefonla giriş sağlayıcısı hâlâ KAPALI.** Konsolda açıldığı
+söylendi ama sunucu hâlâ 17006 (`ERROR_OPERATION_NOT_ALLOWED`) döndürüyor ve
+bağımsız sorgu bunu doğruluyor:
+
+    GET https://identitytoolkit.googleapis.com/v1/projects?key=<API_KEY>
+    → signIn: {}          # phoneNumber anahtarı HİÇ YOK
+
+Yani kayıt sunucuya işlenmemiş (Save'e basılmamış olabilir ya da Identity
+Platform tarafında ayrı bir adım gerekiyor). Doğru yer:
+`console.firebase.google.com/project/insaat-takip-e5683/authentication/providers`
+→ Sign-in method → Phone → Enable → **Save**. Aynı sorgu `phoneNumber` anahtarı
+döndürdüğünde sağlayıcı gerçekten açıktır; uygulamayı denemeden önce bununla
+teyit et.
+
+Tur A'nın kalanı (SMS'in gelmesi, APNs sessiz doğrulamasının çalışıp
+çalışmadığı, kod ekranı, isim, dashboard) HENÜZ DENENMEDİ.
+
+Tur B (kamera, gerçek 12-48 MP HEIC küçültme ve bellek, kesintili şantiye ağı
++ bekleyen-yazma şeridi, dolu depolama dalı) hiç başlamadı; kurulumu hazır:
+`sh scripts/emulator-device.sh` + cihaz derlemesine `-emulator <IP>:8080`.
+
+Komutlar:
+
+    xcodebuild -project InsaatTakip.xcodeproj -scheme InsaatTakip \
+      -destination 'platform=iOS,id=51B0D092-721A-5A8C-8C50-3A1D8275EB48' build
+    xcrun devicectl device install app --device 51B0D092-… <app>
+    xcrun devicectl device process launch --device 51B0D092-… --console \
+      --terminate-existing com.sinanalpagut.insaattakip
+
+Cihaz KİLİTLİ olduğunda başlatma reddediliyor ("Locked") — kilidi açık tut.
+
+---
+
 ## Gerçek cihaz turu — simülatörde KANITLANAMAYAN işler
 
 Simülatör hızlı döngü için doğru araç: arayüz, iş mantığı ve sunucu kuralları
