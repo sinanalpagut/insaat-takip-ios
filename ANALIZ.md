@@ -263,7 +263,7 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
               başkasının projesindeki yetkiyi belirlemiyor.
             · 18. maddenin ÖN KOŞULUYDU: "ortak alıcı adını görmesin" ancak
               "bu projede kim ortak" cevaplanınca yazılabilir.
-- [~] 17. Storage (fiş/daire/belge görselleri, `storagePath`) — **2/3 TAMAM (18 Ağu 2026)**
+- [x] 17. Storage (fiş/daire/belge görselleri, `storagePath`) — **TAMAM (18 Ağu 2026), uçtan uca kanıtlı**
       · (1/3) `storage.rules` + 15 emülatör testi. Yetki FIRESTORE'UN AYNASI:
         kurallar çapraz servis `firestore.get()` ile `projects/{pid}` belgesine
         bakıyor. Yetki iki yerde tekrarlansaydı biri güncellenip diğeri
@@ -292,16 +292,35 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
           uçuştaki yükleme yetim nesne bırakıyordu, açılışta bütün projelerin
           bütün görselleri sınırsız iniyordu (indirme artık ekrandaki hücreye
           bağlı).
-      · KALAN (3/3): fiş görselleri — `materialLogs`, `payments`, `expenses`
-        üç kayıt türü de `receiptImages` sözlüğünü paylaşıyor. Tahsilat
-        dekontu `paymentReceipts` kovasına, malzeme/gider fişi `receipts`
-        kovasına gidecek (kural ve testler hazır, istemci yok).
+      · (3/3) Fiş ve dekont görselleri. Üç kayıt türü (`materialLogs`,
+        `payments`, `expenses`) tek `receiptImages` sözlüğünü paylaşıyordu ve
+        piksel yalnızca RAM'deydi — "Fiş kaydedildi" deniyor, uygulama
+        kapanınca fotoğraf uçuyordu.
+        - KOVA AYRIMI gizliliğin ayağı: malzeme + gider fişi `receipts`
+          (ortak OKUR — aynı harcamayı listede zaten görüyor), tahsilat
+          dekontu `paymentReceipts` (YALNIZCA YÖNETİCİ — dekontun üstünde
+          gönderenin adı ve çoğu kez IBAN'ı var, yani madde 18'in alıcı
+          kimliği). Kova çözümü TEK YERDE: yanlış kova = yetki sızıntısı.
+        - "Fişi kaldır" sessizce yutuluyordu: `UIImage?` ile nil hem
+          "dokunmadım" hem "kaldırdım" demekti. Üç durumlu `ReceiptEdit`.
+        - Göstergeler RAM'e bakıyordu; fiş bulutta dururken ikinci cihazda ve
+          ortakta "fiş yok" görünüyordu. Kapı artık `receiptPath`.
+        - Dört silme yolu (fiş, tahsilat, gider, SATIŞ İPTALİ) Storage'a hiç
+          dokunmuyordu. Satış iptali en keskini: N dekont, belgeler
+          silindikten sonra kimlikler geri gelmez.
+        - Dekont hiçbir ekranda gösterilmiyordu; kalıcı olmayınca yalnızca
+          eksiklikti, kalıcı olunca kişisel veriyi süresiz saklayıp
+          karşılığını vermemek olurdu. Yöneticiye özel dekont küçük resmi ve
+          dokunulabilir gider fişi eklendi.
       · ERTELENDİ → madde 23: BELGE baytları (PDF/DWG). Bugün `documents`
         yalnızca üst veri tutuyor; asıl engel dosya seçicide güvenlik
         kapsamlı URL'in seçim anında bırakılması — ayrı bir iş.
-      · YAPILMADI: `storage.rules` yayına ÇIKMADI. Yayındaki sürüm eski
-        (dekont ortağa açık). Fiş istemcisi (3/3) gelmeden önce
-        `npm run rules:deploy` çalıştırılmalı.
+      · BEKLEYEN: `storage.rules` yayına ÇIKAMADI — Firebase projesinde
+        Storage kovası henüz açılmamış ("Get Started" konsolda tek seferlik,
+        koşul kabulü ve KALICI konum seçimi içeriyor; `europe-west1`
+        seçilmeli, Functions ve Firestore ile aynı bölge). Kova açılınca
+        `npm run rules:deploy`. O ana kadar YAYINDA görsel yükleme zaten
+        çalışmıyor (kova yok); emülatörde her şey kanıtlı.
 - [x] 18. Gizliliğin sorgu düzeyinde uygulanması — **TAMAM (18 Ağu 2026), uçtan uca kanıtlı**
       · KARAR: ortak bir YATIRIMCI. Payını hesaplamak için daire durumunu,
         bedeli, tahsil edilen tutarı ve satış tarihini görmesi gerekiyor —
