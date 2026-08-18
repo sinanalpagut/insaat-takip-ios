@@ -670,6 +670,85 @@ final class ProjectViewModel: ObservableObject {
             }
     }
 
+    // MARK: - Dışa aktarma (madde 26)
+
+    /// Bir projenin dışa aktarılabilir dosyaları.
+    ///
+    /// `role` dosyaların İÇERİĞİNİ belirliyor, erişimini değil: rapor ekranı
+    /// ortağa bilerek açık (şeffaflık iddiasının dayanağı), ama alıcı kimliği
+    /// ortağın eline geçen dosyaya girmemeli.
+    func exportFiles(for projectId: UUID, role: UserRole) -> [URL] {
+        guard let project = projects.first(where: { $0.id == projectId }) else { return [] }
+        let isAdmin = role == .admin
+        let stem = ProjectExporter.safeName(project.title)
+
+        var urls: [URL] = []
+
+        let logs = materialLogs.filter { $0.projectId == projectId }
+        if !logs.isEmpty,
+           let url = ProjectExporter.write(
+            ProjectExporter.materialLogsCSV(logs: logs,
+                                            materials: materials(for: projectId)),
+            name: "\(stem)-Malzeme-Hareketleri.csv") {
+            urls.append(url)
+        }
+
+        let projectExpenses = expenses.filter { $0.projectId == projectId }
+        if !projectExpenses.isEmpty,
+           let url = ProjectExporter.write(ProjectExporter.expensesCSV(projectExpenses),
+                                           name: "\(stem)-Giderler.csv") {
+            urls.append(url)
+        }
+
+        let projectApartments = apartments(for: projectId)
+        if !projectApartments.isEmpty,
+           let url = ProjectExporter.write(
+            ProjectExporter.apartmentsCSV(projectApartments, includeBuyer: isAdmin),
+            name: "\(stem)-Daireler.csv") {
+            urls.append(url)
+        }
+
+        let projectPayments = payments.filter { $0.projectId == projectId }
+        if !projectPayments.isEmpty,
+           let url = ProjectExporter.write(
+            ProjectExporter.paymentsCSV(projectPayments, apartments: projectApartments),
+            name: "\(stem)-Tahsilatlar.csv") {
+            urls.append(url)
+        }
+
+        let backup = ProjectExporter.Backup(
+            surum: 1,
+            olusturma: Date(),
+            aliciDahil: isAdmin,
+            proje: project,
+            malzemeler: materials(for: projectId),
+            malzemeHareketleri: logs,
+            giderler: projectExpenses,
+            daireler: projectApartments,
+            tahsilatlar: projectPayments,
+            ortaklar: partners(for: projectId),
+            belgeler: documents.filter { $0.projectId == projectId && (isAdmin || $0.partnerVisible) },
+            alicilar: isAdmin ? buyersSnapshot(for: projectId) : [],
+            denetimIzi: auditEntries.filter { $0.projectId == projectId })
+        if let data = ProjectExporter.backupJSON(backup),
+           let url = ProjectExporter.writeData(data, name: "\(stem)-Yedek.json") {
+            urls.append(url)
+        }
+
+        return urls
+    }
+
+    /// Yedek için alıcı kayıtları. Bellekte dairenin üstünde duruyor
+    /// (`buyerName`), Firestore'da ayrı belgede — yedeğe ayrı dizi olarak
+    /// giriyor, bkz. `ProjectExporter.Backup`.
+    private func buyersSnapshot(for projectId: UUID) -> [ApartmentBuyer] {
+        apartments(for: projectId).compactMap { apartment in
+            guard let name = apartment.buyerName, !name.isEmpty else { return nil }
+            return ApartmentBuyer(apartmentId: apartment.id,
+                                  projectId: projectId, name: name)
+        }
+    }
+
     // MARK: - m² maliyeti (madde 25)
 
     /// Projenin m² maliyeti ve o rakamın hangi zemine dayandığı.

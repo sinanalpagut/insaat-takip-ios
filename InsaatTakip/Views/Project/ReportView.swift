@@ -5,6 +5,7 @@ import SwiftUI
 // AYLIK SATIŞ çubuk grafiği (≥7 M ₺ koyu bakır, altı açık) ve PDF paylaşımı.
 
 struct ReportView: View {
+    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
@@ -12,6 +13,8 @@ struct ReportView: View {
 
     @State private var period: ProjectViewModel.ReportPeriod = .ceyrek
     @State private var sharePayload: SharePayload?
+    /// CSV/JSON dışa aktarma — birden çok dosya birlikte paylaşılıyor.
+    @State private var exportPayload: ExportPayload?
 
     private var project: Project? {
         viewModel.projects.first { $0.id == projectId }
@@ -40,9 +43,34 @@ struct ReportView: View {
                     }
                     .padding(.top, 6)
 
-                    Text("Rapor tüm ortaklara otomatik olarak da gönderilebilir.")
+                    // CSV/JSON — madde 26. PDF tek sayfalık özet; mali müşavir
+                    // SATIR SATIR veri istiyor ve müteahhit bu yüzden paralel
+                    // Excel tutuyordu.
+                    Button {
+                        exportData()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "tablecells")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Excel (CSV) ve Yedek")
+                                .font(.manrope(14, .bold))
+                        }
+                        .foregroundColor(Palette.ink)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Palette.surface)
+                        .cornerRadius(14)
+                        .overlay(RoundedRectangle(cornerRadius: 14)
+                            .stroke(Palette.border, lineWidth: 1))
+                    }
+                    .padding(.top, 8)
+
+                    Text(isAdmin
+                         ? "CSV dosyaları Excel'de doğrudan açılır. Yedek dosyası alıcı bilgisini de içerir."
+                         : "CSV dosyaları Excel'de doğrudan açılır. Alıcı bilgisi yalnızca yöneticide görünür.")
                         .font(.manrope(11.5, .medium))
                         .foregroundColor(Palette.textTertiary)
+                        .multilineTextAlignment(.center)
 
                     Spacer().frame(height: 40)
                 }
@@ -56,6 +84,25 @@ struct ReportView: View {
         .sheet(item: $sharePayload) { payload in
             ShareSheet(items: [payload.url])
         }
+        .sheet(item: $exportPayload) { payload in
+            ShareSheet(items: payload.urls)
+        }
+    }
+
+    /// BU PROJEDEKİ rol — dışa aktarılan dosyanın İÇERİĞİNİ belirliyor.
+    private var isAdmin: Bool {
+        viewModel.role(inProject: projectId, for: appState.currentUser) == .admin
+    }
+
+    /// CSV dosyalarını ve JSON yedeğini üretip paylaşım sayfasını açar.
+    private func exportData() {
+        let urls = viewModel.exportFiles(for: projectId,
+                                         role: isAdmin ? .admin : .partner)
+        guard !urls.isEmpty else {
+            viewModel.flash("Dışa aktarılacak kayıt yok")
+            return
+        }
+        exportPayload = ExportPayload(urls: urls)
     }
 
     // MARK: Başlık
@@ -301,6 +348,12 @@ struct ReportView: View {
 struct SharePayload: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+/// Birden çok dosyayı tek paylaşımda taşır (CSV'ler + JSON yedeği).
+struct ExportPayload: Identifiable {
+    let id = UUID()
+    let urls: [URL]
 }
 
 /// UIKit paylaşım sayfası köprüsü (PDF çıktısı için).
