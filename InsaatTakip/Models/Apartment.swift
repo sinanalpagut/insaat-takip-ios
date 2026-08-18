@@ -213,8 +213,15 @@ struct Apartment: Codable, Identifiable, Equatable {
     /// Türk virgülü ZORUNLU olarak destekleniyor (demo verisinde üç ayrı
     /// hassasiyet var) ve nokta da: cihaz dili İngilizce olan kullanıcı
     /// "111.55" yazar. Binlik ayracı yok — daire alanı dört haneye çıkmaz.
+    ///
+    /// SÜZGEÇ `isNumber` DEĞİL, AÇIKÇA ASCII RAKAM. Swift'te
+    /// `Character("²").isNumber` **true** döndürüyor (üst simge rakamın sayısal
+    /// değeri var). `isNumber` kullanılınca "111,55 m²" → "111,55²" oluyor,
+    /// `Double(...)` nil veriyor ve alan sessizce kayboluyordu — birim ekinin
+    /// kendisi ayrıştırmayı bozuyordu. Emülatörde eski biçimli bir belge
+    /// okutularak yakalandı: daire "3+1 · —" görünüyordu.
     static func parseLegacyArea(_ text: String) -> Double? {
-        let digits = text.filter { $0.isNumber || $0 == "," || $0 == "." }
+        let digits = text.filter { ("0"..."9").contains($0) || $0 == "," || $0 == "." }
             .replacingOccurrences(of: ",", with: ".")
         guard !digits.isEmpty, let value = Double(digits),
               value.isFinite, value > 0 else { return nil }
