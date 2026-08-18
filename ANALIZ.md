@@ -460,8 +460,20 @@ yazılmıştı ama yalnızca simülatöre yüklenmiş hazır görsellerle denenm
 Gerçek kamera karesinde tarih ve tutarı yakaladı ve tutarı forma KENDİSİ yazdı.
 Cihaz üstü olduğu için internet, ücret ve dışarı veri çıkışı yok.
 
-**Kalan Tur B maddeleri:** kesintili şantiye ağı + bekleyen-yazma şeridi,
-dolu depolama dalı. (Kamera, gerçek foto boyutu ve OCR KAPANDI.) Emülatör kurulumu: `sh scripts/emulator-device.sh` + cihaz
+**KESİNTİLİ ŞANTİYE AĞI GEÇTİ.** Uçak modunda gider kaydedildi; ekranın
+altında amber şerit belirdi: **"Bağlantı bekleniyor · 1 kayıt gönderilecek"**.
+Uçak modu kapatılınca şerit kayboldu, kayıt gönderildi. Uygulama yeniden
+başlatıldı ve veri SUNUCUDAN geldi (`önbellekten=false`) — kayıt yerinde.
+
+Bu, uygulamanın en sinsi hata sınıfına karşı yazılmış korumaydı: çevrimdışıyken
+Firestore yazmayı sessizce kuyruğa alıyor, `commit()` hata vermiyor, ekranda
+veri görünüyor ve kullanıcı kaydettiğini sanıp şantiyeden ayrılıyor. Şerit
+"gönderilmedi" diyor ve kaç kayıt beklediğini sayıyor. Gerçek kesintide ilk kez
+çalıştı.
+
+**KALAN TEK MADDE: dolu depolama dalı.** Gerçekçi biçimde denenmesi cihazın
+depolamasını doldurmayı gerektiriyor; pratik değil. Denetimde bulunan "disk
+yazılamazsa" dalı hâlâ yalnızca kodla doğru, sahada koşmadı. Emülatör kurulumu: `sh scripts/emulator-device.sh` + cihaz
 derlemesine `-- -backend firestore -emulator <IP>:8080` (argümanlardan önce
 `--` ayracı ŞART, yoksa devicectl bayrakları kendi bayrağı sanıyor).
 iOS yerel ağ izni ilk denemede reddediyor ("Local network prohibited") —
