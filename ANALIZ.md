@@ -157,8 +157,24 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
             · Özel anahtar (`*.p8`) gitignore'da — kimlik bilgisi, repoya girmez.
             · HENÜZ GERÇEK CİHAZDA DENENMEDİ: simülatörde push hiç çalışmıyor,
               bu ayarın işe yaradığı yalnızca fiziksel telefonda görülür.
-      - [ ] 16g. `redeemInvite` Cloud Function — davet akışının tek yolu.
-            **SUNUCU TARAFI BİTTİ, İSTEMCİ TARAFI DOĞRULANMADI.**
+      - [x] 16g. `redeemInvite` Cloud Function — davet akışı UÇTAN UCA ÇALIŞIYOR.
+            · DOĞRULAMA (18 Ağu 2026, simülatör + emülatör): yönetici proje kurdu
+              → davet kodu üretti (`invites/M2TJEW` Firestore'a düştü) → çıkış →
+              ikinci numarayla giriş → kod girildi → callable çalıştı. Sunucuda:
+              kod harcandı ("Serkan Ortak" tarafından), proje 2 üyeli oldu, ortak
+              kaydı ve "projeye katıldı" hareketi yazıldı. Ekranda: ortak davet
+              edildiği projeyi görüyor (145 Ada, 12 daire, 9 kalem).
+            · Ad SUNUCUDAN çözüldü (`users/{uid}`), istemci ad göndermedi.
+            · BULUNAN VE DÜZELTİLEN KUSUR — `visibleProjects` role göre süzüyordu
+              (`.admin` → yalnızca `ownerUid == uid`). Her yeni hesap `.admin`
+              açıldığı için davet edilen ortak sunucuda üye oluyor ama ekranda
+              HİÇBİR proje göremiyordu: katılma başarılı, sonuç boş ekran.
+              Artık üyeliğe bakıyor — sunucunun uyguladığı model de bu
+              (`memberUids arrayContains uid` + kural). Rol ne YAPABİLDİĞİNİ
+              belirler, ne GÖRDÜĞÜNÜ değil.
+            · Tanılama izleri bırakıldı (DEBUG): `[load]` uid + sonuç sayısı +
+              önbellekten mi geldiği. Sorgu hata vermeden boş dönebiliyor ve bu
+              sessizlik iki kez saatler kaybettirdi.
             · Blaze engeli KALKTI (17 Ağu 2026): plan yükseltildi, bütçe uyarısı
               25 TRY. Uyarı harcamayı KESMİYOR, yalnızca haber veriyor.
             · Sunucu (commit `a1a7a36`), 121/121 test: geçerli kod dört belgeyi

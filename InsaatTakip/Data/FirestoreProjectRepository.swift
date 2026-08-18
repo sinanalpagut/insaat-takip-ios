@@ -82,6 +82,12 @@ final class FirestoreProjectRepository: ProjectRepository {
         result.projects = try projectDocs.documents.map {
             try decode(Project.self, from: $0, in: "projects")
         }
+        #if DEBUG
+        // Sorgu HATA VERMEDEN boş dönebiliyor (ör. önbellekten yanıtlanırsa).
+        // Sessiz boşluğu ayırt etmek için uid, sonuç sayısı ve verinin
+        // önbellekten mi geldiği yazdırılıyor.
+        print("[load] uid=\(uid) proje=\(result.projects.count) önbellekten=\(projectDocs.metadata.isFromCache)")
+        #endif
 
         for project in result.projects {
             let pid = project.id

@@ -78,6 +78,11 @@ final class ProjectViewModel: ObservableObject {
         do {
             apply(try await repository.load())
         } catch {
+            #if DEBUG
+            // Ham hata görünmezse "yüklenemedi" mesajının NEDENİ hiçbir yerde
+            // okunamaz. Kural reddi mi, indeks mi, ağ mı — ayırt etmek şart.
+            print("[refresh] yükleme başarısız: \(error)")
+            #endif
             flash(Self.loadFailureMessage(for: error))
         }
     }
@@ -244,12 +249,22 @@ final class ProjectViewModel: ObservableObject {
         // (`whereField("memberUids", arrayContains: uid)`), o yüzden yerel filtre
         // de aynı alana bakmalı — iki kaynak ayrışırsa buluta geçişte ekran
         // sessizce farklı bir liste gösterirdi.
-        switch user.role {
-        case .admin:
-            return projects.filter { $0.ownerUid == user.id }
-        case .partner:
-            return projects.filter { $0.memberUids.contains(user.id) }
-        }
+        // ROLDEN BAĞIMSIZ. Hangi projeleri GÖRDÜĞÜNÜ üyelik belirler; rol ne
+        // YAPABİLDİĞİNİ belirler. Önceden yönetici dalı `ownerUid == user.id`
+        // süzüyordu ve bu, davet akışını sessizce kırıyordu: her yeni hesap
+        // `.admin` açıldığı için davet edilen ortak sunucuda üye oluyor ama
+        // dashboard'da hiçbir proje göremiyordu — katılma başarılı, sonuç boş
+        // ekran.
+        //
+        // Sunucu zaten bu modeli uyguluyor: Firestore sorgusu
+        // `whereField("memberUids", arrayContains: uid)` ve güvenlik kuralı
+        // okumayı üyeliğe bağlıyor. İstemcinin farklı bir ölçüt kullanması iki
+        // kaynağın ayrışması demekti.
+        //
+        // Sahip her zaman `memberUids` içinde: kural hem oluşturmada hem
+        // güncellemede `uid() in memberUids` şartını koşuyor, yani kendi
+        // projesini listeden düşürmek mümkün değil.
+        return projects.filter { $0.memberUids.contains(user.id) }
     }
 
     /// Kullanıcı bu projeyi görebiliyor mu? (Derin bağlantı / eski rota koruması)
