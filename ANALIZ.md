@@ -606,7 +606,32 @@ projesi kullanılmalı — kurallar zaten yayında.
         kimliği ele verirdi.
       · Durum çipleri SÜZÜLMEMİŞ listeden sayıyor (çipe basmadan önce kaç
         daire olduğu görünsün); aynı çipe ikinci dokunuş süzgeci kaldırıyor.
-- [ ] 23. Belgelerin gerçekten açılabilmesi/indirilmesi
+- [~] 23. Belgelerin gerçekten açılabilmesi/indirilmesi — **SUNUCU YARISI BİTTİ**
+      · Bugün belge özelliği İKİ UÇTAN DA VİTRİN: `handlePickedFile` güvenlik
+        kapsamlı erişimi açıp yalnızca dosya BOYUTUNU okuyor, kapatıyor ve
+        URL'i atıyor (baytlara bir daha erişilemiyor); ardından `withAnimation`
+        ile SAHTE ilerleme çubuğu oynuyor (kodun yorumu "mock — henüz sunucu
+        yok"). "İndir" düğmesi ise yalnızca `flash("… indiriliyor")` diyor.
+      · **YAPILDI (commit `5dd845f`)**: `documents` için AYRI Storage kural
+        bloğu + 6 emülatör testi. Ayrı olması şart çünkü görsel kalıbına
+        eklemek gizlilik sızıntısı açıyordu — görsellerde yetki KOVA düzeyinde,
+        belgede `partnerVisible` BELGE bazında. Kova düzeyinde açılsaydı
+        ortağın üst verisini göremediği sözleşmenin BAYTLARI okunabilirdi
+        (dekont kararının aynısı). Kural kardeş Firestore belgesine çapraz
+        servis `get()` ile bakıyor. 152/152 test; mutasyonla sınandı.
+      · Nesne adı = Firestore belge kimliği, UZANTI YOK (kural kimliği yoldan
+        çözebilmeli). Gerçek ad ve uzantı Firestore'da duracak.
+      · **KALAN — istemci yarısı:**
+        (a) Baytları kurtar: kapsam AÇIKKEN dosyayı sandbox'a kopyala.
+            `ImageStore` baştan sona `UIImage`/JPEG'e bağlı (jpg soneki,
+            jpegData, contentType sabit) — belge için AYRI depo gerekiyor.
+        (b) `ProjectDocument`'e `storagePath` + gerçek dosya adı/uzantı ekle.
+            Bugün `deletingPathExtension` ile uzantı geri dönülemez biçimde
+            atılıyor; önizleme uzantıya bağlı. `fileType` enum'u yalnızca rozet
+            rengi (bilinmeyen her tür PDF sayılıyor), gerçek MIME değil.
+        (c) Sahte ilerleme çubuğunu gerçek yüklemeye bağla ya da kaldır.
+        (d) Açma/indirme: projede QuickLook/ShareLink/önizleme altyapısı HİÇ
+            yok, sıfırdan gelecek.
 - [x] 24. ~~Fiş OCR'ı~~ — **tamamlandı** (commit `92f1554`, cihaz üstü Vision)
 - [x] 25. m² maliyeti ve malzeme fiyat geçmişi — **TAMAM (18 Ağu 2026)**
       · **Fiyat geçmişi.** Veri zaten kayıtlıydı (her giriş fişi kendi birim
