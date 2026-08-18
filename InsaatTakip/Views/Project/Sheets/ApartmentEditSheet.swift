@@ -64,7 +64,12 @@ struct ApartmentEditSheet: View {
 
                     HStack(alignment: .top, spacing: 10) {
                         field("TİP", text: $type, placeholder: "Örn. 3+1")
-                        field("ALAN", text: $area, placeholder: "Örn. 118 m²")
+                        // Sayısal klavye ve birimsiz yer tutucu: alan artık
+                        // sayı (Apartment.areaM2). Önce serbest metindi ve
+                        // "118", "118m2", "yaklaşık 120" hepsi kabul ediliyordu;
+                        // m² maliyeti o veriden hesaplanamıyordu.
+                        field("ALAN (m²)", text: $area, placeholder: "Örn. 118",
+                              keyboard: .decimalPad)
                     }
                     .padding(.top, 16)
 
@@ -198,7 +203,7 @@ struct ApartmentEditSheet: View {
         // Yeni projede tip/alan "—" gelir; forma boş taşınsın ki kullanıcı
         // tire silmek zorunda kalmasın.
         type = apartment.type == "—" ? "" : apartment.type
-        area = apartment.area == "—" ? "" : apartment.area
+        area = apartment.areaM2.map { Fmt.qty($0) } ?? ""
         floor = apartment.floor
         status = apartment.status
         listPriceText = apartment.price > .zero ? Fmt.moneyText(apartment.price) : ""
@@ -209,7 +214,7 @@ struct ApartmentEditSheet: View {
         let saved = viewModel.updateApartment(role: viewModel.role(forApartment: apartmentId, user: appState.currentUser),
                                               apartmentId: apartmentId,
                                               type: type.isEmpty ? "—" : type,
-                                              area: area.isEmpty ? "—" : area,
+                                              areaM2: Apartment.parseLegacyArea(area),
                                               floor: floor,
                                               status: status,
                                               listPriceText: listPriceText,

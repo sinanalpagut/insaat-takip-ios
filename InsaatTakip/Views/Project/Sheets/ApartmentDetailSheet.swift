@@ -81,7 +81,7 @@ struct ApartmentDetailSheet: View {
                         detailRow("Daire durumu", apartment.status.label)
                             .padding(.top, 14)
                         Divider().overlay(Palette.divider)
-                        detailRow("Tip / Alan", "\(apartment.type) · \(apartment.area)")
+                        detailRow("Tip / Alan", "\(apartment.type) · \(apartment.areaText)")
                         Divider().overlay(Palette.divider)
                         if apartment.isCommitted {
                             detailRow("Ödeme durumu", apartment.paymentStatus?.rawValue ?? "—")

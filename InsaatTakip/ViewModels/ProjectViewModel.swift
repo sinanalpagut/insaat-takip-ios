@@ -648,6 +648,63 @@ final class ProjectViewModel: ObservableObject {
             }
     }
 
+    // MARK: - m² maliyeti (madde 25)
+
+    /// Projenin m² maliyeti ve o rakamın hangi zemine dayandığı.
+    struct AreaCost {
+        /// Dairelerin BRÜT alan toplamı (m²). Ortak alan dahil DEĞİL.
+        let totalAreaM2: Double
+        /// Alanı girilmiş daire sayısı.
+        let measuredCount: Int
+        /// Alanı HENÜZ GİRİLMEMİŞ daire sayısı.
+        let missingCount: Int
+        /// Toplam maliyet ÷ toplam brüt alan.
+        let perM2: Kurus
+    }
+
+    /// m² maliyeti — payda TÜM dairelerin brüt alanı.
+    ///
+    /// PAYDA NEDEN TÜM DAİRELER: kat karşılığı daireyi de müteahhit inşa etti,
+    /// betonu o döktü. Yalnızca satılanlara bölünse maliyet, inşa edilmemiş bir
+    /// alana bölünmüş gibi olur ve m² maliyeti olduğundan yüksek çıkar.
+    ///
+    /// PAY NEDEN totalCost: yalnızca malzemeye bölünse müteahhidin gerçek m²
+    /// maliyetinin çok altında bir rakam çıkardı — işçilik, taşeron, arsa ve
+    /// harç dışarıda kalırdı. Madde 1'de "Net" etiketiyle reddedilen türden
+    /// yanıltıcı sayı olurdu.
+    ///
+    /// ORTAK ALAN PAYDADA YOK ve bu rakamı YUKARI çekiyor: merdiven, hol, şaft
+    /// ve sığınak da inşa edildi ama daire alanı toplamına girmiyor. Gerçek
+    /// inşaat alanı yaklaşık %15 daha büyük, dolayısıyla gerçek m² maliyeti bu
+    /// rakamın altında. Model ortak alan katsayısı TUTMUYOR (demo verisinde
+    /// yalnızca yorumda geçiyor), o yüzden uydurulmuyor — ekranda kapsam
+    /// yazılıyor.
+    ///
+    /// Alanı girilmemiş daire varsa `missingCount` ile bildiriliyor: yeni
+    /// kurulan projede TÜM daireler böyle (madde 14'te uydurma varsayılanlar
+    /// kaldırıldı), yani payda 0 olur ve rakam üretilmez.
+    func areaCost(for projectId: UUID) -> AreaCost? {
+        let roster = apartments(for: projectId)
+        guard !roster.isEmpty else { return nil }
+
+        let measured = roster.compactMap(\.areaM2).filter { $0 > 0 }
+        let total = measured.reduce(0, +)
+        // Sıfıra bölme YOK: alan girilmemişse rakam üretilmiyor. "0 ₺/m²"
+        // göstermek "maliyet yok" demek olurdu.
+        guard total > 0 else { return nil }
+
+        let cost = totalCost(for: projectId)
+        // Kurus'ta bölme operatörü yok; oran AÇIKÇA raw üzerinden hesaplanıyor
+        // ve sonuç bir kez yuvarlanıyor. Bu değer hiçbir toplamaya girmiyor,
+        // yalnızca gösterim — bu yüzden üçüncü bir yuvarlama noktası sayılmaz.
+        let perM2 = Kurus.kurus(Int64((Double(cost.raw) / total).rounded()))
+
+        return AreaCost(totalAreaM2: total,
+                        measuredCount: measured.count,
+                        missingCount: roster.count - measured.count,
+                        perM2: perM2)
+    }
+
     // MARK: - Malzeme fiyat geçmişi (madde 25)
 
     /// Tek bir alım gözlemi.
@@ -1244,7 +1301,7 @@ final class ProjectViewModel: ObservableObject {
     /// düzeltilemiyordu — raporun "1. gün bırakma anı" dediği yer burasıydı.
     /// Satış bu fonksiyondan YAPILAMAZ; .sold'a yalnızca saveSale geçirir.
     @discardableResult
-    func updateApartment(role: UserRole, apartmentId: UUID, type: String, area: String,
+    func updateApartment(role: UserRole, apartmentId: UUID, type: String, areaM2: Double?,
                          floor: Int, status: Apartment.Status,
                          listPriceText: String, deliveryNote: String) -> Bool {
         guard role == .admin else { return false }
@@ -1264,7 +1321,7 @@ final class ProjectViewModel: ObservableObject {
 
         var apartment = before
         apartment.type = type.trimmingCharacters(in: .whitespaces)
-        apartment.area = area.trimmingCharacters(in: .whitespaces)
+        apartment.areaM2 = areaM2
         apartment.floor = floor
         apartment.deliveryNote = deliveryNote.trimmingCharacters(in: .whitespaces)
         apartment.status = status
@@ -1289,8 +1346,10 @@ final class ProjectViewModel: ObservableObject {
         if before.type != apartment.type {
             changes.append(.init(field: "Tip", oldValue: before.type, newValue: apartment.type))
         }
-        if before.area != apartment.area {
-            changes.append(.init(field: "Alan", oldValue: before.area, newValue: apartment.area))
+        if before.areaM2 != apartment.areaM2 {
+            changes.append(.init(field: "Alan",
+                                 oldValue: Fmt.area(before.areaM2),
+                                 newValue: Fmt.area(apartment.areaM2)))
         }
         if before.floor != apartment.floor {
             changes.append(.init(field: "Kat", oldValue: before.floorLabel, newValue: apartment.floorLabel))
@@ -1724,7 +1783,7 @@ final class ProjectViewModel: ObservableObject {
         for n in 1...project.totalApartments {
             let apartment = Apartment(id: UUID(), projectId: project.id,
                                       apartmentNumber: n, floor: (n - 1) / perFloor + 1,
-                                      type: "—", area: "—", status: .available,
+                                      type: "—", areaM2: nil, status: .available,
                                       buyerName: nil, price: .zero, paidAmount: .zero,
                                       paymentStatus: nil, saleDate: nil,
                                       deliveryNote: "Yapım sürüyor")

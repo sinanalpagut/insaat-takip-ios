@@ -139,12 +139,23 @@ struct ReportView: View {
             summaryRow("Dönem net", Fmt.compactMoney(summary.net),
                        valueColor: summary.net >= .zero ? Palette.success : Palette.alertInk)
 
+            // m² MALİYETİ — madde 25.
+            //
+            // Dönem çipinden BAĞIMSIZ: payda projenin tüm dairelerinin brüt
+            // alanı, pay ise projenin TOPLAM maliyeti. Dönemsel maliyeti
+            // dönemsel olmayan bir alana bölmek anlamsız bir rakam üretirdi.
+            // Bu yüzden etiket "proje geneli" diyor.
+            if let area = viewModel.areaCost(for: projectId) {
+                Divider().overlay(Palette.divider)
+                summaryRow("m² maliyeti (proje geneli)", Fmt.costPerArea(area.perM2))
+            }
+
             // Bu kart ortaklara PDF olarak dağıtılıyor; kapsamı yazılı olmalı.
             HStack(alignment: .top, spacing: 7) {
                 Image(systemName: "info.circle")
                     .font(.system(size: 11, weight: .medium))
                     .padding(.top, 1)
-                Text("Yalnızca uygulamaya girilen gider kayıtlarını kapsar; vergi ve finansman giderleri dahil değildir.")
+                Text(scopeNote)
                     .font(.manrope(11, .medium))
                     .lineSpacing(2)
             }
@@ -156,6 +167,23 @@ struct ReportView: View {
         .cornerRadius(18)
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(Palette.border, lineWidth: 1))
         .shadow(color: Color(hex: 0x22262E, alpha: 0.05), radius: 3, x: 0, y: 1)
+    }
+
+    /// Raporun kapsam cümlesi. m² maliyeti eklendiğinde tek bir cümle
+    /// yetmiyor: o rakamın paydası ORTAK ALAN İÇERMİYOR ve bu onu yukarı
+    /// çekiyor — merdiven, hol, şaft ve sığınak da inşa edildi ama daire alanı
+    /// toplamına girmiyor. Gerçek inşaat alanı yaklaşık %15 daha büyük,
+    /// dolayısıyla gerçek m² maliyeti gösterilen rakamın ALTINDA. Model ortak
+    /// alan katsayısı tutmadığı için uydurulmuyor, söyleniyor.
+    private var scopeNote: String {
+        var parts = ["Yalnızca uygulamaya girilen gider kayıtlarını kapsar; vergi ve finansman giderleri dahil değildir."]
+        if let area = viewModel.areaCost(for: projectId) {
+            parts.append("m² maliyetinin paydası dairelerin brüt alan toplamı (\(Fmt.qty(area.totalAreaM2)) m², \(area.measuredCount) daire); merdiven ve hol gibi ortak alanlar dahil değil, bu yüzden gerçek m² maliyeti bir miktar daha düşüktür.")
+            if area.missingCount > 0 {
+                parts.append("\(area.missingCount) dairenin alanı henüz girilmedi.")
+            }
+        }
+        return parts.joined(separator: " ")
     }
 
     private func summaryRow(_ label: String, _ value: String, valueColor: Color = Palette.ink) -> some View {

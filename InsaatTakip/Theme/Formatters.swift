@@ -72,6 +72,20 @@ enum Fmt {
         return "\(decimal2.string(from: NSNumber(value: Double(price.raw) / 100)) ?? "") ₺/\(unit)"
     }
 
+    /// Daire alanı: 111,55 → "111,55 m²" · 95 → "95 m²" · nil → "—".
+    ///
+    /// Ondalık yalnızca gerektiğinde: "95 m²" okunur, "95,00 m²" gürültü.
+    static func area(_ value: Double?) -> String {
+        guard let value, value > 0 else { return "—" }
+        return "\(qty(value)) m²"
+    }
+
+    /// m² maliyeti: "5.680 ₺/m²". Yuvarlama tam liraya — kuruş hassasiyeti
+    /// bir m² birim maliyetinde anlamsız, üstelik payda tahminî.
+    static func costPerArea(_ value: Kurus) -> String {
+        "\(qty((Double(value.raw) / 100).rounded())) ₺/m²"
+    }
+
     /// İşaretli yüzde değişimi: 0,12 → "%+12" · -0,085 → "%−8,5" · 0 → "%0".
     ///
     /// Eksi işareti U+2212 (matematik eksisi), tire değil: tasarımın rakam

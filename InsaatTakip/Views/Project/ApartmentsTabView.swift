@@ -50,7 +50,7 @@ struct ApartmentsTabView: View {
             var haystack = [
                 "\(apartment.apartmentNumber)",
                 apartment.type,
-                apartment.area,
+                apartment.areaText,
                 Apartment.floorLabel(for: apartment.floor),
                 apartment.status.label,
             ]
@@ -426,8 +426,8 @@ struct ApartmentCellView: View {
 
             // Tip/alan girilmişse görünsün: yeni projede "—" gelir ve
             // düzenlenmesi gerektiği kartın üstünde belli olur.
-            if apartment.type != "—" || apartment.area != "—" {
-                Text("\(apartment.type) · \(apartment.area)")
+            if apartment.type != "—" || apartment.areaM2 != nil {
+                Text("\(apartment.type) · \(apartment.areaText)")
                     .font(.manrope(11, .medium))
                     .foregroundColor(Palette.textTertiary)
                     .lineLimit(1)

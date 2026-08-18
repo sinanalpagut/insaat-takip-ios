@@ -198,7 +198,7 @@ extension InMemoryProjectRepository {
         // ---- Daireler --------------------------------------------------------
         // 145 Ada / 2 Parsel: 12 satış — alıcı, bedel, ödeme ve tahsilat değerleri
         // ekran 04'teki kartların birebir aynısı. (Tahsilat 28,12 M · Kalan 14,53 M)
-        let types = [("2+1", "95 m²"), ("3+1", "128 m²"), ("3+1", "132 m²"), ("2+1", "98 m²")]
+        let types: [(String, Double)] = [("2+1", 95), ("3+1", 128), ("3+1", 132), ("2+1", 98)]
 
         // (daireNo, alıcı, bedel, ödeme, tahsil edilen, tarih)
         let p1Sales: [(Int, String, Kurus, PaymentStatus, Kurus, Date)] = [
@@ -261,7 +261,7 @@ extension InMemoryProjectRepository {
                 apartments.append(Apartment(id: UUID(), projectId: project.id,
                                             apartmentNumber: n,
                                             floor: (n - 1) / perFloor + 1,
-                                            type: t.0, area: t.1,
+                                            type: t.0, areaM2: t.1,
                                             status: status,
                                             buyerName: sale?.1 ?? (isReserved ? p1Reserved.buyer : nil),
                                             // Kat karşılığı daire bedelsizdir: arsa bedeli gider
@@ -310,7 +310,7 @@ extension InMemoryProjectRepository {
         for (no, floor, buyer, price, paid, date) in karsUnits {
             apartments.append(Apartment(id: UUID(), projectId: DemoID.kars309,
                                         apartmentNumber: no, floor: floor,
-                                        type: "3+1", area: "111,55 m²",
+                                        type: "3+1", areaM2: 111.55,
                                         status: buyer == nil ? .available : .sold,
                                         buyerName: buyer,
                                         price: price,
@@ -356,7 +356,7 @@ extension InMemoryProjectRepository {
         for (no, floor, buyer, price, paid, date) in kars327Units {
             apartments.append(Apartment(id: UUID(), projectId: DemoID.kars327,
                                         apartmentNumber: no, floor: floor,
-                                        type: "3+1", area: "103,8 m²",
+                                        type: "3+1", areaM2: 103.8,
                                         status: buyer == nil ? .available : .sold,
                                         buyerName: buyer,
                                         price: price,
