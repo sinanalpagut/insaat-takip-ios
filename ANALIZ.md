@@ -427,32 +427,37 @@ Yol boyunca üç gerçek kusur çıktı ve üçü de düzeltildi:
 bu uç noktayla ölçmek YANILTICI — tek güvenilir sinyal uygulamanın aldığı hata
 kodu.
 
-**AÇIK BULGU — fiş fotoğrafı yüklemesi ÜRETİMDE 403 alıyor.** Gerçek cihaz,
-gerçek Firebase, oturum açık ve kullanıcı projenin SAHİBİ; yine de:
+**ÇÖZÜLDÜ — üretimde Storage yüklemesi çalışıyor.** Zincirin tamamı gerçek
+cihazda, gerçek altyapıda kanıtlandı: kamera → küçültme → yükleme → kural
+denetimi.
 
-    projects/{pid}/receipts/{id}.jpg → 403 Permission denied
+Ölçüm: iPhone 13 Pro ile çekilen fiş karesi Storage'a **271.749 bayt (265 KB)**
+`image/jpeg` olarak indi. Ham 12 MP HEIC ~2-3 MB olduğuna göre küçültme yaklaşık
+10 kat indirmiş ve kuralın 4 MB tavanının çok altında. Bu rakam bugüne dek
+varsayımdı; gerçek karede ilk kez ölçüldü.
 
-Zamanlama yarışı DEĞİL: yeniden başlatmada `[load] proje=1 önbellekten=false`,
-yani proje belgesi sunucuda mevcut. `contentType` doğru (`image/jpeg`), dosya
-243 KB yani 4 MB sınırının çok altında. Geriye `isOwner(pid)` içindeki çapraz
-servis `firestore.get()` kalıyor.
+**Kök sebep ve çözüm.** Kimliği doğrulanmış, projenin SAHİBİ olan kullanıcı
+403 alıyordu. Zamanlama yarışı değildi (`[load] proje=1 önbellekten=false`,
+belge sunucuda), `contentType` ve boyut da doğruydu. Sebep `isOwner(pid)`
+içindeki çapraz servis `firestore.get()`: **proje bu çağrıları çalıştıracak
+şekilde yapılandırılmamıştı.** Firebase konsolu Storage → Rules ekranında bunu
+kendisi söylüyor ("Your rules make use of cross-service database calls, but
+your project is not configured to execute those calls") ve **"Fix issue"**
+düğmesiyle çözüyor — eksik olan servis ajanını oluşturup rolü veriyor. IAM
+ekranından elle verilemiyordu çünkü ajan henüz YARATILMAMIŞTI.
 
-Bu kural emülatörde 15 testle GEÇİYOR — fark ortamda. Üretimde çapraz servis
-kuralları Firebase Rules servis ajanının Firestore'u okuyabilmesini gerektiriyor
-ve o ajan (`service-<proje-no>@gcp-sa-firebaserules.iam.gserviceaccount.com`)
-bu projede HİÇ OLUŞTURULMAMIŞ — IAM ekranı "geçerli bir hesap değil" diyerek
-rol vermeyi reddediyor. Ajan elle yaratılamıyor; Google ilk kullanımda kendisi
-oluşturuyor. Denenecek yol: Firebase konsolunun Storage → Rules editöründen
-Publish (konsol `firestore.get()` kullanımını görüp izin akışını başlatıyor).
+Düzeltmeden sonra yeni fotoğraf çekmek GEREKMEDİ: `hydrateImages` açılışta
+"diskte dosya var, belgede yol yok" olan fişi bulup kendi yeniden yükledi —
+madde 17'de yazılan telafi yolu gerçek koşulda çalıştı.
 
-**Bunun anlamı: fiş/fotoğraf yükleme yayında bugüne dek hiç çalışmamış olacaktı.**
-Emülatör kuralları sunucuda koşturuyor ama çapraz servis izinlerini taklit
-etmiyor; bu ancak gerçek cihazda gerçek projeyle görülebilirdi. Turun tek
-başına kendini haklı çıkardığı bulgu bu.
+**Bunun anlamı: görsel yükleme yayında HİÇ çalışmıyordu.** Emülatör kuralları
+sunucuda koşturuyor ama çapraz servis izinlerini taklit etmiyor; ne simülatör
+ne emülatör bunu gösterebilirdi. İlk gerçek kullanıcı fiş çekmeye çalıştığı gün
+ortaya çıkacaktı. Gerçek cihaz turunun tek başına kendini haklı çıkardığı bulgu.
 
-**Kalan:** Tur B — kamera (`CameraPicker` hiç koşmadı), gerçek 12-48 MP HEIC
-küçültme ve bellek, kesintili şantiye ağı + bekleyen-yazma şeridi, dolu
-depolama dalı. Emülatör kurulumu: `sh scripts/emulator-device.sh` + cihaz
+**Kalan Tur B maddeleri:** kesintili şantiye ağı + bekleyen-yazma şeridi,
+dolu depolama dalı. (Kamera ve gerçek foto boyutu KAPANDI.) Fiş okuma (OCR)
+gerçek kamera karesiyle henüz teyit edilmedi. Emülatör kurulumu: `sh scripts/emulator-device.sh` + cihaz
 derlemesine `-- -backend firestore -emulator <IP>:8080` (argümanlardan önce
 `--` ayracı ŞART, yoksa devicectl bayrakları kendi bayrağı sanıyor).
 iOS yerel ağ izni ilk denemede reddediyor ("Local network prohibited") —
