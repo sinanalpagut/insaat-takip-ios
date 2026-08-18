@@ -74,6 +74,50 @@ service firebase.storage {
       allow delete: if knownCollection(collection) && isOwner(pid);
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // BELGELER (madde 23) — plan, ruhsat, sözleşme dosyaları
+    //
+    // AYRI BLOK, çünkü yukarıdaki görsel kalıbı belgeye İKİ yönden uymuyor:
+    //
+    //  1. TÜR VE BOYUT. `isSmallJpeg()` yalnızca `image/jpeg` ve 4 MB kabul
+    //     ediyor; belge PDF/DWG olabiliyor ve uygulama 50 MB duyuruyor.
+    //
+    //  2. GÖRÜNÜRLÜK BELGE BAZLI. Görsellerde yetki KOVA düzeyinde: bir kovayı
+    //     ortak ya tamamen okur ya hiç okumaz. Belgede öyle değil —
+    //     `ProjectDocument.partnerVisible` her belge için ayrı karar veriyor ve
+    //     `firestore.rules` bunu zaten uyguluyor ("gizli belge ortağın yerel
+    //     önbelleğine hiç inmez"). Kova düzeyinde açılsaydı Firestore'da
+    //     kapatılan sızıntı Storage'dan aynen geri açılırdı — tahsilat
+    //     dekontunda verilen kararın aynısı, bu sefer belge bazında.
+    //
+    // NESNE ADI = FIRESTORE BELGE KİMLİĞİ, uzantı YOK. Kural, kardeş Firestore
+    // belgesini ancak kimliği yoldan çözebilirse okuyabiliyor. Gerçek dosya adı
+    // ve uzantı Firestore belgesinde duruyor; indirilen bayt yerel geçici
+    // dosyaya o uzantıyla yazılıyor (önizleme uzantıya bakıyor).
+    match /projects/{pid}/documents/{docId} {
+
+      /// Kardeş Firestore belgesi. Yoksa `get()` null döner ve `.data`
+      /// erişimi kuralı düşürür — yani ÜST VERİSİ OLMAYAN bir nesne hiç
+      /// okunamaz. Bu kasıtlı: yetim bayt yüklenmesin.
+      function documentData() {
+        return firestore.get(
+          /databases/(default)/documents/projects/$(pid)/documents/$(docId)
+        ).data;
+      }
+
+      /// 50 MB tavan uygulamanın duyurduğu sınırla AYNI (UploadSheet).
+      /// İkisi ayrışırsa kullanıcı "yükleniyor" görüp sunucudan red alır.
+      function isAllowedDocument() {
+        return request.resource.size < 50 * 1024 * 1024
+            && request.resource.contentType != null;
+      }
+
+      allow read: if isOwner(pid)
+                  || (isMember(pid) && documentData().partnerVisible == true);
+      allow create, update: if isOwner(pid) && isAllowedDocument();
+      allow delete: if isOwner(pid);
+    }
+
     // Varsayılan: RED. Firestore kurallarındaki son satırla aynı gerekçe.
     match /{allPaths=**} {
       allow read, write: if false;

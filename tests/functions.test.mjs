@@ -276,8 +276,13 @@ describe('redeemInvite — ad sunucudan çözülür', () => {
     const partners = await listDocs(`projects/${P1}/partners`);
     const mine = partners.find((d) => d.fields.userUid?.stringValue === u.uid);
     assert.ok(mine);
-    // Anonim jetonda telefon yok → "Ortak". Uydurma bir ad değil, dürüst bir
-    // yer tutucu: yöneticinin gördüğü liste doğrulanmamış veri taşımıyor.
-    assert.equal(mine.fields.name.stringValue, 'Ortak');
+    // Profilde ad yoksa → "Yeni ortak". Uydurma bir ad değil, dürüst bir yer
+    // tutucu: yöneticinin gördüğü liste doğrulanmamış veri taşımıyor.
+    //
+    // TELEFON NUMARASI YEDEK DEĞİL: önce numaraya düşülüyordu ama
+    // `partners/{id}` belgesi projenin TÜM üyelerine açık, yani numara diğer
+    // ortakların cihazına iniyordu (KVKK). Kişi numarayı kimlik doğrulaması
+    // için verdi, ortaklara gösterilsin diye değil.
+    assert.equal(mine.fields.name.stringValue, 'Yeni ortak');
   });
 });

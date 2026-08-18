@@ -31,9 +31,12 @@ const PROJECT_ID = 'demo-insaattakip';
 const OWNER = 'uid-owner';
 const MEMBER = 'uid-member';
 const STRANGER = 'uid-stranger';
-const P1 = 'storage-p1';   // functions takımının 'project-1'i ile çakışmasın
+const P1 = 'storage-p1';
+const DOC_OPEN = 'doc-acik';      // partnerVisible: true
+const DOC_HIDDEN = 'doc-gizli';   // partnerVisible: false   // functions takımının 'project-1'i ile çakışmasın
 
 const JPEG = { contentType: 'image/jpeg' };
+const PDF = { contentType: 'application/pdf' };
 const smallImage = () => new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3]);
 
 let testEnv, ownerStorage, memberStorage, strangerStorage;
@@ -66,6 +69,20 @@ before(async () => {
     // Tahsilat dekontu — ortağa KAPALI (gönderenin adını taşır, madde 18).
     await uploadBytes(storageRef(ctx.storage(), `projects/${P1}/paymentReceipts/seed.jpg`),
                       smallImage(), JPEG);
+
+    // BELGELER (madde 23). Görünürlük KOVA değil BELGE bazlı: kural kardeş
+    // Firestore belgesindeki `partnerVisible` alanına bakıyor. İki belge
+    // kuruluyor — biri ortağa açık, biri gizli — ve baytları önceden yükleniyor.
+    await setDoc(doc(ctx.firestore(), 'projects', P1, 'documents', DOC_OPEN), {
+      id: DOC_OPEN, projectId: P1, name: 'Vaziyet Planı', partnerVisible: true,
+    });
+    await setDoc(doc(ctx.firestore(), 'projects', P1, 'documents', DOC_HIDDEN), {
+      id: DOC_HIDDEN, projectId: P1, name: 'Arsa Sözleşmesi', partnerVisible: false,
+    });
+    await uploadBytes(storageRef(ctx.storage(), `projects/${P1}/documents/${DOC_OPEN}`),
+                      smallImage(), PDF);
+    await uploadBytes(storageRef(ctx.storage(), `projects/${P1}/documents/${DOC_HIDDEN}`),
+                      smallImage(), PDF);
   });
 
   ownerStorage = testEnv.authenticatedContext(OWNER).storage();
@@ -166,5 +183,48 @@ describe('storage — silme', () => {
 
   it('ortak silemez', async () => {
     await assertFails(deleteObject(storageRef(memberStorage, `projects/${P1}/sitePhotos/seed.jpg`)));
+  });
+});
+
+describe('storage — belgeler (madde 23)', () => {
+
+  it('sahip her belgeyi okur — gizli olanı da', async () => {
+    await assertSucceeds(getBytes(
+      storageRef(ownerStorage, `projects/${P1}/documents/${DOC_HIDDEN}`)));
+  });
+
+  it('ortak partnerVisible belgeyi okur', async () => {
+    await assertSucceeds(getBytes(
+      storageRef(memberStorage, `projects/${P1}/documents/${DOC_OPEN}`)));
+  });
+
+  // Maddenin ASIL testi: Firestore'da gizlenen belgenin BAYTI da kapalı olmalı.
+  // Kova düzeyinde açılsaydı ortak üst veriyi göremeyip dosyayı indirebilirdi.
+  it('ortak GİZLİ belgeyi OKUYAMAZ — baytı da kapalı', async () => {
+    await assertFails(getBytes(
+      storageRef(memberStorage, `projects/${P1}/documents/${DOC_HIDDEN}`)));
+  });
+
+  it('sahip belge yükler', async () => {
+    await assertSucceeds(uploadBytes(
+      storageRef(ownerStorage, `projects/${P1}/documents/${DOC_OPEN}`), smallImage(), PDF));
+  });
+
+  it('ortak belge YÜKLEYEMEZ', async () => {
+    await assertFails(uploadBytes(
+      storageRef(memberStorage, `projects/${P1}/documents/${DOC_OPEN}`), smallImage(), PDF));
+  });
+
+  // NOT — yetim bayt (Firestore karşılığı olmayan nesne) YAZILABİLİR ve bu
+  // bilinçli. Yükleme kuralı kardeş belgeye BAKMIYOR; baksaydı istemcinin
+  // önce üst veriyi yazıp sunucuya ulaşmasını beklemesi gerekirdi ve
+  // Firestore'un çevrimdışı kuyruğu yüzünden yükleme sık sık reddedilirdi —
+  // şantiyede en sık karşılaşılan durum tam olarak bu. Gizlilik riski yok:
+  // OKUMA kardeş belgeyi zorunlu kılıyor, dolayısıyla üst verisi olmayan bir
+  // bayt ortağa hiçbir koşulda açılmıyor. Yalnızca sahip kendi çöpünü görür.
+
+  it('sahip belgeyi siler', async () => {
+    await assertSucceeds(deleteObject(
+      storageRef(ownerStorage, `projects/${P1}/documents/${DOC_OPEN}`)));
   });
 });
