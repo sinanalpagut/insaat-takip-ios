@@ -43,6 +43,11 @@ struct RootView: View {
                         }
                 }
                 .toastOverlay(viewModel.toast)
+                // Bekleyen yazma şeridi burada, TEK yerde: kullanıcı hangi
+                // ekranda olursa olsun görmeli. Tek tek ekranlara eklenseydi
+                // biri unutulur ve tam o ekranda veri sessizce beklerdi.
+                .pendingWritesOverlay(viewModel.showsPendingWrites,
+                                      message: viewModel.pendingWritesMessage)
                 .onAppear { seedFromLaunchConfig() }
                 // Yetkili kaynaktan tam yükleme. `cachedSnapshot()` ekranı
                 // bir kare bile boş bırakmadan açtı; bu çağrı onun üstüne

@@ -117,6 +117,56 @@ final class ProjectViewModel: ObservableObject {
         }
     }
 
+    // MARK: Bekleyen yazma görünürlüğü
+
+    /// Sunucu onayı bekleyen yazma sayısı.
+    ///
+    /// NEDEN GEREKLİ: Firestore çevrimdışıyken yazmayı KUYRUĞA alıyor ve
+    /// `commit()` yalnızca sunucu onayı gelince dönüyor. Yani `persist`in
+    /// `catch` bloğu çalışmıyor, kullanıcı "kaydedildi" görüyor ve veri
+    /// sunucuda olmuyor. Şantiyede internetin gidip geldiği bir uygulamada bu
+    /// sessiz veri kaybı demek — uygulamanın tüm rakam politikasının (bkz.
+    /// `Kurus`, `verifySeam`) tersi.
+    ///
+    /// Yazma İPTAL EDİLMİYOR: kuyruk bir kusur değil, Firestore'un çevrimdışı
+    /// özelliği; bağlantı gelince kayıt düşüyor. Yapılması gereken onu
+    /// GÖRÜNÜR kılmak.
+    @Published private(set) var pendingWrites = 0
+
+    /// Bekleme kullanıcıya gösterilecek kadar uzadı mı.
+    ///
+    /// Her kayıtta uyarı çıkarmıyoruz: normal bir yazma milisaniyeler sürüyor
+    /// ve o durumda çıkan bir şerit, gerçekten takıldığında fark edilmeyecek
+    /// bir gürültüye dönüşürdü.
+    @Published private(set) var showsPendingWrites = false
+
+    private var pendingBannerTask: Task<Void, Never>?
+    /// Bu süreden uzun süren yazma "takıldı" sayılır.
+    private static let pendingBannerDelay: UInt64 = 2_000_000_000
+
+    private func beginPendingWrite() {
+        pendingWrites += 1
+        guard pendingBannerTask == nil else { return }
+        pendingBannerTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: Self.pendingBannerDelay)
+            guard let self, !Task.isCancelled, self.pendingWrites > 0 else { return }
+            withAnimation(.easeInOut(duration: 0.2)) { self.showsPendingWrites = true }
+        }
+    }
+
+    private func endPendingWrite() {
+        pendingWrites = max(0, pendingWrites - 1)
+        guard pendingWrites == 0 else { return }
+        pendingBannerTask?.cancel()
+        pendingBannerTask = nil
+        withAnimation(.easeInOut(duration: 0.2)) { showsPendingWrites = false }
+    }
+
+    /// Bekleyen yazma şeridinin metni.
+    var pendingWritesMessage: String {
+        "Bağlantı bekleniyor · \(pendingWrites) kayıt gönderilecek"
+    }
+
     /// Bir kullanıcı eyleminin ürettiği yazmaları kaynağa iletir.
     ///
     /// Yerel durum ZATEN güncellendi (iyimser güncelleme) — Firestore'un kendi
@@ -126,8 +176,12 @@ final class ProjectViewModel: ObservableObject {
     /// Hata olursa kullanıcıya mevcut toast mekanizmasıyla söylenir.
     private func persist(_ changes: [DocumentChange], failureNote: String) {
         guard !changes.isEmpty else { return }
+        // Sayaç Task'TEN ÖNCE artıyor: Task'in içinde artsaydı, yazma
+        // başladıktan sonraki ilk karede sayı hâlâ sıfır görünürdü.
+        beginPendingWrite()
         Task { [weak self] in
             guard let self else { return }
+            defer { self.endPendingWrite() }
             do {
                 try await self.repository.apply(changes)
                 #if DEBUG

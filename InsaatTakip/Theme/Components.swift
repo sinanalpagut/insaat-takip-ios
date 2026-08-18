@@ -229,6 +229,32 @@ struct DarkHeaderButton: View {
 // MARK: - Toast
 
 /// Alt kenardan 52px yukarıda beliren onay bildirimi.
+/// Bekleyen yazma şeridi. Kehribar ton: hata DEĞİL — veri kaybolmadı, yalnızca
+/// henüz gönderilmedi. Kırmızı kullanmak "bir şey bozuldu" derdi ve yanlış olurdu.
+struct PendingWritesBar: View {
+    var message: String
+
+    var body: some View {
+        HStack(spacing: 9) {
+            ProgressView()
+                .scaleEffect(0.7)
+                .tint(Palette.ink)
+            Text(message)
+                .font(.manrope(12, .semiBold))
+                .foregroundColor(Palette.ink)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(Palette.amberDot.opacity(0.92))
+        .cornerRadius(11)
+        .shadow(color: Color(hex: 0x1C1A18, alpha: 0.18), radius: 10, x: 0, y: 5)
+        // Toast'ın üstünde kalacak kadar: toast 52pt dipten başlıyor ve
+        // ~44pt yüksekliğinde.
+        .padding(.bottom, 104)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}
+
 struct ToastView: View {
     var message: String
 
@@ -258,6 +284,25 @@ struct ToastView: View {
 
 extension View {
     /// ViewModel'deki toast mesajını ekrana bağlar.
+    /// Sunucu onayı bekleyen yazmaların şeridi.
+    ///
+    /// Toast DEĞİL, bilerek: toast bir OLAY bildirir ve söner; bekleyen yazma
+    /// bir DURUM ve kuyruk boşalana kadar ekranda kalmalı. Sönen bir uyarı,
+    /// tam da fark edilmesi gereken durumda (kullanıcı ekrana bakmıyorken
+    /// bağlantı gitti) işe yaramazdı.
+    func pendingWritesOverlay(_ visible: Bool, message: String) -> some View {
+        // ALTTA, üstte değil. Üstte denendi ve koyu başlığın üstüne binip
+        // bildirim zilini kapattı. Alt kenar zaten uygulamanın bildirim dili
+        // (toast orada) ve şerit toast'ın üstünde durup ikisi birlikte
+        // okunabiliyor.
+        overlay(alignment: .bottom) {
+            if visible {
+                PendingWritesBar(message: message)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: visible)
+    }
+
     func toastOverlay(_ message: String?) -> some View {
         overlay(alignment: .bottom) {
             if let message {

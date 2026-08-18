@@ -178,7 +178,7 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
             · SIRADAKİ İŞ: uçtan uca test. Yönetici kod üretir → ikinci numarayla
               girilir → kod kullanılır. Engel kalktı (bkz. commit `7f5a073`),
               yalnızca yapılmadı.
-      - [ ] 16i. **Bekleyen yazma kullanıcıya görünmeli** — bugün bulunan gerçek
+      - [x] 16i. **Bekleyen yazma kullanıcıya görünmeli** — YAPILDI, doğrulandı — bugün bulunan gerçek
             kusur, 16g ararken ortaya çıktı.
             · Firestore çevrimdışıyken yazmayı KUYRUĞA alıyor ve `commit()`
               yalnızca sunucu onayı gelince dönüyor. Dolayısıyla `persist`in
@@ -188,9 +188,27 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
             · Bugün bunun bir yapılandırma hatasıyla (emülatöre TLS) tetiklendiği
               görüldü ve o düzeltildi — ama kusur DURUYOR: gerçek şebekede aynı
               durum yaşanır.
-            · Yapılacak: bekleyen yazma sayısını izleyip arayüzde göstermek
-              (ör. "3 kayıt gönderilmeyi bekliyor") ve `MemoryCacheSettings`
-              KULLANMAMAK (kalıcı önbellek kuyruğu uygulama kapanınca korur).
+            · ÇÖZÜM: `ProjectViewModel.pendingWrites` sayacı + `PendingWritesBar`
+              şeridi ("Bağlantı bekleniyor · N kayıt gönderilecek"). Toast DEĞİL:
+              toast bir olay bildirir ve söner, bekleyen yazma bir DURUM ve
+              kuyruk boşalana kadar durmalı. Kehribar ton — hata değil, veri
+              kaybolmadı, yalnızca gönderilmedi.
+            · 2 saniyelik gecikme: normal yazma milisaniyeler sürüyor, her
+              kayıtta şerit çıksa gerçekten takıldığında farkedilmezdi.
+            · `RootView`de TEK yerde bağlı; ekran ekran eklenseydi biri unutulur
+              ve tam orada veri sessizce beklerdi.
+            · `MemoryCacheSettings` kaldırıldı — kalıcı önbellek kuyruğu uygulama
+              kapanınca koruyor. Doğrulandı: ölü porta bağlıyken kurulan proje
+              yeniden açılışta yerel önbellekten geldi.
+            · DOĞRULAMA: ölü porta (127.0.0.1:9999) yazma → şerit çıktı; çalışan
+              emülatörde başarılı yazma → veri düştü (12 daire, 9 malzeme, 1
+              ortak). Şerit, ÖNCEKİ takılı yazmayı doğru saydı ve çıkış/giriş
+              arasında bile bıraktı — yani sayaç gerçek durumu izliyor.
+            · YAN BULGU: Firebase oturumu KEYCHAIN'de ve uygulama silinse bile
+              hayatta kalıyor; emülatörün kullanıcı veritabanı ise her yeniden
+              başlatmada siliniyor. Sonuç: uygulama kendini giriş yapmış sanıyor,
+              jeton yenilenemiyor, yazmalar sonsuza dek kuyrukta. Emülatörle
+              çalışırken emülatör yeniden başlatıldıysa UYGULAMADAN ÇIKIŞ YAP.
             Kod doğrulama, süre/tek kullanım denetimi ve `memberUids` yazması
             yönetici adına işlevde yapılacak. 16f olmadan gerekliliği
             görünmüyordu; kurallar yazıldığı an zorunlu hale geldi.
