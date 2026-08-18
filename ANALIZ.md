@@ -369,6 +369,25 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
 #
 ---
 
+## BEKLEYEN — sunucu tarafı (18 Ağu 2026)
+
+**`redeemInvite` Cloud Function'ı YAYINDA DEĞİL — davet akışı yayında hiç
+çalışmadı.** İlk deploy denemesi Google Cloud'un derleme servis hesabı izni
+yüzünden düştü ve geriye `FAILED` durumda (`CloudRunServiceNotFound`) boş bir
+kayıt bıraktı; Firebase o kaydı güncelleyemiyor ("Cannot update a GCFv2
+function without storage"). IAM izni verildi (varsayılan compute servis
+hesabına `Cloud Build Service Account`). Kalan adım bozuk kaydı silmek:
+
+    sh scripts/firebase.sh functions:delete redeemInvite --region europe-west1 --force
+    sh scripts/firebase.sh deploy --only functions
+
+Deploy edilecek sürüm ayrıca bir KVKK düzeltmesi taşıyor: `displayName()`
+profilinde ad olmayan kişinin TELEFON NUMARASINI `partners/{id}.name` alanına
+yazıyordu ve o koleksiyon projenin tüm üyelerine açık — numara diğer
+ortakların cihazına iniyordu. Artık "Yeni ortak".
+
+---
+
 ## Gerçek cihaz turu — simülatörde KANITLANAMAYAN işler
 
 Simülatör hızlı döngü için doğru araç: arayüz, iş mantığı ve sunucu kuralları
@@ -434,7 +453,15 @@ projesi kullanılmalı — kurallar zaten yayında.
         sermaye ve çektiği para için ayrı defter. Bugün kapsam kutusunda
         "henüz tutulmuyor" diye AÇIKÇA yazılı.
 - [ ] 21. Vade hatırlatıcı + gecikmiş tahsilat listesi
-- [ ] 22. Daire/alıcı arama ve filtreleme
+- [x] 22. Daire/alıcı arama ve filtreleme — **TAMAM (18 Ağu 2026)**
+      · Arama: daire numarası, tip, alan, kat etiketi, durum metni.
+      · ALICI ADIYLA ARAMA YALNIZCA YÖNETİCİDE. Ortakta `buyerName` zaten nil
+        geliyor (madde 18), ama koşul kodda AÇIKÇA duruyor: alan bir gün
+        ortağa da inse arama kutusu "bu isim bu projede var mı" sorusuna
+        cevap veren bir KÂHİN olurdu — eşleşen tek bir daire, gizlenen
+        kimliği ele verirdi.
+      · Durum çipleri SÜZÜLMEMİŞ listeden sayıyor (çipe basmadan önce kaç
+        daire olduğu görünsün); aynı çipe ikinci dokunuş süzgeci kaldırıyor.
 - [ ] 23. Belgelerin gerçekten açılabilmesi/indirilmesi
 - [x] 24. ~~Fiş OCR'ı~~ — **tamamlandı** (commit `92f1554`, cihaz üstü Vision)
 - [ ] 25. m² maliyeti ve malzeme fiyat geçmişi
