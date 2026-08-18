@@ -315,12 +315,14 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
       · ERTELENDİ → madde 23: BELGE baytları (PDF/DWG). Bugün `documents`
         yalnızca üst veri tutuyor; asıl engel dosya seçicide güvenlik
         kapsamlı URL'in seçim anında bırakılması — ayrı bir iş.
-      · BEKLEYEN: `storage.rules` yayına ÇIKAMADI — Firebase projesinde
-        Storage kovası henüz açılmamış ("Get Started" konsolda tek seferlik,
-        koşul kabulü ve KALICI konum seçimi içeriyor; `europe-west1`
-        seçilmeli, Functions ve Firestore ile aynı bölge). Kova açılınca
-        `npm run rules:deploy`. O ana kadar YAYINDA görsel yükleme zaten
-        çalışmıyor (kova yok); emülatörde her şey kanıtlı.
+      · YAYINDA (18 Ağu 2026): kova `insaat-takip-e5683.firebasestorage.app`,
+        konum **europe-west1** — Functions ile aynı bölge, veri AB'de kalıyor.
+        Ücretsiz katman yalnızca ABD bölgelerini veriyordu; alıcı adı ve
+        dekont KVKK kapsamında kişisel veri olduğu için ABD'de barındırmak
+        "yurt dışına aktarım" olurdu, o yüzden ücretli Avrupa seçildi
+        (1200px JPEG'lerle aylık maliyet kuruşlar mertebesinde).
+        `storage.rules` yayınlandı ve bağımsız doğrulandı: kimliksiz istek
+        dört yolda da 403 (paymentReceipts, receipts, sitePhotos, yazma).
 - [x] 18. Gizliliğin sorgu düzeyinde uygulanması — **TAMAM (18 Ağu 2026), uçtan uca kanıtlı**
       · KARAR: ortak bir YATIRIMCI. Payını hesaplamak için daire durumunu,
         bedeli, tahsil edilen tutarı ve satış tarihini görmesi gerekiyor —
