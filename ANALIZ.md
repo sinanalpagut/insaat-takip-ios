@@ -242,10 +242,27 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
         4. Hesap kartı ismi düzenlemeye izin vermiyordu, ama isim ekranı
            "sonradan değiştirebilirsin" diyordu. Telefon da hiçbir yerde
            görünmüyordu — oysa kimliğin kendisi o numara.
-      · BİLİNEN SINIR: rol kullanıcı başına GLOBAL, proje başına değil. Doğrusu
-        proje başınadır (`Project.ownerUid` bunu ifade edebiliyor). Yeni hesap
-        `.admin` açılıyor çünkü aksi halde ilk kullanıcı proje kuramaz. Ayrı
-        madde olarak ele alınacak.
+      - [x] 16j. **Proje bazlı rol** — eski "bilinen sınır" KAPANDI (18 Ağu 2026,
+            commit `ddb6913`). Kişi kendi projesinde yönetici, davet edildiği
+            projede ortak. `Project.role(for:)` tek kaynak; 18 dosyadaki view
+            koşulları ve 16 ViewModel çağrısı buna bağlandı —
+            `role: appState.currentUser?.role` kalıbı kodda SIFIR.
+            · Neden bu sıra: 16g davet akışını çalışır hale getirdi, yani artık
+              GERÇEK ortaklar var. Ortak yönetici düğmelerini görüyor, basıyor,
+              yazma sunucuda reddediliyordu — güvenlik açığı değil (kural
+              tutuyor) ama yalan bir arayüz.
+            · Sunucu zaten bu modeli uyguluyordu (yazma `ownerUid`e, okuma
+              `memberUids`e bağlı); istemcinin global rol kullanması iki modelin
+              ayrışmasıydı.
+            · Proje bulunamazsa en kısıtlı rol: bilinmeyen bir projede yazma
+              yetkisi varsaymak yanlış tarafta hata yapmak olurdu.
+            · Doğrulama (aynı proje, iki rol): `-role partner` → "İZLEYİCİ"
+              rozeti, "Fiş Ekle" YOK; `-role admin` → "YÖNETİCİ", düğme var.
+            · Yeni hesap hâlâ `.admin` açılıyor — bu artık bir sorun DEĞİL:
+              global rol yalnızca "kendi projesini kurabilir" anlamına geliyor,
+              başkasının projesindeki yetkiyi belirlemiyor.
+            · 18. maddenin ÖN KOŞULUYDU: "ortak alıcı adını görmesin" ancak
+              "bu projede kim ortak" cevaplanınca yazılabilir.
 - [ ] 17. Storage (fiş/daire/belge görselleri, `storagePath`, `uploadState`)
 - [ ] 18. Gizliliğin sorgu düzeyinde uygulanması
 - [x] 19. Stok toplamlarında atomik güncelleme — **çözüm değişti, sorun kapandı**
