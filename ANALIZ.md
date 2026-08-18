@@ -395,7 +395,49 @@ iniyordu. Artık "Yeni ortak".
 
 ---
 
-## Gerçek cihaz turu — TUR A yarıda (18 Ağu 2026)
+## Gerçek cihaz turu — TUR A'nın kritik yolu GEÇTİ (18 Ağu 2026)
+
+**Telefonla giriş gerçek altyapıda uçtan uca çalışıyor.** iPhone 13 Pro,
+üretim Firebase (emülatör YOK): numara girildi → **gerçek SMS geldi** → kod →
+isim → dashboard. Sunucu teyidi: `firebase auth:export` üretimde 1 gerçek
+kullanıcı gösteriyor.
+
+**APNs sessiz doğrulaması ÇALIŞTI.** "Kod Gönder"den sonra Safari/web sayfası
+AÇILMADI — yani Firebase reCAPTCHA'ya düşmedi, sessiz push cihaza ulaştı ve
+FirebaseAuth onu aldı. Yüklenen APNs anahtarı (`WL72654D5U`, Team `36HVD2S94X`,
+Sandbox & Production) doğru yapılandırılmış. Bu madde simülatörde YAPISAL
+olarak denenemiyordu.
+
+Yol boyunca üç gerçek kusur çıktı ve üçü de düzeltildi:
+
+1. **`UIBackgroundModes`'ta `remote-notification` yoktu** (`800d6b3`). iOS
+   uyarıyor ve `content-available` bildirimlerini güvenilir teslim etmiyor —
+   telefon doğrulaması tam olarak o sessiz push'a dayanıyor.
+2. **Kimlik hataları okunamıyordu** (`800d6b3`). 17006 ekranda "Giriş
+   yapılamadı" görünüyordu; kullanıcı "SMS gelmedi" sandı. `.providerDisabled`
+   ve `.appVerificationFailed` ayrıldı; ikincisi APNs sınıfını topluyor.
+3. **İsim ekranında çıkış yolu yoktu** (`d25eb94`). Doğrulama bitmiş ama profil
+   yazılmamışsa uygulama her açılışta oraya dönüyor ve kullanıcı KİLİTLİ
+   kalıyordu. Uygulamayı silmek kurtarmıyor: Firebase oturumu KEYCHAIN'de ve
+   keychain silinmiyor. Turda birebir yaşandı — emülatörde açılan oturum,
+   üretim yapılandırmasına geçilince geri geldi ve giriş akışına ulaşılamadı.
+
+**Yöntem notu:** `identitytoolkit/v1/projects?key=…` uç noktası bu projede
+`signIn` bloğunu BOŞ döndürüyor; sağlayıcı açıkken bile. Sağlayıcının durumunu
+bu uç noktayla ölçmek YANILTICI — tek güvenilir sinyal uygulamanın aldığı hata
+kodu.
+
+**Kalan:** Tur B — kamera (`CameraPicker` hiç koşmadı), gerçek 12-48 MP HEIC
+küçültme ve bellek, kesintili şantiye ağı + bekleyen-yazma şeridi, dolu
+depolama dalı. Emülatör kurulumu: `sh scripts/emulator-device.sh` + cihaz
+derlemesine `-- -backend firestore -emulator <IP>:8080` (argümanlardan önce
+`--` ayracı ŞART, yoksa devicectl bayrakları kendi bayrağı sanıyor).
+iOS yerel ağ izni ilk denemede reddediyor ("Local network prohibited") —
+bir denemeyi yakar, `NSLocalNetworkUsageDescription` eklenmeli.
+
+---
+
+## Gerçek cihaz turu — eski not (Tur A öncesi)
 
 iPhone 13 Pro (`51B0D092-721A-5A8C-8C50-3A1D8275EB48`) bağlandı, cihaz
 derlemesi imzalandı ve kuruldu. Tur A (gerçek Firebase, `-emulator` YOK)
