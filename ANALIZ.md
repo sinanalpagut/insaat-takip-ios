@@ -670,7 +670,32 @@ projesi kullanılmalı — kurallar zaten yayında.
         sessizce kaybolacaktı. Süzgeç açıkça ASCII rakama çevrildi.
       · Ders: elle yazılan Firestore belgelerinde kimlikler BÜYÜK harf olmalı;
         Swift'in `UUID.uuidString`i büyük harf üretiyor.
-- [ ] 26. CSV/JSON dışa aktarma + portföy özeti
+- [x] 26. CSV/JSON dışa aktarma + portföy özeti — **TAMAM (18 Ağu 2026)**
+      · **CSV.** Tek çıktı tek sayfalık PDF'ti; mali müşavir SATIR SATIR veri
+        istiyor ve müteahhit bu yüzden paralel Excel tutuyordu. Türkçe Excel'in
+        üç tuzağı açıkça ele alındı ve üretilen dosyada doğrulandı: ayraç `;`
+        (tr-TR'de ondalık virgül olduğu için virgüllü dosya tek sütuna
+        yapışıyor), UTF-8 BOM (yoksa ş/ğ/İ bozuluyor — `efbbbf` doğrulandı),
+        ondalık VİRGÜLLE (`1234.56` Excel'de metin olur, toplama girmez).
+        Alan kaçışlama da var: açıklamadaki bir noktalı virgül sütunları
+        kaydırıp dosyanın geri kalanını bozardı.
+      · **GİZLİLİK:** alıcı sütunu yalnızca yöneticide. Rapor ekranı ortağa
+        bilerek açık ve dışa aktarma oradan tetikleniyor; koşulsuz yazılsaydı
+        Firestore'da kapatılan kimlik ortağın Excel dosyasına düşerdi.
+      · **JSON yedeği ve bir dürüstlük kararı:** `Apartment.CodingKeys`
+        `buyerName`i dışarıda bırakıyor, dolayısıyla yedek o kodlamayı
+        kullansaydı 13 alıcı adı KENDİLİĞİNDEN düşerdi — "yedek" adı altında
+        eksik dosya vermek, kullanıcının kaybı fark etmeyeceği bir yalan
+        olurdu. Alıcılar ayrı dizide; ortak yedeğinde boş ve dosya bunu
+        `aliciDahil: false` ile söylüyor. Doğrulandı: daire kaydında
+        `buyerName` YOK, `alicilar` dizisinde 13 kayıt VAR.
+      · **Portföy şeridi.** Dashboard kartları alt alta diziyor ama hiçbir
+        toplam vermiyordu. Artık ciro / tahsilat / kalan alacak + projeleri
+        m² maliyetine göre sıralayan karşılaştırma. Bu karşılaştırma ancak
+        madde 25 (m² maliyeti) geldikten sonra mümkün oldu.
+      · Yol üstünde bir kusur: liste `prefix(4)` ile SESSİZCE kırpıyordu, beş
+        projeli portföyde biri düşüyor ve kullanıcı "hepsi bu" sanıyordu.
+        Sınır duruyor ama artık kaç projenin dışarıda kaldığı yazılı.
 
 ### Faz 4 — Yayın paketi
 

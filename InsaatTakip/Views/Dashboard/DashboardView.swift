@@ -28,6 +28,14 @@ struct DashboardView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 14) {
+                    // PORTFÖY ŞERİDİ — madde 26. Tek projesi olan için gürültü,
+                    // o yüzden İKİ ve üzeri projede görünüyor.
+                    if visibleProjects.count > 1,
+                       let portfolio = viewModel.portfolio(for: appState.currentUser) {
+                        portfolioCard(portfolio)
+                            .padding(.top, 18)
+                    }
+
                     HStack {
                         Text("Aktif Projeler")
                             .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
@@ -198,6 +206,99 @@ struct DashboardView: View {
     }
 
     // MARK: Davet kodu kartı
+
+    // MARK: Portföy şeridi (madde 26)
+
+    /// Tüm projelerin toplamı + m² maliyetine göre karşılaştırma.
+    ///
+    /// Dashboard bugüne kadar kartları alt alta diziyor ama HİÇBİR toplam
+    /// vermiyordu: beş projesi olan müteahhit toplam ciroyu, tahsilatı ve
+    /// kalan alacağı hiçbir yerde göremiyordu — uygulamayı açma sebebi olan
+    /// soru cevapsızdı.
+    private func portfolioCard(_ portfolio: ProjectViewModel.Portfolio) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Portföy")
+                    .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                Spacer()
+                Text("\(portfolio.projectCount) proje")
+                    .font(.manrope(12, .semiBold))
+                    .foregroundColor(Palette.textSecondary)
+            }
+
+            HStack(spacing: 0) {
+                portfolioTile("CİRO", portfolio.sales, Palette.ink)
+                portfolioTile("TAHSİLAT", portfolio.collected, Palette.success)
+                portfolioTile("KALAN ALACAK", portfolio.outstanding, Palette.accent)
+            }
+            .padding(.top, 14)
+
+            Divider().overlay(Palette.divider).padding(.vertical, 12)
+
+            // Projeler m² maliyetine göre sıralı — madde 25 gelmeden bu
+            // karşılaştırma yapılamıyordu.
+            // KIRPMA SESSİZ OLAMAZ. Önce `prefix(4)` vardı ve beş projeli
+            // portföyde biri listeden sessizce düşüyordu — kullanıcı "hepsi bu"
+            // sanıyordu. Kart uzamasın diye sınır duruyor ama kaç projenin
+            // dışarıda kaldığı YAZILI.
+            let rows = viewModel.comparisons(for: appState.currentUser)
+            let shown = 5
+            ForEach(rows.prefix(shown)) { row in
+                HStack(spacing: 8) {
+                    Text(row.title)
+                        .font(.manrope(12, .semiBold))
+                        .foregroundColor(Palette.ink)
+                        .lineLimit(1)
+                    Spacer()
+                    if let margin = row.margin {
+                        Text(Fmt.signedPercent(margin))
+                            .font(.manrope(11, .bold))
+                            .foregroundColor(margin >= 0 ? Palette.success : Palette.alertInk)
+                    }
+                    // Alan girilmemiş projede "—": sıfır yazmak "bedava inşa
+                    // edildi" demek olurdu.
+                    Text(row.perM2.map(Fmt.costPerArea) ?? "—")
+                        .font(.sora(12, .bold))
+                        .foregroundColor(Palette.textMuted)
+                        .frame(width: 96, alignment: .trailing)
+                }
+                .padding(.top, 8)
+            }
+
+            if rows.count > shown {
+                Text("+\(rows.count - shown) proje daha")
+                    .font(.manrope(11, .semiBold))
+                    .foregroundColor(Palette.textTertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8)
+            }
+
+            Text("Sıralama m² maliyetine göre. Yüzde, satışa oranla satış−gider farkı; kalan inşaat maliyeti düşülmemiştir.")
+                .font(.manrope(10.5, .medium))
+                .foregroundColor(Palette.textTertiary)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+        }
+        .padding(16)
+        .background(Palette.surface)
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Palette.border, lineWidth: 1))
+    }
+
+    private func portfolioTile(_ label: String, _ value: Kurus,
+                               _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .smallCapsLabel(size: 9, color: Palette.textFaded, tracking: 0.8)
+            Text(Fmt.compactMoney(value))
+                .font(.sora(15, .bold))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
     private var joinCard: some View {
         Button {

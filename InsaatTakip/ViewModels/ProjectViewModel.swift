@@ -670,6 +670,78 @@ final class ProjectViewModel: ObservableObject {
             }
     }
 
+    // MARK: - Portföy özeti (madde 26)
+
+    /// Kullanıcının eriştiği TÜM projelerin toplamı.
+    ///
+    /// Dashboard bugüne kadar kartları alt alta diziyor ama hiçbir toplam
+    /// vermiyordu; alt başlık yalnızca "5 proje · 74 daire" diyordu. Beş
+    /// projesi olan bir müteahhit toplam ciroyu, tahsilatı ve kalan alacağı
+    /// hiçbir yerde göremiyordu — tam da uygulamayı açma sebebi olan soru.
+    struct Portfolio {
+        let projectCount: Int
+        let sales: Kurus
+        let collected: Kurus
+        let outstanding: Kurus
+        let cost: Kurus
+        /// Satış − gider. "Kâr" DEĞİL: kalan inşaat maliyeti düşülmedi,
+        /// madde 20'deki pay hesabıyla aynı kapsam uyarısı geçerli.
+        let difference: Kurus
+    }
+
+    func portfolio(for user: User?) -> Portfolio? {
+        let visible = visibleProjects(for: user)
+        guard !visible.isEmpty else { return nil }
+        var sales = Kurus.zero, collected = Kurus.zero
+        var outstanding = Kurus.zero, cost = Kurus.zero
+        for project in visible {
+            sales = sales + totalSales(for: project.id)
+            collected = collected + collectedAmount(for: project.id)
+            outstanding = outstanding + outstandingAmount(for: project.id)
+            cost = cost + totalCost(for: project.id)
+        }
+        return Portfolio(projectCount: visible.count, sales: sales,
+                         collected: collected, outstanding: outstanding,
+                         cost: cost, difference: sales - cost)
+    }
+
+    /// Projelerin karşılaştırma satırı — m² maliyetine göre sıralı.
+    ///
+    /// m² maliyeti madde 25'te geldi; bu karşılaştırma ancak onunla anlamlı
+    /// oldu. Alanı girilmemiş projeler `perM2 == nil` ile sona düşüyor:
+    /// sıfır yazmak "bedava inşa edildi" demek olurdu.
+    struct ProjectComparison: Identifiable {
+        let id: UUID
+        let title: String
+        let perM2: Kurus?
+        let sales: Kurus
+        let difference: Kurus
+        /// Satışa oranla fark — satış yoksa nil (sıfıra bölme yok).
+        let margin: Double?
+    }
+
+    func comparisons(for user: User?) -> [ProjectComparison] {
+        visibleProjects(for: user).map { project in
+            let sales = totalSales(for: project.id)
+            let difference = netAmount(for: project.id)
+            // Para/para bölmesi AÇIKÇA raw üzerinden (Kurus'ta bölme yok).
+            let margin: Double? = sales.raw != 0
+                ? Double(difference.raw) / Double(sales.raw)
+                : nil
+            return ProjectComparison(id: project.id, title: project.title,
+                                     perM2: areaCost(for: project.id)?.perM2,
+                                     sales: sales, difference: difference,
+                                     margin: margin)
+        }
+        .sorted { lhs, rhs in
+            switch (lhs.perM2, rhs.perM2) {
+            case let (l?, r?): return l < r
+            case (nil, _):     return false
+            case (_, nil):     return true
+            }
+        }
+    }
+
     // MARK: - Dışa aktarma (madde 26)
 
     /// Bir projenin dışa aktarılabilir dosyaları.
