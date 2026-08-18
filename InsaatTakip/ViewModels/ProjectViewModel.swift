@@ -56,6 +56,7 @@ final class ProjectViewModel: ObservableObject {
     /// mevcut davranış aynen korunur. Firestore devredeyken pikseller diske
     /// ANINDA, buluta arkadan gider (madde 17).
     private let images: ImageStore?
+    private let files: DocumentStore?
 
     /// Uçuştaki bulut aktarımları (yükleme + indirme). Bellek içi ve SÜRECE
     /// ÖZGÜ: uçuştaki bir aktarım süreçten uzun yaşayamaz, yani uygulama
@@ -79,11 +80,13 @@ final class ProjectViewModel: ObservableObject {
     private var actorName: String { actingUser?.name ?? User.admin.name }
 
     init(repository: ProjectRepository? = nil, invites: InviteService? = nil,
-         images: ImageStore? = nil) {
+         images: ImageStore? = nil,
+         files: DocumentStore? = nil) {
         let source = repository ?? Self.makeRepository()
         self.repository = source
         self.invites = invites ?? (LaunchConfig.usesFirestore ? FirebaseInviteService() : nil)
         self.images = images ?? (LaunchConfig.usesFirestore ? ImageStore() : nil)
+        self.files = files ?? (LaunchConfig.usesFirestore ? DocumentStore() : nil)
         // Açılışta BEKLEME YOK: önbellek senkron okunur. `load()` async olsaydı
         // ekran bir kare boş görünür, yani kullanıcı bir fark görürdü.
         apply(source.cachedSnapshot())
@@ -2100,22 +2103,134 @@ final class ProjectViewModel: ObservableObject {
     // MARK: Belge ve fotoğraf
 
     /// Yükleme sayfasından yeni belge ekler.
+    /// Belge ekler: baytı diske kopyalar, üst veriyi yazar, yüklemeyi başlatır.
+    ///
+    /// `sourceURL` GÜVENLİK KAPSAMLI olabilir (iCloud Drive, başka uygulama) ve
+    /// kapsam yalnızca seçim geri çağrısı boyunca açık. Kopyalama bu yüzden
+    /// BURADA, çağrı anında yapılıyor — sonraya bırakılsa bayta bir daha
+    /// erişilemezdi. Önceki hâlde tam olarak bu oluyordu: yalnızca dosya adı ve
+    /// boyutu taşınıyor, baytlar daha en başta kayboluyordu ve ekrandaki
+    /// ilerleme çubuğu hiçbir şeye bağlı olmayan bir animasyondu.
+    @discardableResult
     func addDocument(role: UserRole, projectId: UUID, group: ProjectDocument.Group,
-                     fileName: String, sizeMB: Double, versionNote: String, partnerVisible: Bool) {
-        guard role == .admin else { return }
+                     sourceURL: URL, versionNote: String,
+                     partnerVisible: Bool) -> Bool {
+        guard role == .admin else { return false }
+
+        let fileName = sourceURL.lastPathComponent
         let ext = (fileName as NSString).pathExtension.lowercased()
-        let type: ProjectDocument.FileType = ext == "dwg" ? .dwg : (["jpg", "jpeg", "png", "heic"].contains(ext) ? .jpg : .pdf)
         let baseName = (fileName as NSString).deletingPathExtension
-        let doc = ProjectDocument(id: UUID(), projectId: projectId, group: group,
+        let type: ProjectDocument.FileType = ext == "dwg"
+            ? .dwg
+            : (["jpg", "jpeg", "png", "heic"].contains(ext) ? .jpg : .pdf)
+
+        let id = UUID()
+        var bytes: UInt64 = 0
+        if let files {
+            do {
+                bytes = try files.copyIn(from: sourceURL, projectId: projectId, id: id)
+            } catch {
+                // Kopyalama başarısızsa üst veri de YAZILMIYOR: aksi halde
+                // listede baytı olmayan, hiçbir zaman açılamayacak bir satır
+                // kalırdı — "yüklendi" diyip hiçbir şey yüklememenin kayıtlı
+                // hâli.
+                flash("Dosya okunamadı")
+                return false
+            }
+        }
+
+        // Boyut artık DİSKTEKİ gerçek kopyadan; seçicinin bildirdiği tahmin
+        // değil. Demo yolunda (files == nil) çağıranın verdiği değer kalır.
+        let megabytes = bytes > 0 ? Double(bytes) / 1_048_576 : 0
+
+        let doc = ProjectDocument(id: id, projectId: projectId, group: group,
                                   fileType: type,
                                   name: baseName.isEmpty ? fileName : baseName,
                                   versionText: versionNote.isEmpty ? "v1" : versionNote,
-                                  sizeMB: max(0.1, sizeMB),
+                                  sizeMB: max(0.1, megabytes),
                                   date: Date(),
-                                  partnerVisible: partnerVisible)
+                                  partnerVisible: partnerVisible,
+                                  fileExtension: ext,
+                                  contentType: Self.contentType(forExtension: ext))
         documents.insert(doc, at: 0)
         persist([.document(doc)], failureNote: "Dosya")
-        flash("Dosya yüklendi")
+        uploadDocument(doc)
+        flash("Dosya eklendi")
+        return true
+    }
+
+    /// Uzantıdan MIME türü. Storage'a metadata olarak gidiyor.
+    ///
+    /// Liste kısa ve bilinçli: kural yalnızca `contentType != null` arıyor,
+    /// yani doğruluk kullanıcıya dönük (önizleme ve paylaşma bunu kullanıyor).
+    /// Bilinmeyen tür `application/octet-stream` — uydurmak yerine "bilmiyorum".
+    static func contentType(forExtension ext: String) -> String {
+        switch ext {
+        case "pdf":            return "application/pdf"
+        case "jpg", "jpeg":    return "image/jpeg"
+        case "png":            return "image/png"
+        case "heic":           return "image/heic"
+        case "dwg":            return "image/vnd.dwg"
+        case "doc":            return "application/msword"
+        case "docx":           return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        case "xls":            return "application/vnd.ms-excel"
+        case "xlsx":           return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        case "zip":            return "application/zip"
+        default:               return "application/octet-stream"
+        }
+    }
+
+    /// Belge baytını buluta yükler ve yolu belgeye yazar.
+    ///
+    /// Görsellerdeki `uploadImage` ile aynı sözleşme: yükleme bekleyen-yazma
+    /// sayacına dahil (şantiyede kesilen bağlantı sessiz kalmasın) ve başarı
+    /// ancak `storagePath` belgeye yazılınca kesinleşiyor.
+    func uploadDocument(_ document: ProjectDocument) {
+        guard let files else { return }
+        beginPendingWrite()
+        Task { @MainActor [weak self] in
+            defer { self?.endPendingWrite() }
+            guard let self else { return }
+            do {
+                let path = try await files.upload(projectId: document.projectId,
+                                                  id: document.id,
+                                                  contentType: document.contentType)
+                guard let index = self.documents.firstIndex(where: { $0.id == document.id })
+                else {
+                    // Yükleme uçarken kayıt silinmiş: nesneyi geri al, yetim
+                    // bayt kalmasın.
+                    await files.delete(projectId: document.projectId,
+                                       id: document.id, storagePath: path)
+                    return
+                }
+                self.documents[index].storagePath = path
+                self.persist([.document(self.documents[index])], failureNote: "Dosya yolu")
+            } catch {
+                #if DEBUG
+                print("[document] yükleme başarısız \(document.id): \(error)")
+                #endif
+            }
+        }
+    }
+
+    /// Belgeyi açmak için yerel dosya yolu üretir; yoksa buluttan indirir.
+    ///
+    /// Önizleme dosyayı ADINDAN tanıdığı için depo kopyası doğru uzantıyla
+    /// geçici dizine yazılıyor (bkz. `DocumentStore.previewURL`).
+    func documentPreviewURL(_ document: ProjectDocument) async -> URL? {
+        guard let files else { return nil }
+        if let local = files.previewURL(for: document) { return local }
+        guard let path = document.storagePath else { return nil }
+        do {
+            try await files.download(path: path, projectId: document.projectId,
+                                     id: document.id)
+            return files.previewURL(for: document)
+        } catch {
+            #if DEBUG
+            print("[document] indirme başarısız \(document.id): \(error)")
+            #endif
+            return nil
+        }
     }
 
     /// Daireye (küçültülmüş) görsel ekler — galeriden veya kameradan.

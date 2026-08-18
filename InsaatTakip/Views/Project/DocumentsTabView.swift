@@ -11,6 +11,11 @@ struct DocumentsTabView: View {
 
     let projectId: UUID
 
+    /// Açılan belgenin yerel dosyası. QuickLook bunu gösteriyor.
+    @State private var previewURL: URL?
+    /// İndirme sürerken satır iki kez tetiklenmesin.
+    @State private var opening: UUID?
+
     /// PROJE BAZLI rol — global rol DEĞİL. `appState.isAdmin` her gerçek
     /// oturuma `.admin` veriyor (rol artık projede yaşıyor, kullanıcıda değil —
     /// madde 16j); global bakılınca davetle katılan ORTAK burada yönetici
@@ -111,7 +116,7 @@ struct DocumentsTabView: View {
                     VStack(spacing: 0) {
                         ForEach(Array(docs.enumerated()), id: \.element.id) { index, doc in
                             DocumentRowView(document: doc) {
-                                viewModel.flash("\(doc.name) indiriliyor")
+                                open(doc)
                             }
                             if index < docs.count - 1 {
                                 Divider().overlay(Palette.divider)
@@ -127,7 +132,43 @@ struct DocumentsTabView: View {
             }
             .padding(.horizontal, 16)
         }
+        .fullScreenCover(item: Binding(
+            get: { previewURL.map(PreviewFile.init) },
+            set: { if $0 == nil { previewURL = nil } }
+        )) { file in
+            DocumentPreview(url: file.url) { previewURL = nil }
+                .ignoresSafeArea()
+        }
     }
+
+    /// Belgeyi açar: yerel kopya varsa anında, yoksa buluttan indirip.
+    ///
+    /// Önceden bu düğme yalnızca "… indiriliyor" yazan bir bildirim
+    /// gösteriyordu — hiçbir şey inmiyor, hiçbir şey açılmıyordu. Ekranda
+    /// "yapıyormuş gibi" duran ikinci yüzey buydu (birincisi yüklemedeki sahte
+    /// ilerleme çubuğuydu).
+    private func open(_ document: ProjectDocument) {
+        guard opening != document.id else { return }
+        opening = document.id
+        Task { @MainActor in
+            defer { opening = nil }
+            if let url = await viewModel.documentPreviewURL(document) {
+                previewURL = url
+            } else {
+                // Dürüst hata: yol yoksa bayt hiç yüklenmemiş demektir
+                // (eski kayıtlar ya da yarım kalmış yükleme).
+                viewModel.flash(document.storagePath == nil
+                                ? "Bu belgenin dosyası yüklenmemiş"
+                                : "Dosya açılamadı · bağlantıyı kontrol et")
+            }
+        }
+    }
+}
+
+/// `fullScreenCover(item:)` `Identifiable` istiyor; URL değil.
+private struct PreviewFile: Identifiable {
+    let url: URL
+    var id: String { url.path }
 }
 
 // MARK: - Belge satırı

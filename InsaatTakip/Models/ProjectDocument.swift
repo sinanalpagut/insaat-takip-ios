@@ -40,6 +40,35 @@ struct ProjectDocument: Codable, Identifiable, Equatable {
     var date: Date              // Yükleme / evrak tarihi
     var partnerVisible: Bool    // "Ortaklar görebilsin" anahtarı
 
+    /// Dosya uzantısı ("pdf", "dwg", "xlsx"…). Nokta YOK, küçük harf.
+    ///
+    /// Önce atılıyordu: `addDocument` adı `deletingPathExtension` ile kesiyor
+    /// ve geriye yalnızca üç kutulu `fileType` rozeti kalıyordu. Rozet gerçek
+    /// türü taşımıyor — bilinmeyen her uzantı `.pdf` sayılıyor, yani bir
+    /// `.xlsx` PDF olarak etiketleniyordu. Uzantı ÖNİZLEME için şart:
+    /// QuickLook dosyayı adından tanıyor, indirilen bayt geçici dosyaya bu
+    /// uzantıyla yazılmadan açılamıyor.
+    var fileExtension: String = ""
+
+    /// MIME türü — Storage'a metadata olarak gidiyor ve kural bunu görüyor.
+    /// Bilinmiyorsa `application/octet-stream`.
+    var contentType: String = "application/octet-stream"
+
+    /// Belgenin Storage yolu. DOLU olması, baytın buluta yazıldığının tek
+    /// kanıtı — görsellerdeki `storagePath` ile aynı sözleşme: "yükleniyor"
+    /// cihaza özgü bir durum ve belgeye YAZILMAZ, yoksa iki cihaz birbirinin
+    /// durumunu ezer.
+    ///
+    /// Nesne adı belgenin KİMLİĞİ, uzantı içermiyor: `storage.rules` kardeş
+    /// Firestore belgesini ancak kimliği yoldan çözebilirse okuyabiliyor
+    /// (`partnerVisible` kontrolü buna dayanıyor).
+    var storagePath: String? = nil
+
+    /// Ekranda ve paylaşımda görünecek tam dosya adı: "Vaziyet Planı.pdf".
+    var fullFileName: String {
+        fileExtension.isEmpty ? name : "\(name).\(fileExtension)"
+    }
+
     var dateText: String { Fmt.shortDate(date) }
 
     /// Satır alt metni: "v3 · 4,2 MB · 12 Oca 2026"

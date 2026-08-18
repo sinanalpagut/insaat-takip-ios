@@ -17,11 +17,16 @@ struct UploadSheet: View {
     @State private var versionNote = ""
     @State private var partnerVisible = true
     @State private var showImporter = false
+    @State private var pickedURL: URL?
 
     // Seçilen dosya ve sahte yükleme ilerlemesi
     @State private var fileName: String?
     @State private var fileSizeMB: Double = 0
-    @State private var uploadProgress: Double = 0
+
+    /// Seçilen dosyanın URL'İ. Önceden yalnızca ad ve boyut taşınıyordu ve
+    /// baytlara bir daha erişilemiyordu — "yükleme" tamamen sahteydi.
+    /// URL güvenlik kapsamlı olabildiği için baytı ViewModel kopyalıyor
+    /// (`DocumentStore.copyIn`, kapsamı kendi açıp kapatıyor).
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -148,12 +153,14 @@ struct UploadSheet: View {
                     .foregroundColor(Palette.ink)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                ProgressBarView(fraction: uploadProgress, height: 4)
+                Text(Fmt.megabytes(fileSizeMB))
+                    .font(.manrope(11.5, .medium))
+                    .foregroundColor(Palette.textSecondary)
             }
 
-            Text("%\(Int(uploadProgress * 100))")
-                .font(.sora(12, .bold))
-                .foregroundColor(Palette.accent)
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(Palette.success)
         }
         .padding(12)
         .background(Palette.fillSubtle)
@@ -203,27 +210,33 @@ struct UploadSheet: View {
 
         fileName = url.lastPathComponent
         fileSizeMB = megabytes
+        pickedURL = url
 
-        // Yükleme ilerlemesi animasyonu (mock — henüz sunucu yok).
-        uploadProgress = 0
-        withAnimation(.easeInOut(duration: 0.9)) { uploadProgress = 1 }
+        // SAHTE İLERLEME ÇUBUĞU KALDIRILDI. Dosya seçilir seçilmez 0,9 saniyede
+        // %100'e giden bir animasyondu ve ağdaki hiçbir şeye bağlı değildi:
+        // yükleme başlamadan "tamamlandı" gösteriyordu. Gerçek yükleme artık
+        // "Kaydet"e basılınca başlıyor ve ilerlemesi ekranın altındaki
+        // bekleyen-yazma şeridinden okunuyor — tüm yazmalarla aynı yerden,
+        // ikinci bir ilerleme dili icat etmeden.
     }
 
     /// Sheet başlığında duyurulan sınır.
     static let maxUploadMB: Double = 50
 
     private func upload() {
-        guard let fileName else {
+        guard let pickedURL else {
             viewModel.flash("Önce dosya seç")
             return
         }
-        viewModel.addDocument(role: viewModel.role(inProject: projectId, for: appState.currentUser),
-                              projectId: projectId,
-                              group: category,
-                              fileName: fileName,
-                              sizeMB: fileSizeMB,
-                              versionNote: versionNote,
-                              partnerVisible: partnerVisible)
-        dismiss()
+        let saved = viewModel.addDocument(
+            role: viewModel.role(inProject: projectId, for: appState.currentUser),
+            projectId: projectId,
+            group: category,
+            sourceURL: pickedURL,
+            versionNote: versionNote,
+            partnerVisible: partnerVisible)
+        // Kopyalama başarısızsa sheet AÇIK kalıyor: kullanıcı hatayı görüp
+        // başka dosya seçebilsin. Kapansaydı "eklendi" sanırdı.
+        if saved { dismiss() }
     }
 }
