@@ -23,8 +23,40 @@ struct ApartmentsTabView: View {
             .role(for: appState.currentUser) == .admin
     }
 
+    @State private var searchText = ""
+    /// nil = tümü.
+    @State private var statusFilter: Apartment.Status?
+
     private var apartments: [Apartment] {
         viewModel.apartments(for: projectId)
+    }
+
+    /// Arama + durum süzgeci.
+    ///
+    /// ALICI ADIYLA ARAMA YALNIZCA YÖNETİCİDE. Ortakta `buyerName` zaten nil
+    /// geliyor (madde 18: alıcı kimliği ayrı belgede ve yalnızca yöneticiye
+    /// açık), ama koşul burada AÇIKÇA duruyor: alan bir gün ortağa da inse,
+    /// arama kutusu "bu isim bu projede var mı" sorusuna cevap veren bir
+    /// kâhin hâline gelirdi — eşleşen tek bir daire, gizlenen kimliği ele
+    /// verirdi.
+    private var visibleApartments: [Apartment] {
+        let query = searchText
+            .trimmingCharacters(in: .whitespaces)
+            .lowercased(with: Fmt.locale)
+        return apartments.filter { apartment in
+            if let statusFilter, apartment.status != statusFilter { return false }
+            guard !query.isEmpty else { return true }
+
+            var haystack = [
+                "\(apartment.apartmentNumber)",
+                apartment.type,
+                apartment.area,
+                Apartment.floorLabel(for: apartment.floor),
+                apartment.status.label,
+            ]
+            if isAdmin, let buyer = apartment.buyerName { haystack.append(buyer) }
+            return haystack.contains { $0.lowercased(with: Fmt.locale).contains(query) }
+        }
     }
 
     private let columns = [
@@ -47,8 +79,15 @@ struct ApartmentsTabView: View {
                     }
                 }
 
+                searchBar
+                statusChips
+
+                if visibleApartments.isEmpty {
+                    noMatchState
+                }
+
                 LazyVGrid(columns: columns, spacing: 9) {
-                    ForEach(apartments) { apartment in
+                    ForEach(visibleApartments) { apartment in
                         Button {
                             onSelect(apartment)
                         } label: {
@@ -74,6 +113,98 @@ struct ApartmentsTabView: View {
     }
 
     // MARK: Özet kart
+
+    // MARK: Arama ve süzgeç (madde 22)
+
+    /// 22 daire gözle taranıyordu. Arama daire numarası, tip, alan, kat ve
+    /// durum metninde geçiyor; alıcı adı YALNIZCA yöneticide (bkz.
+    /// `visibleApartments`).
+    private var searchBar: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Palette.textTertiary)
+
+            TextField(isAdmin ? "Daire no, tip, kat veya alıcı" : "Daire no, tip veya kat",
+                      text: $searchText)
+                .font(.manrope(13, .medium))
+                .foregroundColor(Palette.ink)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(Palette.textTertiary)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 46)
+        .background(Palette.surface)
+        .cornerRadius(13)
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
+    }
+
+    /// Durum çipleri. Sayılar SÜZÜLMEMİŞ listeden: çipe basmadan önce kaç
+    /// daire olduğunu görmek, süzgecin ne yapacağını önceden söyler.
+    private var statusChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                chip(title: "Tümü", count: apartments.count, value: nil)
+                ForEach(Apartment.Status.allCases) { status in
+                    let count = apartments.filter { $0.status == status }.count
+                    if count > 0 {
+                        chip(title: status.badge, count: count, value: status)
+                    }
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+
+    private func chip(title: String, count: Int, value: Apartment.Status?) -> some View {
+        let selected = statusFilter == value
+        return Button {
+            // Aynı çipe ikinci dokunuş süzgeci kaldırır — çıkış yolu
+            // "Tümü"ne gitmeyi gerektirmesin.
+            statusFilter = selected ? nil : value
+        } label: {
+            Text("\(title) \(count)")
+                .font(.manrope(11.5, .bold))
+                .foregroundColor(selected ? .white : Palette.textMuted)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(selected ? Palette.accent : Palette.surface)
+                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: 10)
+                    .stroke(selected ? Color.clear : Palette.border, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var noMatchState: some View {
+        VStack(spacing: 7) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 20, weight: .light))
+                .foregroundColor(Palette.textTertiary)
+            Text("Eşleşen daire yok")
+                .font(.manrope(13.5, .bold))
+                .foregroundColor(Palette.ink)
+            Text(searchText.isEmpty ? "Bu durumda daire bulunmuyor."
+                                    : "\"\(searchText)\" için sonuç yok.")
+                .font(.manrope(11.5, .medium))
+                .foregroundColor(Palette.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .background(Palette.fillSubtle)
+        .cornerRadius(15)
+        .dashedBorder(Palette.dashed, radius: 15, lineWidth: 1.2)
+    }
 
     private var summaryCard: some View {
         let total = apartments.count
