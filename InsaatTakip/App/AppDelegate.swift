@@ -124,6 +124,19 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     /// Gelen sessiz bildirimi FirebaseAuth'a iletir.
+    ///
+    /// Bu metodun VAR OLMASI yetmiyor: `Config/Info.plist` içinde
+    /// `UIBackgroundModes = [remote-notification]` de gerekiyor. Yoksa iOS
+    /// açılışta şunu yazıyor ve `content-available` bildirimlerini güvenilir
+    /// biçimde teslim etmiyor:
+    ///
+    ///   "You've implemented -[<UIApplicationDelegate>
+    ///    application:didReceiveRemoteNotification:fetchCompletionHandler:],
+    ///    but you still need to add \"remote-notification\" to the list of
+    ///    your supported UIBackgroundModes"
+    ///
+    /// Bu uyarı SİMÜLATÖRDE HİÇ ÇIKMIYOR (push zaten çalışmıyor); ilk gerçek
+    /// cihaz açılışında görüldü.
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification notification: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler:

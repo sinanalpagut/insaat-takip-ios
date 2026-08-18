@@ -37,6 +37,20 @@ enum AuthError: LocalizedError, Equatable {
     /// çağrı URL şeması yok). Bu bir KULLANICI hatası değil, derleme hatası;
     /// yine de çökmek yerine söylenmesi gerekiyor — bkz. FirebaseAuthService.
     case notConfigured
+    /// Telefonla giriş Firebase projesinde KAPALI (kod 17006).
+    ///
+    /// Emülatör bu ayarı sormuyor; sağlayıcının açık olması yalnızca GERÇEK
+    /// projede gerekiyor. Bu yüzden tüm geliştirme emülatörle yapıldığında
+    /// hata ilk kez gerçek cihazda görülüyor. Kullanıcı hatası değil, kurulum
+    /// eksiği — o yüzden ayrı bir durum.
+    case providerDisabled
+    /// APNs/uygulama doğrulaması başarısız (17054, 17093, 17095…).
+    ///
+    /// Firebase telefon doğrulamasında uygulamanın gerçekliğini sessiz bir push
+    /// ile kanıtlıyor. Anahtar, arka plan kipi ya da bildirim iletimi eksikse
+    /// buraya düşüyor. Ayrı tutulmasının sebebi: "Giriş yapılamadı" bu durumda
+    /// hem kullanıcıyı hem geliştiriciyi yanlış yere bakmaya itiyordu.
+    case appVerificationFailed
     case unknown(String)
 
     /// Kullanıcıya gösterilen metin. Firebase'in İngilizce hata dizeleri
@@ -49,6 +63,9 @@ enum AuthError: LocalizedError, Equatable {
         case .tooManyRequests:  return "Çok fazla deneme · bir süre sonra tekrar dene"
         case .network:          return "Bağlantı yok"
         case .notConfigured:    return "Telefon girişi bu derlemede yapılandırılmadı"
+        case .providerDisabled: return "Telefonla giriş bu projede açık değil · Firebase konsolunda etkinleştirilmeli"
+        case .appVerificationFailed:
+            return "Uygulama doğrulaması yapılamadı · bildirim ayarları eksik"
         case .unknown:          return "Giriş yapılamadı"
         }
     }

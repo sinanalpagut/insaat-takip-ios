@@ -97,6 +97,11 @@ final class FirebaseAuthService: AuthService {
             return .tooManyRequests
         case .networkError:
             return .network
+        case .operationNotAllowed:
+            return .providerDisabled
+        case .notificationNotForwarded, .missingAppToken, .appNotVerified,
+             .captchaCheckFailed, .invalidAppCredential:
+            return .appVerificationFailed
         default:
             return .unknown((error as NSError).domain)
         }
