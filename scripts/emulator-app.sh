@@ -27,4 +27,4 @@ if [ -z "$PROJECT_ID" ]; then
 fi
 
 exec sh "$ROOT/scripts/with-java.sh" \
-  npx firebase emulators:start --only firestore,auth --project "$PROJECT_ID"
+  npx firebase emulators:start --only firestore,auth,functions,storage --project "$PROJECT_ID"

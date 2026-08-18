@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// İnşaat Takip — Storage güvenlik kuralları (madde 17)
+//
+// YETKİ MODELİ FIRESTORE'UN AYNASI: kim neyi okur/yazar sorusunun cevabı tek
+// yerde (projects/{pid}.ownerUid / memberUids) durur; Storage kuralları oraya
+// ÇAPRAZ SERVİS `firestore.get()` ile bakar. Yetki iki yerde tekrarlansaydı
+// biri güncellenip diğeri unutulurdu.
+//
+// YOL ŞEMASI — Firestore koleksiyon adlarıyla bire bir:
+//   projects/{pid}/sitePhotos/{photoId}.jpg
+//   projects/{pid}/apartmentPhotos/{photoId}.jpg
+//   projects/{pid}/receipts/{logId}.jpg
+//
+// KISITLAR:
+//   · Yalnızca image/jpeg — uygulama zaten her görseli 1200px JPEG'e küçültüyor
+//     (madde 13); başka tür bir yükleme uygulamadan gelmiyor demektir.
+//   · 4 MB üst sınır: 1200px JPEG tipik ~300-500 KB; sınır, ele geçirilmiş bir
+//     oturumun depoyu çöplüğe çevirmesine karşı tavan.
+//   · Alıcı görseli diye bir yol YOK — kişisel veri Storage'a hiç girmiyor.
+// ═══════════════════════════════════════════════════════════════════════════
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function projectData(pid) {
+      return firestore.get(/databases/(default)/documents/projects/$(pid)).data;
+    }
+
+    function isOwner(pid) {
+      return request.auth != null && projectData(pid).ownerUid == request.auth.uid;
+    }
+
+    function isMember(pid) {
+      return request.auth != null && request.auth.uid in projectData(pid).memberUids;
+    }
+
+    function isSmallJpeg() {
+      return request.resource.contentType == 'image/jpeg'
+          && request.resource.size < 4 * 1024 * 1024;
+    }
+
+    /// Bilinen görsel kovaları. Liste AÇIK: yeni bir kova eklendiğinde buraya
+    /// da yazılmalı — sessizce dünyaya açılan yol olmasın.
+    function knownCollection(collection) {
+      return collection in ['sitePhotos', 'apartmentPhotos', 'receipts'];
+    }
+
+    match /projects/{pid}/{collection}/{file} {
+      allow read: if knownCollection(collection) && isMember(pid);
+      allow create, update: if knownCollection(collection) && isOwner(pid) && isSmallJpeg();
+      allow delete: if knownCollection(collection) && isOwner(pid);
+    }
+
+    // Varsayılan: RED. Firestore kurallarındaki son satırla aynı gerekçe.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -6,8 +6,14 @@
   "functions": {
     "source": "functions",
     "codebase": "default",
-    "predeploy": ["npm --prefix functions run build"],
-    "ignore": ["node_modules", ".git", "*.local"]
+    "predeploy": [
+      "npm --prefix functions run build"
+    ],
+    "ignore": [
+      "node_modules",
+      ".git",
+      "*.local"
+    ]
   },
   "emulators": {
     "firestore": {
@@ -22,6 +28,12 @@
     "ui": {
       "enabled": false
     },
-    "singleProjectMode": false
+    "singleProjectMode": false,
+    "storage": {
+      "port": 9199
+    }
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

@@ -5,12 +5,12 @@
   "type": "module",
   "description": "İnşaat Takip — Firestore güvenlik kuralları ve kural testleri. iOS uygulamasının kendisi Xcode ile derlenir; burada yalnızca sunucu tarafı kurallar var.",
   "scripts": {
-    "test": "npm --prefix functions run build && sh scripts/with-java.sh npx firebase emulators:exec --only firestore,auth,functions --project demo-insaattakip \"node --test tests/*.test.mjs\"",
+    "test": "npm --prefix functions run build && sh scripts/with-java.sh npx firebase emulators:exec --only firestore,auth,functions,storage --project demo-insaattakip \"node --test --test-concurrency=1 tests/*.test.mjs\"",
     "test:rules": "sh scripts/with-java.sh npx firebase emulators:exec --only firestore --project demo-insaattakip \"node --test tests/rules.test.mjs\"",
-    "emulator": "sh scripts/with-java.sh npx firebase emulators:start --only firestore,auth,functions --project demo-insaattakip",
+    "emulator": "sh scripts/with-java.sh npx firebase emulators:start --only firestore,auth,functions,storage --project demo-insaattakip",
     "java:install": "sh scripts/install-java.sh",
     "login": "npx firebase login",
-    "rules:deploy": "sh scripts/firebase.sh deploy --only firestore:rules,firestore:indexes",
+    "rules:deploy": "sh scripts/firebase.sh deploy --only firestore:rules,firestore:indexes,storage",
     "rules:current": "sh scripts/firebase.sh firestore:databases:list"
   },
   "devDependencies": {
