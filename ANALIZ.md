@@ -55,7 +55,7 @@ Bu listedeki her madde tamamlandıkça işaretlenir ve aynı commit'te push edil
 
 ### Faz 2 — Kilometre taşı: kalıcılık
 
-- [ ] 16. Firestore + Auth + güvenlik kuralları — **kimlik doğrulama bitti**
+- [x] 16. Firestore + Auth + güvenlik kuralları — **TAMAM (18 Ağu 2026)**: tüm alt maddeler (16a–16j) bitti ve uçtan uca kanıtlı
       · KARAR (13 Ağu 2026): Auth = **telefon + SMS kodu**. Şantiyedeki ortak
         e-posta hatırlamak zorunda kalmasın; davet akışıyla da doğal eşleşiyor.
         Gerektirdikleri: APNs kurulumu, SMS kotası sonrası ücret, test numaraları.
