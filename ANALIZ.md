@@ -455,9 +455,13 @@ sunucuda koşturuyor ama çapraz servis izinlerini taklit etmiyor; ne simülatö
 ne emülatör bunu gösterebilirdi. İlk gerçek kullanıcı fiş çekmeye çalıştığı gün
 ortaya çıkacaktı. Gerçek cihaz turunun tek başına kendini haklı çıkardığı bulgu.
 
+**FİŞ OKUMA (OCR) GERÇEK KAREDE ÇALIŞTI.** Madde 24 cihaz üstü Vision ile
+yazılmıştı ama yalnızca simülatöre yüklenmiş hazır görsellerle denenmişti.
+Gerçek kamera karesinde tarih ve tutarı yakaladı ve tutarı forma KENDİSİ yazdı.
+Cihaz üstü olduğu için internet, ücret ve dışarı veri çıkışı yok.
+
 **Kalan Tur B maddeleri:** kesintili şantiye ağı + bekleyen-yazma şeridi,
-dolu depolama dalı. (Kamera ve gerçek foto boyutu KAPANDI.) Fiş okuma (OCR)
-gerçek kamera karesiyle henüz teyit edilmedi. Emülatör kurulumu: `sh scripts/emulator-device.sh` + cihaz
+dolu depolama dalı. (Kamera, gerçek foto boyutu ve OCR KAPANDI.) Emülatör kurulumu: `sh scripts/emulator-device.sh` + cihaz
 derlemesine `-- -backend firestore -emulator <IP>:8080` (argümanlardan önce
 `--` ayracı ŞART, yoksa devicectl bayrakları kendi bayrağı sanıyor).
 iOS yerel ağ izni ilk denemede reddediyor ("Local network prohibited") —
