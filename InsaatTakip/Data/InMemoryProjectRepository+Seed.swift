@@ -173,6 +173,15 @@ extension InMemoryProjectRepository {
         let karsLogs: [(UUID, String, MaterialLog.LogType, Double, Kurus, Date, String)] = [
             (DemoID.kars309, "ALÇ", .exit,  120,   .lira(210),  Fmt.makeDate(18, 3, 2025), "Saten perdah tamamlandı"),
             (DemoID.kars309, "EPS", .exit,  90,    .lira(96),   Fmt.makeDate(4, 3, 2025),  "Cephe mantolama kapanışı"),
+            // Ø12 demirin ÜÇ ayrı alımı, üç ayrı fiyattan. Fiyat geçmişi
+            // (madde 25) ancak aynı kalemin farklı tarihli farklı fiyatlı
+            // alımları varsa bir şey gösterir; önceden demo verideki her fiş
+            // malzemenin güncel fiyatını taşıdığı için seri dümdüzdü ve
+            // özellik ekran görüntüsünde doğrulanamıyordu.
+            // Seri gerçek piyasa hareketini andırıyor: 2024 sonu 24,80 →
+            // 2025 başı 26,40 → Şubat 28,50 (yaklaşık %15 artış).
+            (DemoID.kars309, "Ø12", .entry, 6_000, .lira(24, 80), Fmt.makeDate(14, 11, 2024), "İrsaliye #1842 · Kars Demir Çelik"),
+            (DemoID.kars309, "Ø12", .entry, 5_500, .lira(26, 40), Fmt.makeDate(9, 1, 2025),  "İrsaliye #1967 · Kars Demir Çelik"),
             (DemoID.kars309, "Ø12", .entry, 9_500, .lira(28, 50), Fmt.makeDate(11, 2, 2025), "İrsaliye #2087 · Kars Demir Çelik"),
             (DemoID.kars309, "Ø12", .exit,  4_200, .lira(28, 50), Fmt.makeDate(27, 2, 2025), "Çevre duvarı donatısı"),
             (DemoID.kars327, "ALÇ", .exit,  150,   .lira(210),  Fmt.makeDate(8, 4, 2025),  "Son kat saten perdah"),

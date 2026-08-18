@@ -625,8 +625,86 @@ final class ProjectViewModel: ObservableObject {
         materials.filter { $0.projectId == projectId }
     }
 
+    /// Bir malzemenin hareketleri — YENİDEN ESKİYE sıralı.
+    ///
+    /// Sıralama BURADA olmak zorundaydı: önceden yalnızca süzülüyordu ve sıra
+    /// diziye nasıl girdiğine kalıyordu. İki kaynak iki farklı sıra veriyor —
+    /// `addReceipt` başa ekliyor (yani geçmiş tarihli bir fiş en üste düşüyor),
+    /// Firestore'un `getDocuments()` çağrısı ise `order(by:)` olmadığı için
+    /// doküman kimliği (UUID) sırasında, yani RASTGELE döndürüyor. Sonuç:
+    /// "Son Hareketler" listesi simülatörde doğru, gerçek cihazda karışık
+    /// görünüyordu — en sinsi hata tipi, çünkü ekran çalışıyor gibi duruyor.
+    ///
+    /// Eşit tarihlerde kimliğe göre kırılıyor ki sonuç çağrıdan çağrıya AYNI
+    /// olsun; aynı gün iki fiş girmek mümkün ve tarih alanı gün hassasiyetinde
+    /// gösteriliyor.
     func logs(for materialId: UUID) -> [MaterialLog] {
-        materialLogs.filter { $0.materialId == materialId }
+        materialLogs
+            .filter { $0.materialId == materialId }
+            .sorted {
+                $0.date == $1.date
+                    ? $0.id.uuidString > $1.id.uuidString
+                    : $0.date > $1.date
+            }
+    }
+
+    // MARK: - Malzeme fiyat geçmişi (madde 25)
+
+    /// Tek bir alım gözlemi.
+    struct PriceObservation: Identifiable {
+        let id: UUID
+        let date: Date
+        let unitPrice: Kurus
+        let amount: Double
+        /// Bir önceki gözleme göre oran değişimi (0,12 = %12 zam). İlk gözlemde nil.
+        let changeRatio: Double?
+    }
+
+    /// Bir malzemenin alım fiyatı geçmişi — ESKİDEN YENİYE.
+    ///
+    /// YALNIZCA GİRİŞ FİŞLERİ. Çıkış fişleri de `unitPrice` taşıyor ama o bir
+    /// alış fiyatı DEĞİL: `addReceipt` çıkışta o anki güncel fiyatı kaydın
+    /// içine kopyalıyor. Seriye girseler aynı fiyatın tekrarları olarak çizgiyi
+    /// yapay biçimde düzleştirirlerdi — bağımsız bir gözlem değiller.
+    /// `Material.recalculate` da maliyete yalnızca girişleri katıyor; aynı
+    /// süzgeç.
+    ///
+    /// DEVİR (`openingCost`) BU SERİDE YOK ve olamaz: tarihi yok, fiş dökümü
+    /// yok. Demo veride maliyetin çoğu oradadır. Bu yüzden ekranda kapsam
+    /// yazılı: seri "proje boyunca fiyat" değil, "kayıtlı giriş fişlerindeki
+    /// fiyat".
+    func priceHistory(for materialId: UUID) -> [PriceObservation] {
+        let entries = materialLogs
+            .filter { $0.materialId == materialId && $0.type == .entry }
+            .sorted {
+                $0.date == $1.date
+                    ? $0.id.uuidString < $1.id.uuidString
+                    : $0.date < $1.date
+            }
+
+        return entries.enumerated().map { index, log in
+            var ratio: Double?
+            if index > 0 {
+                let previous = entries[index - 1].unitPrice
+                // Para/para bölmesi AÇIKÇA raw üzerinden: Kurus'ta bölme
+                // operatörü yok ve oran üretmek yeni bir yuvarlama noktası
+                // olmasın diye burada Double'a çıkılıyor (bkz. Kurus.swift).
+                if previous.raw != 0 {
+                    ratio = Double(log.unitPrice.raw - previous.raw) / Double(previous.raw)
+                }
+            }
+            return PriceObservation(id: log.id, date: log.date,
+                                    unitPrice: log.unitPrice,
+                                    amount: log.amount, changeRatio: ratio)
+        }
+    }
+
+    /// İlk gözlemden son gözleme oran değişimi. Tek gözlem varsa nil.
+    func priceChangeRatio(for materialId: UUID) -> Double? {
+        let history = priceHistory(for: materialId)
+        guard let first = history.first, let last = history.last,
+              first.id != last.id, first.unitPrice.raw != 0 else { return nil }
+        return Double(last.unitPrice.raw - first.unitPrice.raw) / Double(first.unitPrice.raw)
     }
 
     func apartments(for projectId: UUID) -> [Apartment] {
@@ -807,7 +885,7 @@ final class ProjectViewModel: ObservableObject {
             return false
         }
 
-        var material = materials[index]
+        let material = materials[index]
         // Kayda geçen miktar, stoğa uygulanan miktarla daima aynıdır:
         // çıkışta stok yetmiyorsa sessizce kırpmak yerine işlemi reddederiz.
         let effectivePrice: Kurus
@@ -816,10 +894,9 @@ final class ProjectViewModel: ObservableObject {
             let newPrice = Self.parseMoney(unitPriceText)
             // Fiyat yalnızca bu girişe uygulanır; geçmiş stok yeniden fiyatlanmaz.
             effectivePrice = newPrice > .zero ? newPrice : material.unitPrice
-            if newPrice > .zero {
-                material.unitPrice = newPrice        // sonraki fişlere ön dolum
-                materials[index] = material
-            }
+            // Atama YOK: fiş eklendikten sonra `refreshCurrentPrice` en yeni
+            // giriş fişinden türetiyor. Burada doğrudan yazılsaydı geçmiş
+            // tarihli bir fiş "güncel fiyat"ı geriye çekerdi.
         } else {
             guard material.currentStock >= amount else {
                 flash("Stok yetersiz · kalan \(Fmt.qty(material.currentStock, unit: material.unit))")
@@ -1048,6 +1125,32 @@ final class ProjectViewModel: ObservableObject {
     private func recalculateMaterial(_ materialId: UUID) -> Material? {
         guard let index = materials.firstIndex(where: { $0.id == materialId }) else { return nil }
         materials[index].recalculate(from: materialLogs)
+
+        // "Güncel fiyat" da hareketlerden TÜRETİLİYOR — en yeni giriş fişinden.
+        //
+        // Önceden `addReceipt` bu alana doğrudan yazıyordu ve iki kusuru vardı:
+        // (1) karar ekleme anına bakıyordu, fişin TARİHİNE değil — bugün geçen
+        // ayın 24,80'lik fişini girmek "güncel fiyat"ı 28,50'den geriye
+        // çekiyordu; (2) fiş düzeltilince ya da silinince geri alınmıyordu —
+        // fiyatı yanlışlıkla 2.850 girip sonra düzelten yönetici kartta hâlâ
+        // 2.850 ₺/kg görüyordu. Yani türetilebilir bir değerin saklanmış hâliydi
+        // ve projenin "türetilen rakam saklanmaz" ilkesini ihlal ediyordu.
+        //
+        // Burada olması üç yolu birden kapatıyor: ekleme, düzeltme, silme —
+        // hepsi bu fonksiyondan geçiyor.
+        //
+        // Hiç giriş fişi yoksa alan OLDUĞU GİBİ kalıyor: yalnızca devirle açılmış
+        // bir kalemin fiyatı elle girilmiştir, türetilecek kaynak yoktur.
+        let newest = materialLogs
+            .filter { $0.materialId == materialId && $0.type == .entry }
+            .max { lhs, rhs in
+                lhs.date == rhs.date
+                    ? lhs.id.uuidString < rhs.id.uuidString
+                    : lhs.date < rhs.date
+            }
+        if let newest, newest.unitPrice > .zero {
+            materials[index].unitPrice = newest.unitPrice
+        }
         return materials[index]
     }
 

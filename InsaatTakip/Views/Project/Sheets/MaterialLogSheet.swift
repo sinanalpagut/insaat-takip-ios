@@ -76,6 +76,8 @@ struct MaterialLogSheet: View {
                 }
                 .padding(.top, 18)
 
+                priceHistoryCard(material)
+
                 HStack(alignment: .firstTextBaseline) {
                     Text("Son Hareketler")
                         .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
@@ -171,6 +173,96 @@ struct MaterialLogSheet: View {
 
     /// Hareket satırı: 26px yön rozeti, not, "tarih · kullanıcı", işaretli miktar.
     /// Fiş kamerayla çekildiyse notun yanında küçük bir önizleme çıkar.
+    // MARK: Fiyat geçmişi (madde 25)
+
+    /// Alım fiyatı geçmişi — seyrek bir seri olduğu için grafik değil satır
+    /// listesi + tek satırlık sparkline.
+    ///
+    /// Veri zaten kayıtlıydı: her giriş fişi kendi birim fiyatını donduruyor.
+    /// Görünmediği için "bu demiri geçen yıl kaça almıştım" sorusu
+    /// cevaplanamıyordu.
+    @ViewBuilder
+    private func priceHistoryCard(_ material: Material) -> some View {
+        let history = viewModel.priceHistory(for: materialId)
+        // Tek gözlem bir GEÇMİŞ değil; kart ancak karşılaştırılacak iki nokta
+        // varken anlam taşıyor.
+        if history.count >= 2 {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Alım Fiyatı Geçmişi")
+                        .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                    Spacer()
+                    if let ratio = viewModel.priceChangeRatio(for: materialId) {
+                        Text(Fmt.signedPercent(ratio))
+                            .font(.manrope(11.5, .bold))
+                            .foregroundColor(ratio > 0 ? Palette.alertInk
+                                             : ratio < 0 ? Palette.success : Palette.textSecondary)
+                    }
+                }
+
+                sparkline(history)
+                    .padding(.top, 12)
+
+                // En yeni üç gözlem: liste uzarsa sheet'in kalan alanını
+                // "Son Hareketler"den çalardı.
+                ForEach(history.suffix(3).reversed()) { observation in
+                    HStack(spacing: 8) {
+                        Text(Fmt.shortDate(observation.date))
+                            .font(.manrope(11.5, .medium))
+                            .foregroundColor(Palette.textSecondary)
+                        Spacer()
+                        if let ratio = observation.changeRatio, ratio != 0 {
+                            Text(Fmt.signedPercent(ratio))
+                                .font(.manrope(10.5, .bold))
+                                .foregroundColor(ratio > 0 ? Palette.alertInk : Palette.success)
+                        }
+                        Text(Fmt.unitPriceExact(observation.unitPrice, unit: material.unit))
+                            .font(.sora(12.5, .bold))
+                            .foregroundColor(Palette.ink)
+                    }
+                    .padding(.top, 8)
+                }
+
+                // Kapsam. Devrin tarihi ve fiş dökümü yok, dolayısıyla bu seri
+                // "proje boyunca fiyat" değil "kayıtlı giriş fişlerindeki
+                // fiyat". Demo veride maliyetin çoğu devirde duruyor; kapsamı
+                // yazmadan gösterilen rakam yanıltıcı olurdu.
+                Text("\(history.count) giriş fişine göre. Uygulamaya girilmeden önceki devir alımları bu seride yok.")
+                    .font(.manrope(10.5, .medium))
+                    .foregroundColor(Palette.textTertiary)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 10)
+            }
+            .padding(14)
+            .background(Palette.fillSubtle)
+            .cornerRadius(15)
+            .overlay(RoundedRectangle(cornerRadius: 15).stroke(Palette.border, lineWidth: 1))
+            .padding(.top, 18)
+        }
+    }
+
+    /// Kapsül sparkline — mevcut rapor grafiğinin (ReportView.chartCard)
+    /// desenini izliyor: elle çizilmiş, oran AÇIKÇA raw üzerinden. Swift Charts
+    /// getirilmedi; 3-8 noktalı seyrek bir seri için ikinci bir grafik dili
+    /// eklemeye değmez.
+    private func sparkline(_ history: [ProjectViewModel.PriceObservation]) -> some View {
+        let prices = history.map(\.unitPrice.raw)
+        let low = prices.min() ?? 0
+        let high = prices.max() ?? 0
+        let span = max(1, high - low)
+        return HStack(alignment: .bottom, spacing: 3) {
+            ForEach(history) { observation in
+                // Taban 6pt: tüm fiyatlar eşitken çubuklar kaybolmasın.
+                let ratio = Double(observation.unitPrice.raw - low) / Double(span)
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Palette.accent.opacity(0.75))
+                    .frame(height: 6 + ratio * 26)
+            }
+        }
+        .frame(height: 32)
+    }
+
     /// Fiş küçük resmi. Piksel elde yoksa yer tutucu çizilir ve indirme
     /// EKRANDA GÖRÜNDÜĞÜ AN istenir — açılışta toptan indirme yok.
     @ViewBuilder
@@ -237,9 +329,25 @@ struct MaterialLogSheet: View {
 
             Spacer()
 
-            Text(log.signedAmount(unit: unit))
-                .font(.sora(13, .bold))
-                .foregroundColor(log.type == .entry ? Palette.success : Palette.textMuted)
+            // Miktarın altında O FİŞİN kendi fiyatı ve tutarı.
+            //
+            // Fişin `unitPrice`ı kayıt anında donduruluyor ama tüm uygulamada
+            // hiçbir ekranda görünmüyordu — görünen tek fiyat malzemenin
+            // GÜNCEL fiyatıydı. Yani "hangi demiri kaça aldım" sorusunun
+            // cevabı veritabanında duruyor, kullanıcıya kapalıydı.
+            //
+            // Yalnızca GİRİŞ fişinde gösteriliyor: çıkışta taşınan fiyat o anki
+            // güncel fiyatın kopyası, bir alış fiyatı değil.
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(log.signedAmount(unit: unit))
+                    .font(.sora(13, .bold))
+                    .foregroundColor(log.type == .entry ? Palette.success : Palette.textMuted)
+                if log.type == .entry {
+                    Text("\(Fmt.unitPriceExact(log.unitPrice, unit: unit)) · \(Fmt.compactMoney(Kurus.cost(quantity: log.amount, unitPrice: log.unitPrice)))")
+                        .font(.manrope(10.5, .medium))
+                        .foregroundColor(Palette.textTertiary)
+                }
+            }
         }
         .padding(.vertical, 12)
         // Boş alan da dokunulabilir olsun (aksi halde yalnızca metne basmak gerekir).

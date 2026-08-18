@@ -72,6 +72,27 @@ enum Fmt {
         return "\(decimal2.string(from: NSNumber(value: Double(price.raw) / 100)) ?? "") ₺/\(unit)"
     }
 
+    /// İşaretli yüzde değişimi: 0,12 → "%+12" · -0,085 → "%−8,5" · 0 → "%0".
+    ///
+    /// Eksi işareti U+2212 (matematik eksisi), tire değil: tasarımın rakam
+    /// fontunda tire dar ve rakamlara yapışık görünüyor.
+    ///
+    /// Ondalık YALNIZCA gerektiğinde: "%+12" okunur, "%+12,0" gürültü. Ama
+    /// küçük değişimler yuvarlanınca kaybolur, o yüzden %10'un altında bir
+    /// ondalık gösteriliyor — %0,4'lük bir zam "%0" diye yazılırsa kart
+    /// "fiyat değişmedi" der, oysa değişti.
+    static func signedPercent(_ ratio: Double) -> String {
+        guard ratio.isFinite else { return "—" }
+        let percent = ratio * 100
+        let magnitude = abs(percent)
+        let digits = magnitude < 10 && magnitude > 0 ? 1 : 0
+        let text = String(format: "%.\(digits)f", magnitude)
+            .replacingOccurrences(of: ".", with: ",")
+        if percent > 0 { return "%+\(text)" }
+        if percent < 0 { return "%\u{2212}\(text)" }
+        return "%0"
+    }
+
     /// Para değerini FORMA geri yazmak için: "3.850.000" · "28,50".
     /// `qty` kullanılamaz — o `rounded()` uygulayıp ondalığı atıyor, yani
     /// 28,50 ₺'lik bir birim fiyat forma "29" olarak dolar ve kaydedilince
