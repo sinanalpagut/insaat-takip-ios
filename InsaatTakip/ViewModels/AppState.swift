@@ -44,8 +44,28 @@ final class AppState: ObservableObject {
             if let name = store.cachedProfile(uid: session.uid)?.name, !name.isEmpty {
                 currentUser = Self.user(from: session, name: name)
             } else {
+                // Önbellek boş — ama SUNUCU ismi biliyor olabilir. Uygulama
+                // silinip yeniden kurulduğunda anahtar zinciri oturumu koruyor,
+                // yerel önbellek ise sıfırlanıyor: yalnızca önbelleğe bakılırsa
+                // isim yeniden soruluyor ve verilen cevap `users/{uid}` belgesini
+                // YENİ `createdAt` ile eziyor. Farklı yazılırsa ortakların
+                // gördüğü ad da sessizce değişirdi.
                 pendingNameSession = session
+                Task { await adoptRemoteName(for: session) }
             }
+        }
+    }
+
+    /// Sunucudaki profili okur; isim varsa isim ekranını hiç göstermeden içeri
+    /// alır. Ekran bir an görünüp kapanabilir — bu, yanlış ismi kalıcılaştırmaya
+    /// yeğdir. Hata durumunda sessizce isim ekranında kalınır.
+    private func adoptRemoteName(for session: AuthSession) async {
+        guard let name = try? await profiles.fetch(uid: session.uid)?.name,
+              !name.isEmpty,
+              pendingNameSession?.uid == session.uid else { return }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            currentUser = Self.user(from: session, name: name)
+            pendingNameSession = nil
         }
     }
 
