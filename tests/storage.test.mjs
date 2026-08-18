@@ -60,6 +60,12 @@ before(async () => {
     // Okuma testleri için önceden yüklenmiş bir görsel.
     await uploadBytes(storageRef(ctx.storage(), `projects/${P1}/sitePhotos/seed.jpg`),
                       smallImage(), JPEG);
+    // Malzeme/gider fişi — ortağa AÇIK.
+    await uploadBytes(storageRef(ctx.storage(), `projects/${P1}/receipts/seed.jpg`),
+                      smallImage(), JPEG);
+    // Tahsilat dekontu — ortağa KAPALI (gönderenin adını taşır, madde 18).
+    await uploadBytes(storageRef(ctx.storage(), `projects/${P1}/paymentReceipts/seed.jpg`),
+                      smallImage(), JPEG);
   });
 
   ownerStorage = testEnv.authenticatedContext(OWNER).storage();
@@ -77,6 +83,26 @@ describe('storage — okuma', () => {
 
   it('ÜYE OLMAYAN indiremez', async () => {
     await assertFails(getBytes(storageRef(strangerStorage, `projects/${P1}/sitePhotos/seed.jpg`)));
+  });
+
+  it('ortak MALZEME FİŞİNİ indirir — aynı harcamayı listede zaten görüyor', async () => {
+    await assertSucceeds(getBytes(storageRef(memberStorage, `projects/${P1}/receipts/seed.jpg`)));
+  });
+
+  // Madde 18'in Storage ayağı: alıcı kimliği ortaktan ayrıldı. Dekontun
+  // üstünde gönderenin adı yazıyor; `receipts` kovasında dursaydı ortak
+  // `payments` belgesindeki id ile onu indirir ve Firestore'da kapatılan
+  // sızıntı buradan geri açılırdı.
+  it('ortak TAHSİLAT DEKONTUNU İNDİREMEZ — alıcı kimliği sızmasın', async () => {
+    await assertFails(getBytes(storageRef(memberStorage, `projects/${P1}/paymentReceipts/seed.jpg`)));
+  });
+
+  it('yönetici tahsilat dekontunu indirir', async () => {
+    await assertSucceeds(getBytes(storageRef(ownerStorage, `projects/${P1}/paymentReceipts/seed.jpg`)));
+  });
+
+  it('ÜYE OLMAYAN tahsilat dekontunu indiremez', async () => {
+    await assertFails(getBytes(storageRef(strangerStorage, `projects/${P1}/paymentReceipts/seed.jpg`)));
   });
 });
 
@@ -106,6 +132,16 @@ describe('storage — yazma', () => {
     await assertFails(uploadBytes(
       storageRef(ownerStorage, `projects/${P1}/sitePhotos/big.jpg`),
       new Uint8Array(4 * 1024 * 1024 + 1), JPEG));
+  });
+
+  it('yönetici tahsilat dekontu yükler', async () => {
+    await assertSucceeds(uploadBytes(
+      storageRef(ownerStorage, `projects/${P1}/paymentReceipts/x.jpg`), smallImage(), JPEG));
+  });
+
+  it('ortak tahsilat dekontu yükleyemez', async () => {
+    await assertFails(uploadBytes(
+      storageRef(memberStorage, `projects/${P1}/paymentReceipts/y.jpg`), smallImage(), JPEG));
   });
 
   it('bilinmeyen kova reddedilir — sessizce açılan yol olmasın', async () => {

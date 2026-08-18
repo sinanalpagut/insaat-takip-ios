@@ -26,7 +26,19 @@ struct ApartmentDetailSheet: View {
         viewModel.apartments.first { $0.id == apartmentId }
     }
 
-    private var isAdmin: Bool { appState.isAdmin }
+    /// PROJE BAZLI rol — global rol değil.
+    ///
+    /// `appState.isAdmin` her gerçek oturuma `.admin` veriyor (rol artık
+    /// projede yaşıyor, kullanıcıda değil — madde 16j). Burada globale
+    /// bakıldığında, davetle katılan ORTAK bu ekranda "Galeriden / Fotoğraf
+    /// Çek" karolarını görüyor, fotoğraf ekleyebiliyor ve yükleme hem
+    /// `storage.rules` hem `firestore.rules` tarafından 403 ile reddediliyordu:
+    /// ekranda duran ama hiçbir yere gitmeyen bir fotoğraf ve "sonra yeniden
+    /// denenecek" diyen, asla tutulamayacak bir söz. Aynı soru
+    /// `SitePhotosView`de baştan doğru soruluyordu.
+    private var isAdmin: Bool {
+        viewModel.role(forApartment: apartmentId, user: appState.currentUser) == .admin
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -315,6 +327,10 @@ struct ApartmentDetailSheet: View {
                 }
             }
         }
+        // Piksel EKRANA GELİNCE isteniyor. Açılışta hepsini indirmek, fotoğraf
+        // ekranını hiç açmayan kullanıcıya bile projenin tüm görsellerinin
+        // faturasını çıkarıyordu.
+        .task(id: photo.id) { viewModel.imageNeeded(bucket: .apartmentPhotos, photoId: photo.id) }
     }
 
     /// Kesikli "ekle" yuvası (galeri / kamera).
@@ -341,7 +357,7 @@ struct ApartmentDetailSheet: View {
         guard !pickedItems.isEmpty else { return }
         let items = pickedItems
         pickedItems = []
-        let role = appState.currentUser?.role ?? .partner
+        let role: UserRole = isAdmin ? .admin : .partner
 
         Task.detached(priority: .userInitiated) {
             var images: [UIImage] = []

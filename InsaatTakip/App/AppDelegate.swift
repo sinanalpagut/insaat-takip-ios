@@ -2,6 +2,7 @@ import FirebaseAuth
 import FirebaseCore
 import FirebaseFirestore
 import FirebaseFunctions
+import FirebaseStorage
 import UIKit
 
 // MARK: - App delegate (yalnızca Firebase telefon doğrulaması için)
@@ -103,7 +104,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         Functions.functions(region: FirebaseInviteService.region)
             .useEmulator(withHost: name, port: 5001)
 
-        print("[emulator] Firestore \(name):\(port) · Auth \(name):9099 · Functions \(name):5001")
+        // Storage emülatörü 9199'da. Bağlanmazsa "-emulator" ile açılan
+        // uygulama görsel baytlarını GERÇEK kovaya yüklerdi — jetonlar Auth
+        // emülatöründen gelirken üstelik.
+        Storage.storage().useEmulator(withHost: name, port: 9199)
+
+        print("[emulator] Firestore \(name):\(port) · Auth \(name):9099 · Functions \(name):5001 · Storage \(name):9199")
         #endif
     }
 

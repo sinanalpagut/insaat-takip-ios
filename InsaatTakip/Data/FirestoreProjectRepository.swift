@@ -355,16 +355,22 @@ final class FirestoreProjectRepository: ProjectRepository {
     // MARK: - Görselli modeller (elle)
 
     private func fields(of photo: SitePhoto) -> [String: Any] {
-        ["id": photo.id.uuidString,
-         "projectId": photo.projectId.uuidString,
-         "date": Timestamp(date: photo.date)]
+        var fields: [String: Any] = ["id": photo.id.uuidString,
+                                     "projectId": photo.projectId.uuidString,
+                                     "date": Timestamp(date: photo.date)]
+        // Yol ancak yükleme bitince yazılır; nil iken alan hiç konmaz ki
+        // "yol var ama boş" gibi üçüncü bir durum doğmasın.
+        if let path = photo.storagePath { fields["storagePath"] = path }
+        return fields
     }
 
     private func fields(of photo: ApartmentPhoto) -> [String: Any] {
-        ["id": photo.id.uuidString,
-         "projectId": photo.projectId.uuidString,
-         "apartmentId": photo.apartmentId.uuidString,
-         "label": photo.label]
+        var fields: [String: Any] = ["id": photo.id.uuidString,
+                                     "projectId": photo.projectId.uuidString,
+                                     "apartmentId": photo.apartmentId.uuidString,
+                                     "label": photo.label]
+        if let path = photo.storagePath { fields["storagePath"] = path }
+        return fields
     }
 
     private func fetchSitePhotos(_ pid: UUID) async throws -> [SitePhoto] {
@@ -378,7 +384,8 @@ final class FirestoreProjectRepository: ProjectRepository {
                                                    documentId: doc.documentID,
                                                    reason: "id / projectId / date eksik")
             }
-            return SitePhoto(id: id, projectId: projectId, date: date, image: nil)
+            return SitePhoto(id: id, projectId: projectId, date: date, image: nil,
+                             storagePath: doc.data()["storagePath"] as? String)
         }
     }
 
@@ -395,7 +402,8 @@ final class FirestoreProjectRepository: ProjectRepository {
             }
             let label = doc.data()["label"] as? String ?? ""
             return ApartmentPhoto(id: id, projectId: projectId, apartmentId: apartmentId,
-                                  label: label, image: nil)
+                                  label: label, image: nil,
+                                  storagePath: doc.data()["storagePath"] as? String)
         }
     }
 }

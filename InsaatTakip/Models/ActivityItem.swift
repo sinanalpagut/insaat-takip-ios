@@ -72,12 +72,19 @@ struct SitePhoto: Identifiable, Equatable {
     /// `SitePhoto.thumbnailSide` boyutuna indirgenir ve tek sefer üretilir.
     var image: UIImage?
 
+    /// Storage'daki nesnenin yolu; nil = bulutta kopya yok (madde 17).
+    /// Yükleme durumu AYRICA tutulmuyor: "bekliyor" bilgisi cihaza özgüdür
+    /// (başka cihaz A'nın yüklemesini tamamlayamaz) — belge düzeyindeki tek
+    /// gerçek, yolun var olup olmadığı.
+    var storagePath: String? = nil
+
     static let thumbnailSide: CGFloat = 1200
 
     /// Diff maliyeti: görselin baytlarını karşılaştırmak yerine kimlik + tarih.
     static func == (lhs: SitePhoto, rhs: SitePhoto) -> Bool {
         lhs.id == rhs.id
             && lhs.date == rhs.date
+            && lhs.storagePath == rhs.storagePath
             && (lhs.image === rhs.image)
     }
 
@@ -106,8 +113,11 @@ struct ApartmentPhoto: Identifiable, Equatable {
     let apartmentId: UUID
     var label: String        // "Salon", "Mutfak", "Görsel 3"…
     var image: UIImage?      // nil = tasarımdaki yer tutucu kare
+    /// Storage yolu; gerekçesi SitePhoto.storagePath ile aynı.
+    var storagePath: String? = nil
 
     static func == (lhs: ApartmentPhoto, rhs: ApartmentPhoto) -> Bool {
-        lhs.id == rhs.id && lhs.label == rhs.label && (lhs.image === rhs.image)
+        lhs.id == rhs.id && lhs.label == rhs.label
+            && lhs.storagePath == rhs.storagePath && (lhs.image === rhs.image)
     }
 }

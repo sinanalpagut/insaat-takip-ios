@@ -52,10 +52,24 @@ final class ProjectViewModel: ObservableObject {
     /// Firestore devredeyse dolu: davet kullanma bir Cloud Function çağrısı.
     private let invites: InviteService?
 
-    init(repository: ProjectRepository? = nil, invites: InviteService? = nil) {
+    /// Görsel deposu (disk + Storage). `nil` = demo: görseller RAM'de yaşar,
+    /// mevcut davranış aynen korunur. Firestore devredeyken pikseller diske
+    /// ANINDA, buluta arkadan gider (madde 17).
+    private let images: ImageStore?
+
+    /// Uçuştaki bulut aktarımları (yükleme + indirme). Bellek içi ve SÜRECE
+    /// ÖZGÜ: uçuştaki bir aktarım süreçten uzun yaşayamaz, yani uygulama
+    /// ölünce bu küme de ölmeli ve `hydrateImages` yeniden denemeli. Kalıcı
+    /// bir defter tutulsaydı defterle gerçek arasındaki ayrışma yeni bir hata
+    /// sınıfı olurdu.
+    private var transfersInFlight: Set<String> = []
+
+    init(repository: ProjectRepository? = nil, invites: InviteService? = nil,
+         images: ImageStore? = nil) {
         let source = repository ?? Self.makeRepository()
         self.repository = source
         self.invites = invites ?? (LaunchConfig.usesFirestore ? FirebaseInviteService() : nil)
+        self.images = images ?? (LaunchConfig.usesFirestore ? ImageStore() : nil)
         // Açılışta BEKLEME YOK: önbellek senkron okunur. `load()` async olsaydı
         // ekran bir kare boş görünür, yani kullanıcı bir fark görürdü.
         apply(source.cachedSnapshot())
@@ -120,6 +134,188 @@ final class ProjectViewModel: ObservableObject {
         for apartment in apartments where apartment.isCommitted {
             recalculateCollected(for: apartment.id)
         }
+
+        // Diskteki/buluttaki görselleri modele geri bağla. `load()` yalnızca
+        // üst veri döndürür (görsel baytları Firestore'da değil); bu çağrı
+        // olmasa oturum ortasındaki bir `refresh()` kullanıcının az önce
+        // eklediği fotoğrafları bile yer tutucuya çevirirdi.
+        hydrateImages()
+    }
+
+    // MARK: - Görsel canlandırma ve yükleme (madde 17)
+
+    /// İki adım: (1) DİSKTE olan anında bağlanır, (2) diskte olup bulutta
+    /// olmayan yeniden yüklenir — yarım kalmış yüklemelerin telafisi budur.
+    ///
+    /// BULUTTAN İNDİRME BURADA YOK, bilinçli: `sitePhotos`/`apartmentPhotos`
+    /// TÜM projelerin görsellerini taşıyor ve `apply()` her açılışta çalışıyor.
+    /// İndirme buraya konulduğunda, 300 fotoğraflı bir projeye katılan ortak
+    /// daha Dashboard'da dururken 300 eşzamanlı indirme başlıyordu: ~120 MB
+    /// hücresel trafik, 300 Storage okuması ve kuralın çapraz-servis
+    /// `firestore.get()`i yüzünden 300 EK Firestore okuması — kullanıcı fotoğraf
+    /// ekranını hiç açmasa bile. Piksel artık ekranda GÖRÜNEN hücre için
+    /// isteniyor: `imageNeeded(...)`.
+    private func hydrateImages() {
+        guard let images else { return }
+
+        for index in sitePhotos.indices where sitePhotos[index].image == nil {
+            let photo = sitePhotos[index]
+            if let cached = images.cached(bucket: .sitePhotos,
+                                          projectId: photo.projectId, id: photo.id) {
+                sitePhotos[index].image = cached
+            }
+        }
+        for index in apartmentPhotos.indices where apartmentPhotos[index].image == nil {
+            let photo = apartmentPhotos[index]
+            if let cached = images.cached(bucket: .apartmentPhotos,
+                                          projectId: photo.projectId, id: photo.id) {
+                apartmentPhotos[index].image = cached
+            }
+        }
+
+        // (2) Yarım kalmış yüklemeler: belge var, yol yok, piksel elde var.
+        for photo in sitePhotos where photo.storagePath == nil && photo.image != nil {
+            uploadImage(bucket: .sitePhotos, projectId: photo.projectId, id: photo.id)
+        }
+        for photo in apartmentPhotos where photo.storagePath == nil && photo.image != nil {
+            uploadImage(bucket: .apartmentPhotos, projectId: photo.projectId, id: photo.id)
+        }
+    }
+
+    /// Ekranda çizilen bir fotoğraf hücresi pikselini burada ister. Diskte
+    /// varsa `hydrateImages` zaten bağlamıştır; yoksa ve belgede yol varsa
+    /// buluttan indirilir. Görünmeyen fotoğraf indirilmez — fatura da trafik
+    /// de kullanıcının gerçekten baktığı kadardır.
+    func imageNeeded(bucket: ImageBucket, photoId: UUID) {
+        switch bucket {
+        case .sitePhotos:
+            guard let photo = sitePhotos.first(where: { $0.id == photoId }),
+                  photo.image == nil, let path = photo.storagePath else { return }
+            downloadImage(bucket: .sitePhotos, projectId: photo.projectId,
+                          id: photo.id, path: path)
+        case .apartmentPhotos:
+            guard let photo = apartmentPhotos.first(where: { $0.id == photoId }),
+                  photo.image == nil, let path = photo.storagePath else { return }
+            downloadImage(bucket: .apartmentPhotos, projectId: photo.projectId,
+                          id: photo.id, path: path)
+        case .receipts, .paymentReceipts:
+            break   // fişler madde 17'nin 3. parçasında
+        }
+    }
+
+    /// Storage'dan indirip modele bağlar. Kayıp ağda sessiz kalır: görsel yer
+    /// tutucuda kalır ve bir sonraki `refresh()` yeniden dener — üst veri
+    /// (tarih/etiket) zaten ekranda, kaybolan yalnızca piksel.
+    private func downloadImage(bucket: ImageBucket, projectId: UUID, id: UUID, path: String) {
+        guard let images else { return }
+        // Aynı nesne zaten iniyorsa ikinci kez İSTEME. Liste yeniden çizildikçe
+        // `imageNeeded` her hücre için tekrar çağrılıyor; bu kayıt olmasa aynı
+        // JPEG kaydırma başına birkaç kez inerdi.
+        let key = transferKey(bucket, projectId, id)
+        guard transfersInFlight.insert(key).inserted else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.transfersInFlight.remove(key) }
+            guard let image = try? await images.download(path: path, bucket: bucket,
+                                                         projectId: projectId, id: id)
+            else { return }
+            switch bucket {
+            case .sitePhotos:
+                if let i = self.sitePhotos.firstIndex(where: { $0.id == id }) {
+                    self.sitePhotos[i].image = image
+                }
+            case .apartmentPhotos:
+                if let i = self.apartmentPhotos.firstIndex(where: { $0.id == id }) {
+                    self.apartmentPhotos[i].image = image
+                }
+            case .receipts, .paymentReceipts:
+                self.receiptImages[id] = image
+            }
+        }
+    }
+
+    /// Diskteki görseli Storage'a yükler; başarıda belgeye `storagePath` yazar.
+    /// `pendingWrites` sayacına BAĞLI: yükleme de bir "gönderilecek kayıt" —
+    /// sayaca girmese, şeridin kapattığı sessiz kayıp sınıfı Storage'da
+    /// yeniden doğardı.
+    private func uploadImage(bucket: ImageBucket, projectId: UUID, id: UUID) {
+        guard let images else { return }
+        // Aynı görsel zaten gidiyorsa ikinci kez GÖNDERME. `hydrateImages`
+        // yolu henüz yazılmamış her fotoğrafı aday sayıyor; araya giren bir
+        // `refresh()` (örneğin davet kodu kabulü) uçuştaki yüklemeleri baştan
+        // başlatıyordu: aynı baytlar iki kez, bekleyen-yazma şeridi de gerçeğin
+        // iki katı. Kayıt SÜRECE ÖZGÜ — uygulama ölünce uçuştaki yükleme de
+        // ölür ve bir sonraki açılış yeniden denemeli.
+        let key = transferKey(bucket, projectId, id)
+        guard transfersInFlight.insert(key).inserted else { return }
+        beginPendingWrite()
+        Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.transfersInFlight.remove(key)
+                self.endPendingWrite()
+            }
+            do {
+                // Diskte dosya yoksa (depolama dolu) bellekteki kare yedek
+                // olarak gider — yoksa piksel hiçbir yere ulaşmadan kaybolurdu.
+                let path = try await images.upload(bucket: bucket, projectId: projectId,
+                                                   id: id, fallback: self.pixels(bucket, id))
+                switch bucket {
+                case .sitePhotos:
+                    if let i = self.sitePhotos.firstIndex(where: { $0.id == id }) {
+                        self.sitePhotos[i].storagePath = path
+                        self.persist([.sitePhoto(self.sitePhotos[i])], failureNote: "Fotoğraf yolu")
+                    } else {
+                        await self.discardOrphan(bucket, projectId, id, path)
+                    }
+                case .apartmentPhotos:
+                    if let i = self.apartmentPhotos.firstIndex(where: { $0.id == id }) {
+                        self.apartmentPhotos[i].storagePath = path
+                        self.persist([.apartmentPhoto(self.apartmentPhotos[i])], failureNote: "Görsel yolu")
+                    } else {
+                        await self.discardOrphan(bucket, projectId, id, path)
+                    }
+                case .receipts, .paymentReceipts:
+                    break   // fişler ayrı adımda (madde 17'nin 3. parçası)
+                }
+            } catch {
+                #if DEBUG
+                print("[image] yükleme başarısız \(bucket.rawValue)/\(id): \(error)")
+                #endif
+                // Yeniden deneme yalnızca piksel elde kaldıysa mümkün: diskte
+                // dosya ya da bellekte kare. İkisi de yoksa söz verilemez.
+                if self.pixels(bucket, id) != nil {
+                    self.flash("Görsel gönderilemedi · sonra yeniden denenecek")
+                } else {
+                    self.flash("Görsel gönderilemedi · yeniden ekleyin")
+                }
+            }
+        }
+    }
+
+    /// Modeldeki piksel — disk yazılamadığında yüklemeye yedek, hata mesajını
+    /// dürüst kurmak için de ölçüt.
+    private func pixels(_ bucket: ImageBucket, _ id: UUID) -> UIImage? {
+        switch bucket {
+        case .sitePhotos:      return sitePhotos.first { $0.id == id }?.image
+        case .apartmentPhotos: return apartmentPhotos.first { $0.id == id }?.image
+        case .receipts, .paymentReceipts: return receiptImages[id]
+        }
+    }
+
+    /// Yükleme uçuştayken kayıt silinmiş: az önce yazılan nesneyi geri al.
+    /// Yoksa hiçbir kodun bir daha silmeyeceği, projenin HER üyesinin
+    /// okuyabildiği bir yetim nesne bulutta kalırdı — üstelik kullanıcıya
+    /// "silindi" denmişken.
+    private func discardOrphan(_ bucket: ImageBucket, _ projectId: UUID,
+                               _ id: UUID, _ path: String) async {
+        await images?.delete(bucket: bucket, projectId: projectId, id: id, storagePath: path)
+    }
+
+    /// Uçuştaki aktarımların anahtarı — ImageStore'un disk dosya adıyla aynı
+    /// şema, yeni bir kimlik düzeni doğmasın diye.
+    private func transferKey(_ bucket: ImageBucket, _ projectId: UUID, _ id: UUID) -> String {
+        "\(bucket.rawValue)_\(projectId.uuidString)_\(id.uuidString)"
     }
 
     // MARK: Bekleyen yazma görünürlüğü
@@ -1486,6 +1682,9 @@ final class ProjectViewModel: ObservableObject {
                                        image: image)
             apartmentPhotos.append(photo)
             writes.append(.apartmentPhoto(photo))
+            self.images?.cache(image, bucket: .apartmentPhotos,
+                               projectId: apartment.projectId, id: photo.id)
+            uploadImage(bucket: .apartmentPhotos, projectId: apartment.projectId, id: photo.id)
         }
         persist(writes, failureNote: "Görsel")
         flash(images.count == 1 ? "Görsel eklendi" : "\(images.count) görsel eklendi")
@@ -1498,6 +1697,12 @@ final class ProjectViewModel: ObservableObject {
         apartmentPhotos.removeAll { $0.id == photoId }
         persist([.deleteApartmentPhoto(id: photoId, projectId: photo.projectId)],
                 failureNote: "Görsel silme")
+        // Bulut/disk temizliği en iyi çaba: belge silindi, kalan nesne yetim
+        // olur — sızıntı değil, temizlik borcu. Bu yüzden persist'i beklemiyor.
+        Task { [images] in
+            await images?.delete(bucket: .apartmentPhotos, projectId: photo.projectId,
+                                 id: photoId, storagePath: photo.storagePath)
+        }
         flash("Görsel silindi")
     }
 
@@ -1510,6 +1715,9 @@ final class ProjectViewModel: ObservableObject {
             let photo = SitePhoto(id: UUID(), projectId: projectId, date: Date(), image: image)
             sitePhotos.insert(photo, at: 0)
             writes.append(.sitePhoto(photo))
+            // Önce DİSK (uygulama ölse de piksel durur), sonra bulut.
+            self.images?.cache(image, bucket: .sitePhotos, projectId: projectId, id: photo.id)
+            uploadImage(bucket: .sitePhotos, projectId: projectId, id: photo.id)
         }
         persist(writes, failureNote: "Fotoğraf")
         flash(images.count == 1 ? "Fotoğraf eklendi" : "\(images.count) fotoğraf eklendi")

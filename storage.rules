@@ -9,16 +9,25 @@ rules_version = '2';
 // biri güncellenip diğeri unutulurdu.
 //
 // YOL ŞEMASI — Firestore koleksiyon adlarıyla bire bir:
-//   projects/{pid}/sitePhotos/{photoId}.jpg
-//   projects/{pid}/apartmentPhotos/{photoId}.jpg
-//   projects/{pid}/receipts/{logId}.jpg
+//   projects/{pid}/sitePhotos/{photoId}.jpg        → ortak OKUR
+//   projects/{pid}/apartmentPhotos/{photoId}.jpg   → ortak OKUR
+//   projects/{pid}/receipts/{logId}.jpg            → ortak OKUR (malzeme/gider fişi)
+//   projects/{pid}/paymentReceipts/{paymentId}.jpg → YALNIZCA YÖNETİCİ
 //
 // KISITLAR:
 //   · Yalnızca image/jpeg — uygulama zaten her görseli 1200px JPEG'e küçültüyor
 //     (madde 13); başka tür bir yükleme uygulamadan gelmiyor demektir.
 //   · 4 MB üst sınır: 1200px JPEG tipik ~300-500 KB; sınır, ele geçirilmiş bir
 //     oturumun depoyu çöplüğe çevirmesine karşı tavan.
-//   · Alıcı görseli diye bir yol YOK — kişisel veri Storage'a hiç girmiyor.
+//
+// KİŞİSEL VERİ — TAHSİLAT DEKONTU AYRI KOVADA:
+// Alıcının adı Firestore'da bilinçli olarak `buyers/{apartmentId}` belgesine
+// ayrıldı ve yalnızca yöneticiye açıldı (madde 18); gerekçe orada yazılı —
+// güvenlik kuralı ALAN gizleyemez, belge gizler. Tahsilat dekontunun üstünde
+// gönderenin adı soyadı (çoğu kez IBAN'ı da) yazıyor: aynı kişisel veri.
+// Malzeme fişiyle aynı kovada dursaydı, ortak `payments` belgesinden okuduğu
+// `paymentId` ile dekonta erişir ve Firestore'da kapatılan sızıntı Storage
+// üzerinden aynen geri açılırdı. Bu yüzden ayrı yol, ayrı okuma kuralı.
 // ═══════════════════════════════════════════════════════════════════════════
 
 service firebase.storage {
@@ -41,14 +50,26 @@ service firebase.storage {
           && request.resource.size < 4 * 1024 * 1024;
     }
 
-    /// Bilinen görsel kovaları. Liste AÇIK: yeni bir kova eklendiğinde buraya
-    /// da yazılmalı — sessizce dünyaya açılan yol olmasın.
-    function knownCollection(collection) {
+    /// Ortağın okuyabildiği kovalar. Ortak aynı harcamayı listede zaten
+    /// görüyor; fişi de görmesi şeffaflığın parçası.
+    function memberReadable(collection) {
       return collection in ['sitePhotos', 'apartmentPhotos', 'receipts'];
     }
 
+    /// Yalnızca yöneticinin okuyabildiği kovalar (yukarıdaki KİŞİSEL VERİ notu).
+    function ownerReadable(collection) {
+      return collection == 'paymentReceipts';
+    }
+
+    /// Bilinen görsel kovaları. Liste AÇIK: yeni bir kova eklendiğinde buraya
+    /// da yazılmalı — sessizce dünyaya açılan yol olmasın.
+    function knownCollection(collection) {
+      return memberReadable(collection) || ownerReadable(collection);
+    }
+
     match /projects/{pid}/{collection}/{file} {
-      allow read: if knownCollection(collection) && isMember(pid);
+      allow read: if (memberReadable(collection) && isMember(pid))
+                  || (ownerReadable(collection) && isOwner(pid));
       allow create, update: if knownCollection(collection) && isOwner(pid) && isSmallJpeg();
       allow delete: if knownCollection(collection) && isOwner(pid);
     }

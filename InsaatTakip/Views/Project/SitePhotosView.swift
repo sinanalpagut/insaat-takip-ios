@@ -143,6 +143,9 @@ struct SitePhotosView: View {
     /// Color.clear + aspectRatio: hücre, ızgara sütununu kare olarak doldurur.
     @ViewBuilder
     private func currentWeekTile(_ photo: SitePhoto) -> some View {
+        // Piksel EKRANA GELİNCE isteniyor (`.task` aşağıda). Açılışta bütün
+        // projelerin bütün görsellerini indirmek, fotoğraf ekranını hiç açmayan
+        // kullanıcıya da hücresel veri ve Storage faturası çıkarıyordu.
         // Görsel içe aktarımda bir kez küçültülüp saklanır; burada yalnızca çizilir.
         if let image = photo.image {
             Color.clear
@@ -169,6 +172,9 @@ struct SitePhotosView: View {
                 .background(Palette.fillMuted.opacity(0.6))
                 .cornerRadius(12)
                 .dashedBorder(Palette.dashed, radius: 12, lineWidth: 1.2)
+                .task(id: photo.id) {
+                    viewModel.imageNeeded(bucket: .sitePhotos, photoId: photo.id)
+                }
         }
     }
 
