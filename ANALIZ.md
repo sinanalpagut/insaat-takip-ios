@@ -471,7 +471,37 @@ projesi kullanılmalı — kurallar zaten yayında.
         daire olduğu görünsün); aynı çipe ikinci dokunuş süzgeci kaldırıyor.
 - [ ] 23. Belgelerin gerçekten açılabilmesi/indirilmesi
 - [x] 24. ~~Fiş OCR'ı~~ — **tamamlandı** (commit `92f1554`, cihaz üstü Vision)
-- [ ] 25. m² maliyeti ve malzeme fiyat geçmişi
+- [x] 25. m² maliyeti ve malzeme fiyat geçmişi — **TAMAM (18 Ağu 2026)**
+      · **Fiyat geçmişi.** Veri zaten kayıtlıydı (her giriş fişi kendi birim
+        fiyatını donduruyor) ama hiçbir ekranda görünmüyordu. Yazmadan önce üç
+        hata düzeltilmek zorundaydı: (1) `logs(for:)` SIRALAMIYORDU ve Firestore
+        `getDocuments()` sırasız döndürüyor — grafik gerçek cihazda uydurma
+        çıkardı, aynı düzeltme "Son Hareketler" listesini de doğrulttu;
+        (2) çıkış fişleri seriye girmemeli, taşıdıkları fiyat o anki güncel
+        fiyatın kopyası; (3) `Material.unitPrice` "güncel fiyat" diye
+        gösteriliyordu ama SON GİRİLEN fiyattı ve fiş düzeltilince/silinince
+        geri alınmıyordu — artık `recalculateMaterial` içinde en yeni giriş
+        fişinden türetiliyor. Kapsam ekranda yazılı: devir tarihsiz olduğu için
+        seri "kayıtlı giriş fişlerindeki fiyat". Swift Charts getirilmedi.
+        Demo veriye gerçekçi zam serisi eklendi (Kas 2024 24,80 → Şub 2025
+        28,50), yoksa özellik ekranda düz çizgi gösterip doğrulanamıyordu.
+      · **m² maliyeti.** Paydası YOKTU: `Apartment.area` serbest METİNDİ ve
+        `parseNumber("111,55 m²")` SESSİZCE 0 döndürüyordu. Alan
+        `areaM2: Double?` oldu (optional, çünkü yeni projede alan girilmemiş ve
+        0 ile "bilmiyorum" aynı şey değil), giriş kutusu ondalık klavyeye
+        geçti, eski metin belgeleri için tek yönlü göç yazıldı.
+        Payda TÜM daireler (kat karşılığını da müteahhit inşa etti), pay
+        `totalCost` (yalnız malzeme olsa rakam gerçeğin altında kalırdı).
+        ORTAK ALAN paydada yok ve bu rakamı YUKARI çekiyor — raporda yazılı.
+        Rakam dönem çipinden bağımsız ("proje geneli") ve ortağa giden PDF'e
+        giriyor.
+      · **GÖÇ SESSİZCE ÇALIŞMIYORDU** ve yalnızca emülatörde eski biçimli
+        belge okutarak yakalandı: `parseLegacyArea` süzgeci `isNumber`
+        kullanıyordu, Swift'te `Character("²").isNumber` **TRUE** — birim ekinin
+        kendisi ayrıştırmayı bozuyor, "111,55²" → nil. Yayındaki her eski alan
+        sessizce kaybolacaktı. Süzgeç açıkça ASCII rakama çevrildi.
+      · Ders: elle yazılan Firestore belgelerinde kimlikler BÜYÜK harf olmalı;
+        Swift'in `UUID.uuidString`i büyük harf üretiyor.
 - [ ] 26. CSV/JSON dışa aktarma + portföy özeti
 
 ### Faz 4 — Yayın paketi
