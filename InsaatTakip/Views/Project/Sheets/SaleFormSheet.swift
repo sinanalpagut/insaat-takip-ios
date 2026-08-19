@@ -322,8 +322,17 @@ struct SaleFormSheet: View {
             return "Bedel ve peşinat girilince aylık tutar burada görünür."
         }
         let rest = price - down
-        let monthly = Kurus.kurus(rest.raw / Int64(installmentCount))
+        // Önizleme, planı KURAN işlemin kendisinden okunuyor — ayrıca
+        // hesaplanmıyor. Önceden burada `rest.raw / Int64(installmentCount)`
+        // vardı: `Kurus.split`ten bağımsız ÜÇÜNCÜ bir yuvarlama noktası ve
+        // ekranla veritabanının sessizce ayrışabildiği bir yer. Nitekim
+        // ayrışmıştı: plan üretimi son taksiti şişirirken bu satır doğru eşit
+        // tutarı gösteriyordu, farkı da "yaklaşık" kelimesi örtüyordu.
+        let shares = Kurus.split(rest, into: installmentCount)
+        let monthly = shares.first ?? .zero
         let downText = down > .zero ? "\(Fmt.money(down)) peşinat + " : ""
+        // Paylar arasında en fazla 1 kuruş fark olabilir; "yaklaşık" bunu
+        // karşılıyor ve artık gerçekten yalnızca bunu karşılıyor.
         return "\(downText)\(installmentCount) ay × yaklaşık \(Fmt.money(monthly)). İlk vade \(Fmt.shortDate(firstDueDate))."
     }
 
