@@ -26,6 +26,7 @@ struct DataSnapshot {
     var sitePhotos: [SitePhoto] = []
     var expenses: [Expense] = []
     var payments: [Payment] = []
+    var installments: [Installment] = []
     var apartmentPhotos: [ApartmentPhoto] = []
     var auditEntries: [AuditEntry] = []
 }
@@ -45,6 +46,8 @@ enum DocumentChange {
     case sitePhoto(SitePhoto)
     case expense(Expense)
     case payment(Payment)
+    /// Taksit planı kaydı (madde 21).
+    case installment(Installment)
     case apartmentPhoto(ApartmentPhoto)
     case audit(AuditEntry)
     /// Alıcının kimliği — daire belgesinden AYRI (madde 18): kural alan
@@ -68,6 +71,10 @@ enum DocumentChange {
     /// düşürdüğünü zaten biliyor (cancelSale'deki `removed`), o yüzden liste
     /// geçirmek işlemi gerçekten tek partiye indiriyor.
     case deletePayments(ids: [UUID], projectId: UUID)
+    /// Bir dairenin TÜM taksit planı. Satış iptalinde plan da düşmeli —
+    /// yoksa iptal edilmiş dairenin vadeleri yetim kalır ve gecikme
+    /// listesinde "Boş" bir daire görünür.
+    case deleteInstallments(ids: [UUID], projectId: UUID)
 }
 
 /// @MainActor bilinçli: `SitePhoto` ve `ApartmentPhoto` birer `UIImage` taşıdığı

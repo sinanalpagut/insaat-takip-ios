@@ -26,6 +26,9 @@ final class ProjectViewModel: ObservableObject {
     @Published var sitePhotos: [SitePhoto] = []        // Şantiye fotoğraf yuvaları
     @Published var expenses: [Expense] = []            // Malzeme dışı giderler
     @Published var payments: [Payment] = []            // Daire tahsilatları
+    /// Taksit planı — BEKLENEN ödemeler (madde 21). `payments` gerçekleşeni
+    /// tutuyor; ikisinin farkı "gecikmiş tahsilat".
+    @Published var installments: [Installment] = []
     @Published var apartmentPhotos: [ApartmentPhoto] = []   // Daire görselleri
     /// Düzenleme ve silmelerin değişiklik kaydı (eski → yeni, kim, ne zaman).
     @Published var auditEntries: [AuditEntry] = []
@@ -142,6 +145,7 @@ final class ProjectViewModel: ObservableObject {
         sitePhotos = snapshot.sitePhotos
         expenses = snapshot.expenses
         payments = snapshot.payments
+        installments = snapshot.installments
         apartmentPhotos = snapshot.apartmentPhotos
         auditEntries = snapshot.auditEntries
 
@@ -1419,6 +1423,9 @@ final class ProjectViewModel: ObservableObject {
         apartments[index] = apartment
 
         // Satış iptal edilince o daireye ait tahsilat kayıtları da düşer.
+        let droppedPlan = installments.filter { $0.apartmentId == apartmentId }
+        installments.removeAll { $0.apartmentId == apartmentId }
+
         let removed = payments.filter { $0.apartmentId == apartmentId }
         // N adet dekont: belgeler silindikten sonra bu kimlikler hiçbir yerden
         // geri gelmez — nesneleri şimdi silinmezse bulutta sonsuza dek kalır ve
@@ -1452,7 +1459,13 @@ final class ProjectViewModel: ObservableObject {
                                         .deleteBuyer(apartmentId: apartmentId,
                                                      projectId: apartment.projectId),
                                         .deletePayments(ids: removed.map(\.id),
-                                                        projectId: apartment.projectId)]
+                                                        projectId: apartment.projectId),
+                                        // PLAN DA DÜŞÜYOR. Unutulsaydı iptal
+                                        // edilmiş dairenin vadeleri yetim
+                                        // kalır ve gecikme listesinde "Boş"
+                                        // bir daire görünürdü.
+                                        .deleteInstallments(ids: droppedPlan.map(\.id),
+                                                            projectId: apartment.projectId)]
         writes += recordAudit(recordId: apartmentId, projectId: apartment.projectId,
                               subject: "Daire No \(apartment.apartmentNumber) satışı",
                               action: .delete, changes: changes)
@@ -1753,7 +1766,9 @@ final class ProjectViewModel: ObservableObject {
     /// Daire satışı ekler veya mevcut satış kaydını günceller.
     @discardableResult
     func saveSale(role: UserRole, apartmentId: UUID, buyerName: String,
-                  priceText: String, paidText: String, payment: PaymentStatus, saleDate: Date? = nil) -> Bool {
+                  priceText: String, paidText: String, payment: PaymentStatus,
+                  saleDate: Date? = nil,
+                  installmentCount: Int = 0, firstDueDate: Date? = nil) -> Bool {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return false }
 
@@ -1879,6 +1894,37 @@ final class ProjectViewModel: ObservableObject {
                                       subject: "Daire No \(apartment.apartmentNumber) satışı",
                                       action: .update, changes: changes)
             }
+        }
+
+        // TAKSİT PLANI (madde 21). Yalnızca taksit adedi verilmişse kuruluyor;
+        // peşinat, formda girilen "tahsil edilen" tutarı.
+        //
+        // Plan HER KAYITTA YENİDEN KURULUYOR: eskisi silinip yenisi yazılıyor.
+        // Kısmi güncelleme denenseydi (bedel değişince tutarları oranla, vade
+        // gününü koru…) sessizce tutarsız bir plan üretme riski doğardı ve
+        // hangi taksidin kullanıcının elle değiştirdiği, hangisinin türetildiği
+        // ayırt edilemezdi. Yeniden kurmak kaybı görünür kılıyor: ödemeler
+        // ayrı defterde duruyor, mahsup FIFO ile yeniden hesaplanıyor.
+        let previousPlan = installments.filter { $0.apartmentId == apartmentId }
+        if !previousPlan.isEmpty {
+            installments.removeAll { $0.apartmentId == apartmentId }
+            writes.append(.deleteInstallments(ids: previousPlan.map(\.id),
+                                              projectId: apartment.projectId))
+        }
+        if installmentCount > 0, after.price > .zero {
+            // Vade ÖĞLEN'e sabitleniyor — gün sınırı sorunları için bkz.
+            // Installment modelinin başındaki not.
+            let anchor = firstDueDate ?? after.saleDate ?? Date()
+            let noon = Fmt.calendar.date(bySettingHour: 12, minute: 0, second: 0,
+                                         of: anchor) ?? anchor
+            let plan = Installment.plan(apartmentId: apartmentId,
+                                        projectId: apartment.projectId,
+                                        price: after.price,
+                                        downPayment: after.paidAmount,
+                                        count: installmentCount,
+                                        firstDueDate: noon)
+            installments.append(contentsOf: plan)
+            writes += plan.map { DocumentChange.installment($0) }
         }
 
         // Satış akışa `kind: .sale` olarak düşer. Koşul isNewSale DEĞİL "bu

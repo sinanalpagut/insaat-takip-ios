@@ -21,6 +21,10 @@ struct SaleFormSheet: View {
     @State private var payment: PaymentStatus = .tamamlandi
     /// Sözleşme tarihi; düzenlemede kayıtlı tarihle açılır.
     @State private var saleDate = Date()
+
+    /// Taksit planı (madde 21). Yalnızca "Taksitli" seçiliyken sorulur.
+    @State private var installmentCount = 12
+    @State private var firstDueDate = Date()
     @State private var didPrefill = false
 
     /// Formda seçilebilecek daireler: gerçekten boş olanlar + düzenlenen daire.
@@ -134,6 +138,57 @@ struct SaleFormSheet: View {
                         .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
                     }
                     .padding(.top, 16)
+
+                    // TAKSİT PLANI — yalnızca "Taksitli" seçiliyken.
+                    //
+                    // Bugüne kadar "Taksitli" bir ETİKETTİ: arkasında taksit
+                    // sayısı, tutarı ya da vadesi yoktu, dolayısıyla "gecikmiş
+                    // tahsilat" sorusu cevaplanamıyordu.
+                    if payment == .taksitli {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("TAKSİT PLANI")
+                                .smallCapsLabel(size: 10, color: Palette.textControl, tracking: 0.9)
+
+                            HStack {
+                                Text("Taksit sayısı")
+                                    .font(.manrope(13.5, .medium))
+                                    .foregroundColor(Palette.textMuted)
+                                Spacer()
+                                Text("\(installmentCount)")
+                                    .font(.sora(15, .bold))
+                                    .foregroundColor(Palette.ink)
+                                Stepper("", value: $installmentCount, in: 1...240)
+                                    .labelsHidden()
+                                    .tint(Palette.accent)
+                            }
+                            .padding(.horizontal, 14)
+                            .frame(height: 52)
+                            .background(Palette.surface)
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
+
+                            HStack {
+                                Text("İlk vade")
+                                    .font(.manrope(13.5, .medium))
+                                    .foregroundColor(Palette.textMuted)
+                                Spacer()
+                                // Sözleşme tarihi geçmişe açık ama vade
+                                // GELECEĞE bakar; alt sınır yok, üst sınır da.
+                                DatePicker("", selection: $firstDueDate, displayedComponents: .date)
+                                    .labelsHidden()
+                                    .tint(Palette.accent)
+                            }
+                            .padding(.horizontal, 14)
+                            .frame(height: 52)
+                            .background(Palette.surface)
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
+
+                            Text(planSummary)
+                                .font(.manrope(11.5, .medium))
+                                .foregroundColor(Palette.textTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 16)
+                    }
 
                     PrimaryButton(title: isConverting ? "Satışa Çevir"
                                      : (isEditing ? "Kaydı Güncelle" : "Satışı Kaydet")) { save() }
@@ -256,6 +311,22 @@ struct SaleFormSheet: View {
         priceText = apartment.price > .zero ? Fmt.moneyText(apartment.price) : ""
     }
 
+    /// Kaydetmeden ÖNCE planın ne üreteceğini söyler.
+    ///
+    /// Rakamı kullanıcı kaydettikten sonra keşfetmemeli: 3.850.000 ₺'lik bir
+    /// daireyi 12 taksite bölerken aylık tutarın ne olacağı kararı etkiliyor.
+    private var planSummary: String {
+        let price = ProjectViewModel.parseMoney(priceText)
+        let down = ProjectViewModel.parseMoney(paidText)
+        guard price > down, installmentCount > 0 else {
+            return "Bedel ve peşinat girilince aylık tutar burada görünür."
+        }
+        let rest = price - down
+        let monthly = Kurus.kurus(rest.raw / Int64(installmentCount))
+        let downText = down > .zero ? "\(Fmt.money(down)) peşinat + " : ""
+        return "\(downText)\(installmentCount) ay × yaklaşık \(Fmt.money(monthly)). İlk vade \(Fmt.shortDate(firstDueDate))."
+    }
+
     private func save() {
         guard let apartment = selectedApartment else {
             viewModel.flash("Daire seçilmedi")
@@ -267,7 +338,9 @@ struct SaleFormSheet: View {
                                        priceText: priceText,
                                        paidText: paidText,
                                        payment: payment,
-                                       saleDate: saleDate)
+                                       saleDate: saleDate,
+                                       installmentCount: payment == .taksitli ? installmentCount : 0,
+                                       firstDueDate: payment == .taksitli ? firstDueDate : nil)
         if saved { dismiss() }
     }
 

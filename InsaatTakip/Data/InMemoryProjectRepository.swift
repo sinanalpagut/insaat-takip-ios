@@ -21,6 +21,7 @@ final class InMemoryProjectRepository: ProjectRepository {
     var sitePhotos: [SitePhoto] = []
     var expenses: [Expense] = []
     var payments: [Payment] = []
+    var installments: [Installment] = []
     var apartmentPhotos: [ApartmentPhoto] = []
     var auditEntries: [AuditEntry] = []
 
@@ -34,7 +35,8 @@ final class InMemoryProjectRepository: ProjectRepository {
         DataSnapshot(projects: projects, materials: materials, materialLogs: materialLogs,
                      apartments: apartments, partners: partners, documents: documents,
                      activities: activities, sitePhotos: sitePhotos, expenses: expenses,
-                     payments: payments, apartmentPhotos: apartmentPhotos,
+                     payments: payments, installments: installments,
+                     apartmentPhotos: apartmentPhotos,
                      auditEntries: auditEntries)
     }
 
@@ -64,6 +66,7 @@ final class InMemoryProjectRepository: ProjectRepository {
         case .activity(let value):       upsert(value, into: &activities, newestFirst: true)
 
         case .payment(let value):        upsert(value, into: &payments)
+        case .installment(let value):    upsert(value, into: &installments)
         case .document(let value):       upsert(value, into: &documents, newestFirst: true)
         case .sitePhoto(let value):      upsert(value, into: &sitePhotos, newestFirst: true)
         case .apartmentPhoto(let value): upsert(value, into: &apartmentPhotos)
@@ -88,6 +91,9 @@ final class InMemoryProjectRepository: ProjectRepository {
         case .deletePayments(let ids, _):
             let dropped = Set(ids)
             payments.removeAll { dropped.contains($0.id) }
+        case .deleteInstallments(let ids, _):
+            let dropped = Set(ids)
+            installments.removeAll { dropped.contains($0.id) }
         }
     }
 
