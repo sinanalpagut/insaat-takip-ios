@@ -11,7 +11,8 @@
     "java:install": "sh scripts/install-java.sh",
     "login": "npx firebase login",
     "rules:deploy": "sh scripts/firebase.sh deploy --only firestore:rules,firestore:indexes,storage",
-    "rules:current": "sh scripts/firebase.sh firestore:databases:list"
+    "rules:current": "sh scripts/firebase.sh firestore:databases:list",
+    "build:number": "sh scripts/set-build-number.sh"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

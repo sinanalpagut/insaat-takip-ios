@@ -771,7 +771,37 @@ projesi kullanılmalı — kurallar zaten yayında.
         silme fazla geniş yazılsaydı projeden ayrılan bir ortak müteahhidin
         bütün projesini götürürdü. İşlev YAYINDA.
 - [ ] 29. Davet deep link'i (WhatsApp bağlantısı çalışsın)
-- [ ] 30. `PrivacyInfo.xcprivacy` + Crashlytics + build numarası otomasyonu
+- [~] 30. `PrivacyInfo.xcprivacy` + build numarası — **MANİFEST VE BUILD NO TAMAM**,
+      Crashlytics madde 27'ye bağlandı (19 Ağu 2026)
+      · **Manifest ZORUNLU hâle gelmişti:** Firebase Apple'ın "yaygın kullanılan
+        üçüncü parti SDK" listesinde ve eklendiği an hem kendi imzalı manifesti
+        hem uygulamanın kendi manifesti gerekiyor.
+      · Beyanlar TAHMİNLE değil KODLA doğrulanarak yazıldı: kaynak "required
+        reason API" listesine göre tarandı. Sonuç: yalnızca UserDefaults
+        (CA92.1). Disk alanı, systemUptime ve aktif klavye API'leri hiç
+        çağrılmıyor.
+      · **Dosya zaman damgası beyanı GEREKMEDİ, çünkü erişim daraltıldı:**
+        `DocumentStore` boyut için `attributesOfItem` çağırıyordu ve o API
+        zaman damgalarını da döndürdüğü için Apple'ın listesine giriyor.
+        Yalnızca boyut gerektiğinden `.fileSizeKey`e geçildi — kullanılmayan bir
+        erişimi beyan etmek yerine erişimin kendisini daraltmak.
+      · Toplanan veri türleri beyan edildi: telefon, ad, fotoğraf ve kullanıcı
+        içeriği (iş kayıtları + ALICI ADLARI). Hiçbiri izleme amaçlı değil.
+      · Paket doğrulandı: manifest Firebase'in kendi manifestlerinin yanında.
+      · **BUILD NUMARASI — derleme içi betik ÇALIŞMIYOR ve sessizce
+        çalışmıyordu.** Bir Run Script fazı eklendi; `ENABLE_USER_SCRIPT_SANDBOXING
+        = YES` olduğu için kum havuzu `.git` okumasını engelledi, `git rev-list`
+        BOŞ döndü ve numara hep 1 kaldı — hiçbir uyarı çıkmadan. Kum havuzunu
+        kapatmak Apple'ın önerdiği güvenlik ayarını zayıflatmak olurdu; faz
+        kaldırıldı ve numara derlemenin DIŞINDA üretiliyor:
+        `npm run build:number` (git commit sayısı → `CURRENT_PROJECT_VERSION`).
+        Betik sürümün GERİ GİTMESİNİ reddediyor (sığ klonda commit sayısı düşük
+        çıkar; App Store küçük build numarasını kabul etmiyor).
+        Doğrulandı: pakette `CFBundleVersion = 86`.
+      · **KALAN — Crashlytics.** Bilinçli olarak madde 27'ye bağlandı: analitik
+        eklendiği an App Privacy etiketi ve GİZLİLİK POLİTİKASI da güncellenmek
+        zorunda, o da alan adına bağlı ve henüz yayında değil. Şimdi eklenirse
+        politika onu kapsamadan yayına çıkmış olurdu.
 - [ ] 31. Erişilebilirlik paketi (kontrast, 44pt hedefler, VoiceOver, Dynamic Type)
 
 ---

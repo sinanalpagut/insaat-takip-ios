@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- ═══════════════════════════════════════════════════════════════════
+	     Gizlilik Manifesti (madde 30)
+
+	     Firebase eklendiği an ZORUNLU hâle geldi: Apple'ın "yaygın kullanılan
+	     üçüncü parti SDK" listesinde ve UserDefaults kullanıyor. Firebase
+	     kendi imzalı manifestini getiriyor; bu dosya UYGULAMANIN KENDİ
+	     erişimlerini ve topladığı veri türlerini beyan ediyor.
+
+	     Beyanlar KODLA DOĞRULANARAK yazıldı, tahminle değil: kaynak
+	     "required reason API" listesine göre tarandı. Sonuç: yalnızca
+	     UserDefaults kullanılıyor. Disk alanı, systemUptime ve aktif klavye
+	     API'leri hiç çağrılmıyor. Dosya zaman damgası da çağrılmıyor —
+	     `DocumentStore` boyut için bilinçli olarak `.fileSizeKey`
+	     kullanıyor (gerekçesi orada yazılı).
+	     ═══════════════════════════════════════════════════════════════════ -->
+
+	<!-- Reklam/izleme YOK. Uygulamada analitik, reklam kimliği ve üçüncü
+	     parti izleyici bulunmuyor. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!-- Oturum, yerel profil önbelleği ve sahte servis anahtarları.
+			     Hepsi UYGULAMANIN KENDİ verisi — CA92.1 tam bu durum. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array>
+		<!-- Telefon numarası — kimlik doğrulamanın kendisi (SMS ile giriş). -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhoneNumber</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- Ad — ortak listesinde, hareket akışında ve denetim defterinde
+		     görünüyor; numarayla bırakılsaydı tablo okunamaz olurdu. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeName</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- Şantiye ve daire fotoğrafları, fiş/dekont görselleri. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhotosorVideos</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- Kullanıcının girdiği iş kayıtları: malzeme hareketleri, giderler,
+		     satış ve tahsilat kayıtları, sözleşme/ruhsat dosyaları ve ALICI
+		     ADLARI. Alıcı adı üçüncü kişiye ait bir veri; uygulamada yalnızca
+		     proje sahibine açık (ayrı belge + ayrı Storage kovası). -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherUserContentData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

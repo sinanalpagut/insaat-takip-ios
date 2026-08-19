@@ -69,8 +69,15 @@ final class DocumentStore {
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.copyItem(at: url, to: destination)
 
-        let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
-        return (attributes[.size] as? UInt64) ?? 0
+        // `attributesOfItem` DEĞİL `resourceValues(forKeys: [.fileSizeKey])`.
+        //
+        // İkisi de boyutu veriyor ama ilki dosya ZAMAN DAMGALARINI da
+        // döndürüyor ve bu yüzden Apple'ın "gerekçeli API" listesine giriyor
+        // (NSPrivacyAccessedAPICategoryFileTimestamp). Bize yalnızca boyut
+        // lazım; kullanmadığımız bir erişimi manifestte beyan etmek yerine
+        // erişimin kendisini daraltmak doğrusu. `.fileSizeKey` o listede yok.
+        let values = try destination.resourceValues(forKeys: [.fileSizeKey])
+        return UInt64(values.fileSize ?? 0)
     }
 
     /// Yerel kopyayı, önizlemenin tanıyacağı ADLA geçici dizine yazar.
