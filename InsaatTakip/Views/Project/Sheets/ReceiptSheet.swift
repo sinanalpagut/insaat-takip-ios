@@ -207,7 +207,14 @@ struct ReceiptSheet: View {
                                         .frame(width: 30, height: 30)
                                         .background(Palette.fillMuted)
                                         .cornerRadius(9)
+                                        // Geri alınamayan bir işlem (fiş
+                                        // fotoğrafını ve taramasını siliyor)
+                                        // uygulamanın en küçük butonlarından
+                                        // birindeydi: 30×30 = asgarinin %46'sı.
+                                        .frame(width: 44, height: 44)
+                                        .contentShape(Rectangle())
                                 }
+                                .accessibilityLabel("Fiş fotoğrafını kaldır")
                             }
 
                             if let reading, reading.hasAnything {

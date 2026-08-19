@@ -87,7 +87,7 @@ struct WelcomeView: View {
             // aynı telefon girişinden geçiyor, koda dashboard'dan ulaşıyor.
             Text("Ortak olarak davet edildiysen de telefonunla giriş yap; davet kodunu girişten sonra kullanacaksın.")
                 .font(.manrope(11, .medium))
-                .foregroundColor(.white.opacity(0.35))
+                .foregroundColor(.white.opacity(0.62))
                 .lineSpacing(3)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)

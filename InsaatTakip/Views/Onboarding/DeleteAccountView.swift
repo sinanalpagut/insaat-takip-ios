@@ -127,7 +127,7 @@ struct DeleteAccountView: View {
 
             Text("Güvenlik için numarana bir kod göndereceğiz.")
                 .font(.manrope(11.5, .medium))
-                .foregroundColor(.white.opacity(0.45))
+                .foregroundColor(.white.opacity(0.62))
                 .padding(.top, 12)
         }
     }

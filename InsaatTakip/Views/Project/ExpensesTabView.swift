@@ -157,7 +157,7 @@ struct ExpensesTabView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
-        .frame(height: 190)
+        .frame(minHeight: 190)
         .background(Palette.fillSubtle)
         .cornerRadius(16)
         .dashedBorder(Palette.dashed, radius: 16)

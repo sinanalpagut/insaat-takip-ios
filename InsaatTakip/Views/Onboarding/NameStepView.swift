@@ -33,7 +33,7 @@ struct NameStepView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("AD SOYAD")
-                    .smallCapsLabel(size: 10, color: .white.opacity(0.45), tracking: 1.0)
+                    .smallCapsLabel(size: 10, color: .white.opacity(0.62), tracking: 1.0)
                 TextField("", text: $name, prompt: Text("Örn. Mehmet Kılıç")
                     .foregroundColor(.white.opacity(0.3)))
                     .textContentType(.name)

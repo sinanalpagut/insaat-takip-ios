@@ -96,7 +96,7 @@ struct JoinWithCodeView: View {
 
             Text("Kodlar 48 saat geçerlidir ve tek kişilik kullanım içindir.")
                 .font(.manrope(11, .medium))
-                .foregroundColor(.white.opacity(0.35))
+                .foregroundColor(.white.opacity(0.62))
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 12)
         }

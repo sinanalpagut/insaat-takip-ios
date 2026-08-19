@@ -26,7 +26,7 @@ struct PhoneSignInView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Spacer()
-                DarkHeaderButton(systemName: "xmark") { dismiss() }
+                DarkHeaderButton(systemName: "xmark", label: "Kapat") { dismiss() }
             }
             .padding(.top, 6)
 
@@ -80,7 +80,7 @@ struct PhoneSignInView: View {
 
             Text("Girişte SMS ile tek kullanımlık kod gönderilir. Numaran yalnızca kimlik doğrulama ve ortak davetleri için kullanılır.")
                 .font(.manrope(11.5, .medium))
-                .foregroundColor(.white.opacity(0.35))
+                .foregroundColor(.white.opacity(0.62))
                 .lineSpacing(3)
                 .padding(.bottom, 18)
         }
@@ -105,7 +105,7 @@ struct PhoneSignInView: View {
     private var phoneField: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("TELEFON")
-                .smallCapsLabel(size: 10, color: .white.opacity(0.45), tracking: 1.0)
+                .smallCapsLabel(size: 10, color: .white.opacity(0.62), tracking: 1.0)
             TextField("", text: $phoneText, prompt: Text("0555 123 45 67")
                 .foregroundColor(.white.opacity(0.3)))
                 .keyboardType(.phonePad)
@@ -126,7 +126,7 @@ struct PhoneSignInView: View {
     private var codeField: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("DOĞRULAMA KODU")
-                .smallCapsLabel(size: 10, color: .white.opacity(0.45), tracking: 1.0)
+                .smallCapsLabel(size: 10, color: .white.opacity(0.62), tracking: 1.0)
             TextField("", text: $codeText, prompt: Text("123456")
                 .foregroundColor(.white.opacity(0.3)))
                 .keyboardType(.numberPad)

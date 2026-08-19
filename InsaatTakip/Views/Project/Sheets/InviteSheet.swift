@@ -85,16 +85,16 @@ struct InviteSheet: View {
     private func codeBlock(_ invite: Invite) -> some View {
         VStack(spacing: 8) {
             Text("Davet Kodu")
-                .smallCapsLabel(size: 9.5, color: .white.opacity(0.45), tracking: 1.4)
+                .smallCapsLabel(size: 9.5, color: .white.opacity(0.62), tracking: 1.4)
             Text(InviteCode.formatted(invite.code))
                 .font(.sora(34, .bold))
                 .tracking(4)
-                .foregroundColor(invite.isUsable ? .white : .white.opacity(0.35))
+                .foregroundColor(invite.isUsable ? .white : .white.opacity(0.62))
                 .strikethrough(!invite.isUsable, color: .white.opacity(0.5))
             // Gerçek durum: kalan süre, kullanıldıysa kim kullandı, süresi dolduysa uyarı
             Text(invite.statusText)
                 .font(.manrope(11, .medium))
-                .foregroundColor(invite.isUsable ? .white.opacity(0.45) : Palette.accentLight)
+                .foregroundColor(invite.isUsable ? .white.opacity(0.62) : Palette.accentLight)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)

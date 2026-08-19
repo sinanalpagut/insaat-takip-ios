@@ -86,7 +86,7 @@ struct SitePhotosView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 12) {
-                DarkHeaderButton(systemName: "chevron.left") { dismiss() }
+                DarkHeaderButton(systemName: "chevron.left", label: "Geri") { dismiss() }
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Şantiye Kaydı")
                         .font(.sora(17, .bold))
@@ -121,7 +121,7 @@ struct SitePhotosView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 170)
+        .frame(minHeight: 170)
         .background(Palette.fillSubtle)
         .cornerRadius(16)
         .dashedBorder(Palette.dashed, radius: 16)

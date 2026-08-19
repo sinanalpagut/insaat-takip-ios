@@ -129,7 +129,7 @@ struct UploadSheet: View {
                     .foregroundColor(Palette.textTertiary)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 150)
+            .frame(minHeight: 150)
             .background(Palette.fillSubtle)
             .cornerRadius(16)
             .dashedBorder(Palette.dashed, radius: 16)

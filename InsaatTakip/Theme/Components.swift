@@ -144,7 +144,12 @@ struct SheetHeader: View {
                         .frame(width: 40, height: 40)
                         .background(Palette.fillMuted)
                         .cornerRadius(13)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                // Tek satır, 13 sheet'i birden düzeltiyor: hepsinin kapatma
+                // yolu VoiceOver'da "xmark" diye okunuyordu.
+                .accessibilityLabel("Kapat")
             }
             .padding(.top, 14)
         }
@@ -182,7 +187,13 @@ struct PrimaryButton: View {
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 52)
+            // `height` DEĞİL `minHeight`: `cornerRadius` SwiftUI'da clipShape,
+            // yani arka planı değil İÇERİĞİ kırpıyor. Büyük yazı boyutunda
+            // "Satış Kaydını Düzenle" → "Satış Kaydını Dü..." oluyor ve harf
+            // kuyrukları hapın kenarında düz kesiliyor. Varsayılan boyutta
+            // buton yine tam 52pt: içerik 52'nin altında kaldığı sürece hiçbir
+            // şey değişmiyor, yalnızca taşma durumunda büyüyor.
+            .frame(minHeight: 52)
             .background(background)
             .cornerRadius(14)
             .shadow(color: background.opacity(0.28), radius: 10, x: 0, y: 8)
@@ -201,7 +212,7 @@ struct OutlineButton: View {
                 .font(.manrope(13.5, .bold))
                 .foregroundColor(Palette.ink)
                 .frame(maxWidth: .infinity)
-                .frame(height: 48)
+                .frame(minHeight: 48)
                 .background(Palette.surface)
                 .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
                 .cornerRadius(13)
@@ -212,6 +223,10 @@ struct OutlineButton: View {
 /// Koyu header üzerindeki 34px yuvarlatılmış kare buton (geri oku vb.).
 struct DarkHeaderButton: View {
     var systemName: String
+    /// VoiceOver etiketi (madde 31). Zorunlu: etiketsiz bırakılırsa ekran
+    /// okuyucu SF Symbol adını İNGİLİZCE okuyor ("chevron.left"), yani beş
+    /// ekranın çıkış yolu adsız kalıyordu.
+    var label: String
     var action: () -> Void
 
     var body: some View {
@@ -219,9 +234,38 @@ struct DarkHeaderButton: View {
             Image(systemName: systemName)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.white)
+                // GÖRSEL 34pt, DOKUNMA HEDEFİ 44pt. Tasarımdaki kare
+                // korunuyor; yalnızca dokunulabilir alan Apple'ın asgarisine
+                // çıkıyor. 34×34 = 1156pt², yani 44×44'ün %60'ıydı — tozlu
+                // elle şantiyede ıskalanması kolay.
                 .frame(width: 34, height: 34)
                 .background(Color.white.opacity(0.08))
                 .cornerRadius(11)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(label)
+    }
+}
+
+/// Erişilebilirlik boyutlarında yatay yerine DİKEY dizilen karo satırı.
+///
+/// Üç finans karosu yan yana AX5'te sığmıyor: etiketler ortasından bölünüyor
+/// ("TAHSİLA / T"), rakamlar sarılıyor ve kart okunmaz hâle geliyor. Yatay
+/// düzen tasarımın parçası ama sığmadığı yerde bilgi taşımıyor — sığmayınca
+/// düzeni değiştirmek, rakamı kırpmaktan iyi.
+struct AdaptiveTileRow<Content: View>: View {
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var spacing: CGFloat
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: spacing) { content }
+        } else {
+            HStack(spacing: spacing) { content }
         }
     }
 }

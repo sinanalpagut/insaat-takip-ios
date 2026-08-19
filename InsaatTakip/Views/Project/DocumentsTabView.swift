@@ -94,7 +94,7 @@ struct DocumentsTabView: View {
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 170)
+                    .frame(minHeight: 170)
                     .background(Palette.fillSubtle)
                     .cornerRadius(16)
                     .dashedBorder(Palette.dashed, radius: 16)

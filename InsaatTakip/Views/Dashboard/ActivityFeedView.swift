@@ -53,7 +53,7 @@ struct ActivityFeedView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
-                DarkHeaderButton(systemName: "chevron.left") { dismiss() }
+                DarkHeaderButton(systemName: "chevron.left", label: "Geri") { dismiss() }
                 Spacer()
             }
             .padding(.top, 6)

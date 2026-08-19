@@ -32,12 +32,28 @@ enum Palette {
     static let accentLight   = Color(hex: 0xE8A87C) // koyu bar üzerindeki "Net" rakamı
 
     // Metin
-    static let textSecondary = Color(hex: 0x8C877F)
-    static let textTertiary  = Color(hex: 0xB0A99F)
-    static let textMuted     = Color(hex: 0x6E6860)
-    static let textControl   = Color(hex: 0x7C766D)
-    static let textFaded     = Color(hex: 0x857F76) // pasif segment / boş daire rozeti
-    static let tabInactive   = Color(hex: 0xA8A199)
+    //
+    // ═══ KONTRAST (madde 31) ═══
+    // Tasarımdan gelen gri tonlar WCAG AA'nın normal metin eşiğinin (4,5:1)
+    // ALTINDAYDI ve en kötüsü en çok kullanılanıydı: textTertiary beyaz
+    // üzerinde 2,33:1, textSecondary 3,57:1, tabInactive 2,55:1.
+    //
+    // İşin can sıkıcı tarafı NEREDE kullanıldıklarıydı: kapsam notları.
+    // "m² maliyetinin paydası dairelerin brüt alan toplamı", "kalan inşaat
+    // maliyeti düşülmemiştir", "ortakların koyduğu sermaye henüz tutulmuyor" —
+    // yani rakamları DÜRÜST kılan metinler, uygulamanın en okunmaz metinleriydi.
+    // Şantiyede güneş altında pratikte görünmüyorlardı.
+    //
+    // Tonlar surface / page / fillSubtle / fillMuted zeminlerinde 4,5:1'i
+    // geçecek şekilde koyulaştırıldı. Hiyerarşi KAYBOLMADI: aralarındaki
+    // parlaklık farkı korundu ve zaten ağırlık (Regular / SemiBold / ExtraBold)
+    // ile boyut farkı da taşıyor.
+    static let textSecondary = Color(hex: 0x5F5B55) // 6,74:1 (beyaz)
+    static let textTertiary  = Color(hex: 0x726C62) // 5,20:1
+    static let textMuted     = Color(hex: 0x6E6860) // 5,51:1 — zaten geçiyordu
+    static let textControl   = Color(hex: 0x67625A) // form etiketleri
+    static let textFaded     = Color(hex: 0x6C675F) // 5,61:1
+    static let tabInactive   = Color(hex: 0x74706A) // 4,92:1 — birincil navigasyon
 
     // Başarı (satış) tonları
     static let success       = Color(hex: 0x3F7A54)

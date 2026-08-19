@@ -8,6 +8,8 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var avatarSize: CGFloat = 40
     @EnvironmentObject private var viewModel: ProjectViewModel
 
     @State private var showNewProject = false
@@ -95,7 +97,7 @@ struct DashboardView: View {
                 Text("İNŞAAT TAKİP")
                     .font(.manrope(10.5, .extraBold))
                     .tracking(2.2)
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(.white.opacity(0.62))
                 Spacer()
 
                 // Bildirim zili — okunmamış hareket varsa kehribar nokta.
@@ -114,7 +116,14 @@ struct DashboardView: View {
                                 .offset(x: -11, y: 11)
                         }
                     }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                 }
+                // Nokta bilgi taşıyor ama SADECE renkle: VoiceOver kullanıcısı
+                // okunmamış hareket olduğunu hiç öğrenemiyordu.
+                .accessibilityLabel(viewModel.hasUnreadActivity
+                                    ? "Hareket akışı · okunmamış var"
+                                    : "Hareket akışı")
 
                 // Avatar — rol değiştirme / çıkış menüsü.
                 Button {
@@ -123,10 +132,29 @@ struct DashboardView: View {
                     Text(appState.currentUser?.initials ?? "")
                         .font(.manrope(13, .extraBold))
                         .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
+                        // Daire YAZIYLA BİRLİKTE büyüyor: sabit 40pt'de baş
+                        // harfler AX5'te sığmıyor ve avatar "..." gösteriyordu
+                        // — hesap sayfasının (rol, çıkış, HESAP SİLME) tek
+                        // girişi tanımsız bir noktaya dönüyordu. Tasarımdaki
+                        // 40 sayısı varsayılan boyutta aynen korunuyor.
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        // ÖLÇEKLENİYOR AMA SINIRLI. Serbest bırakıldığında
+                        // AX5'te 109pt'ye çıkıp başlığı taşırıyor ve zilin
+                        // üstüne biniyordu. Başlık çubuğu gibi krom öğeler
+                        // sınırsız büyüyemez; 52pt tavan hem baş harfleri
+                        // okunur kılıyor hem düzeni koruyor. Tasarımdaki 40
+                        // sayısı varsayılan boyutta aynen geçerli.
+                        .frame(width: min(avatarSize, 52), height: min(avatarSize, 52))
                         .background(Palette.accent)
                         .clipShape(Circle())
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                // Hesap sayfasının (rol, oturum kapatma, HESAP SİLME) TEK
+                // girişi. Etiketsizken VoiceOver'da yalnızca baş harfler
+                // okunuyordu — nereye götürdüğü belirsizdi.
+                .accessibilityLabel("Hesap menüsü")
                 .padding(.leading, 10)
             }
             .padding(.top, 6)
@@ -134,6 +162,9 @@ struct DashboardView: View {
             Text("Projelerim")
                 .font(.sora(26, .bold))
                 .foregroundColor(.white)
+                // Büyük yazıda "Projeler..." diye kesiliyordu; sarılmasına
+                // izin veriliyor.
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 20)
 
             Text(viewModel.dashboardSubtitle(for: appState.currentUser))
@@ -226,10 +257,24 @@ struct DashboardView: View {
                     .foregroundColor(Palette.textSecondary)
             }
 
-            HStack(spacing: 0) {
-                portfolioTile("CİRO", portfolio.sales, Palette.ink)
-                portfolioTile("TAHSİLAT", portfolio.collected, Palette.success)
-                portfolioTile("KALAN ALACAK", portfolio.outstanding, Palette.accent)
+            // ERİŞİLEBİLİRLİK BOYUTLARINDA DİKEY. Üç karo yan yana AX5'te
+            // sığmıyor: etiketler bölünüyor ("TAHSİLA / T"), rakamlar
+            // sarılıyor ve kart okunmaz hâle geliyor. Yatay düzen tasarımın
+            // parçası ama sığmadığı yerde bilgi taşımıyor.
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 12) {
+                        portfolioTile("CİRO", portfolio.sales, Palette.ink)
+                        portfolioTile("TAHSİLAT", portfolio.collected, Palette.success)
+                        portfolioTile("KALAN ALACAK", portfolio.outstanding, Palette.accent)
+                    }
+                } else {
+                    HStack(spacing: 0) {
+                        portfolioTile("CİRO", portfolio.sales, Palette.ink)
+                        portfolioTile("TAHSİLAT", portfolio.collected, Palette.success)
+                        portfolioTile("KALAN ALACAK", portfolio.outstanding, Palette.accent)
+                    }
+                }
             }
             .padding(.top, 14)
 
@@ -291,11 +336,15 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .smallCapsLabel(size: 9, color: Palette.textFaded, tracking: 0.8)
+            // Bkz. ProjectDetailView.financeTile: kırpma büyüklük ekini
+            // yiyordu. Bu kart madde 26'nın tek varlık sebebi ("beş projesi
+            // olan müteahhit toplam ciroyu hiçbir yerde göremiyordu") ve
+            // büyük yazıda tam o soruyu cevapsız bırakıyordu.
             Text(Fmt.compactMoney(value))
                 .font(.sora(15, .bold))
                 .foregroundColor(color)
-                .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -219,7 +219,7 @@ struct ProjectDetailView: View {
     private func header(_ project: Project) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 10) {
-                DarkHeaderButton(systemName: "chevron.left") { dismiss() }
+                DarkHeaderButton(systemName: "chevron.left", label: "Geri") { dismiss() }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(project.title)
@@ -274,7 +274,10 @@ struct ProjectDetailView: View {
             // SATIŞ / MALZEME / NET finans şeridi — dört sekmede de görünür.
             // Sabit başlık yüksekliği, sekme çubuğunun yerinden oynamasını önler
             // (sekme değiştirirken ikinci dokunuş kaymasın diye).
-            HStack(spacing: 9) {
+            // AX boyutunda üç karo alt alta — bkz. DashboardView portföy şeridi.
+            // Sabit başlık yüksekliği gerekçesi (sekme çubuğu oynamasın)
+            // korunuyor: üçü de aynı anda büyüdüğü için hizalama bozulmuyor.
+            AdaptiveTileRow(spacing: 9) {
                 financeTile("Satış", Fmt.compactMoney(viewModel.totalSales(for: projectId)),
                             background: Color.white.opacity(0.07), valueColor: .white)
                 financeTile("Gider", Fmt.compactMoney(viewModel.totalCost(for: projectId)),
@@ -335,12 +338,20 @@ struct ProjectDetailView: View {
     private func financeTile(_ label: String, _ value: String, background: Color, valueColor: Color) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .smallCapsLabel(size: 9.5, color: .white.opacity(0.45), tracking: 1.1)
+                .smallCapsLabel(size: 9.5, color: .white.opacity(0.62), tracking: 1.1)
+            // KIRPMA KALDIRILDI. `lineLimit(1)` + `minimumScaleFactor(0.8)`
+            // yalnızca %20 pay veriyordu, oysa AX5'te yazı %172 büyüyor:
+            // "42,65 M ₺" ekrana "42,..." olarak düşüyordu ve KESİLEN PARÇA
+            // TAM OLARAK BÜYÜKLÜK EKİ — yani 42 bin ile 42 milyon ayırt
+            // edilemiyordu. Bu, uygulamanın baştan beri reddettiği "yanıltıcı
+            // rakam" sınıfı; kırpmak yerine karo dikey büyüyor.
+            //
+            // Üç karo da aynı anda büyüdüğü için hizalama bozulmuyor.
             Text(value)
                 .font(.sora(15, .bold))
                 .foregroundColor(valueColor)
-                .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)

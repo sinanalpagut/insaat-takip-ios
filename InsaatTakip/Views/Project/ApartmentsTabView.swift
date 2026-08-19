@@ -139,7 +139,15 @@ struct ApartmentsTabView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 14))
                         .foregroundColor(Palette.textTertiary)
+                        // Glif 14pt (tasarım değişmiyor) ama dokunma hedefi
+                        // 44pt: sembolün gerçek kutusu 16×16'ydı, yani
+                        // Apple'ın asgarisinin %13'ü — uygulamanın en küçük
+                        // hedefi. Çubuk 46pt yüksek olduğu için görsel hiçbir
+                        // şey kaymıyor.
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Aramayı temizle")
             }
         }
         .padding(.horizontal, 14)
