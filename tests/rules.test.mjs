@@ -344,6 +344,10 @@ describe('alt koleksiyonların tamamı aynı yetki kalıbına uyuyor', () => {
   const COLLECTIONS = [
     'materials', 'materialLogs', 'apartments', 'partners',
     'sitePhotos', 'expenses', 'payments', 'apartmentPhotos',
+    // Taksit planı (madde 21). Ortağa AÇIK: ortak zaten gerçekleşmiş
+    // ödemelerin tarih ve tutarını görüyor, vadeleri gizlemek onu bilgisiz
+    // bırakmaz — aynı sonucu elle çıkarmaya zorlar ve şeffaflıkla çelişir.
+    'installments',
   ];
 
   for (const name of COLLECTIONS) {

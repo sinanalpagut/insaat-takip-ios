@@ -245,6 +245,20 @@ service cloud.firestore {
         allow delete: if isOwner(pid);
       }
 
+      // TAKSİT PLANI (madde 21) — beklenen ödemeler ve vadeleri.
+      //
+      // ORTAK OKUR. Yeni bir gizlilik yüzeyi DEĞİL: ortak bugün zaten daire
+      // detayında gerçekleşmiş ödemelerin tarihini ve tutarını görüyor, yani
+      // "şu daireye aylardır para gelmiyor" bilgisi elinde. Vadeleri gizlemek
+      // ortağı bilgisiz bırakmaz, yalnızca aynı sonucu elle çıkarmaya zorlar —
+      // üstelik şeffaflık iddiasıyla çelişir. ALICI KİMLİĞİ burada da yok:
+      // kayıt yalnızca daire kimliği, sıra, vade ve tutar taşıyor.
+      match /installments/{docId} {
+        allow read: if isMember(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
       match /apartmentPhotos/{docId} {
         allow read: if isMember(pid);
         allow create, update: if ownerWrite(pid);
