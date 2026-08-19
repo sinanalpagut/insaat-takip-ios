@@ -834,8 +834,14 @@ projesi kullanılmalı — kurallar zaten yayında.
         kaldırma 30×30 ve GERİ ALINAMAZ bir işlem, başlık butonları 34×34.
       · Varsayılan boyutta tasarım BİREBİR korunuyor — simülatörde iki boyutta
         da doğrulandı.
+      · **GERÇEK CİHAZDA VOICEOVER İLE DOĞRULANDI** (19 Ağu 2026, iPhone 13
+        Pro): daire kartı TEK CÜMLE olarak okunuyor, "Satıldı" cümlede geçiyor
+        ve uzunluk doğal. Kartın gruplanması ve renkle taşınan durumun
+        seslendirilmesi bu maddenin en kritik iki düzeltmesiydi.
       · KALAN (küçük): AX5'te proje başlığı ve rol çipi kırpılıyor (krom öğe,
         bilgi kaybı değil); fiş küçük resimlerinin dokunma hedefi hâlâ 30–34pt.
+        Diğer VoiceOver etiketleri (zil, hesap menüsü, geri, kapat) kodda
+        yazılı ama cihazda tek tek DİNLENMEDİ.
 
 ---
 
