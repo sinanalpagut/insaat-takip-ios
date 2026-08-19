@@ -674,6 +674,47 @@ final class ProjectViewModel: ObservableObject {
             }
     }
 
+    // MARK: - Gecikmiş tahsilat (madde 21)
+
+    /// Bir dairenin vade durumu — plan yoksa nil.
+    func installmentStatus(for apartmentId: UUID) -> Installment.Status? {
+        let plan = installments.filter { $0.apartmentId == apartmentId }
+        guard !plan.isEmpty,
+              let apartment = apartments.first(where: { $0.id == apartmentId })
+        else { return nil }
+        return Installment.status(for: plan, collected: apartment.paidAmount)
+    }
+
+    /// Gecikmiş tahsilatı olan daireler — en çok gecikenden başlayarak.
+    ///
+    /// ALICI ADI TAŞIMIYOR. Liste ortağa da açık (ortak zaten daire detayında
+    /// ödeme tarihlerini görüyor, yani "şu daireye para gelmiyor" bilgisi
+    /// elinde); ama kimlik madde 18'in sınırında kalıyor. Satırda daire
+    /// numarası, gecikmiş tutar ve gün var — kim olduğu yok.
+    struct OverdueRow: Identifiable {
+        let id: UUID            // apartmentId
+        let apartmentNumber: Int
+        let amount: Kurus
+        let days: Int
+    }
+
+    func overdueRows(for projectId: UUID) -> [OverdueRow] {
+        apartments(for: projectId).compactMap { apartment in
+            guard let status = installmentStatus(for: apartment.id),
+                  status.overdue > .zero,
+                  let days = status.overdueDays else { return nil }
+            return OverdueRow(id: apartment.id,
+                              apartmentNumber: apartment.apartmentNumber,
+                              amount: status.overdue, days: days)
+        }
+        .sorted { $0.days > $1.days }
+    }
+
+    /// Projedeki toplam gecikmiş tutar.
+    func overdueTotal(for projectId: UUID) -> Kurus {
+        overdueRows(for: projectId).reduce(Kurus.zero) { $0 + $1.amount }
+    }
+
     // MARK: - Portföy özeti (madde 26)
 
     /// Kullanıcının eriştiği TÜM projelerin toplamı.

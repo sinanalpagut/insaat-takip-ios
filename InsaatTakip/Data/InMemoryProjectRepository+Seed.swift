@@ -505,6 +505,50 @@ extension InMemoryProjectRepository {
             recalculateCollected(for: apartment.id)
         }
 
+        // ---- Taksit planları (madde 21) -------------------------------------
+        //
+        // GECİKME OLMADAN ÖZELLİK DOĞRULANAMAZ. Madde 25'te öğrenilen ders:
+        // demo veride varyasyon yoksa özellik ekranda "çalışıyor gibi" görünüp
+        // doğru mu yanlış mı ayırt edilemiyor (fiyat geçmişi düz çizgi
+        // çıkmıştı). Burada tuzak daha keskin — hiçbir daire gecikmiş değilse
+        // liste BOŞ çıkar ve FIFO mahsubunun doğruluğu hiç sınanmaz.
+        //
+        // Bu yüzden `.taksitli` dairelere gerçek plan kuruluyor: ilk vade satış
+        // tarihinden bir ay sonra, aylık. Tahsilat zaten zamana göre üretildiği
+        // için bazı daireler doğal olarak GERİDE kalıyor; gecikme uydurulmuyor,
+        // planla tahsilatın farkından doğuyor.
+        for apartment in apartments where apartment.paymentStatus == .taksitli {
+            guard let saleDate = apartment.saleDate, apartment.price > .zero else { continue }
+            let firstDue = Fmt.calendar.date(byAdding: .month, value: 1, to: saleDate) ?? saleDate
+            // Peşinat: satıştaki ilk ödeme (bedelin ~%10-20'si).
+            let down = payments
+                .filter { $0.apartmentId == apartment.id && $0.method == .pesinat }
+                .reduce(Kurus.zero) { $0 + $1.amount }
+            installments += Installment.plan(apartmentId: apartment.id,
+                                             projectId: apartment.projectId,
+                                             price: apartment.price,
+                                             downPayment: down,
+                                             count: 12,
+                                             firstDueDate: firstDue)
+        }
+
+        // ÖDEMESİ KESİLEN ALICI — gecikme UYDURULMUYOR, senaryodan doğuyor.
+        //
+        // Demo alıcıların tamamı planın önünde gidiyordu (bedelin %60'ını ilk
+        // altı ayda ödüyorlar), dolayısıyla gecikme listesi boş çıkıyor ve FIFO
+        // mahsubu hiç sınanamıyordu. Gerçek hayatta bazı alıcılar ödemeyi
+        // keser; burada da bir daire için son üç ayın taksitleri siliniyor.
+        // Rakamı zorlamak yerine olayı modelliyoruz: sonuç kendiliğinden
+        // "gecikmiş tahsilat" oluyor ve toplamlar `recalculateCollected` ile
+        // yeniden türetildiği için tutarlı kalıyor.
+        if let stalled = apartments.first(where: {
+            $0.paymentStatus == .taksitli && $0.projectId == DemoID.cayirova
+        }) {
+            let cutoff = Fmt.calendar.date(byAdding: .month, value: -3, to: Date()) ?? Date()
+            payments.removeAll { $0.apartmentId == stalled.id && $0.date > cutoff }
+            recalculateCollected(for: stalled.id)
+        }
+
         // ---- Giderler (malzeme dışı) ----------------------------------------
         // Gerçekçi bir betonarme konut projesinde malzeme toplam maliyetin
         // ancak %35-45'idir; kalanı işçilik, taşeron, arsa ve resmî giderlerdir.

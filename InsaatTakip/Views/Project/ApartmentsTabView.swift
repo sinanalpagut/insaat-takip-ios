@@ -259,6 +259,56 @@ struct ApartmentsTabView: View {
                     .foregroundColor(Palette.textTertiary)
                     .padding(.top, 6)
             }
+
+            // GECİKMİŞ TAHSİLAT (madde 21). Yalnızca gecikme VARSA görünüyor:
+            // "0 gecikmiş daire" satırı her açılışta yer kaplar ve bilgi
+            // taşımaz. Alıcı adı YOK — ortak da bu listeyi görüyor.
+            let overdue = viewModel.overdueRows(for: projectId)
+            if !overdue.isEmpty {
+                Divider().overlay(Palette.divider).padding(.top, 12)
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text("GECİKMİŞ TAHSİLAT")
+                        .smallCapsLabel(size: 9.5, color: Palette.alertInk, tracking: 1.0)
+                    Spacer()
+                    Text(Fmt.compactMoney(viewModel.overdueTotal(for: projectId)))
+                        .font(.sora(14, .bold))
+                        .foregroundColor(Palette.alertInk)
+                }
+                .padding(.top, 12)
+
+                ForEach(overdue.prefix(4)) { row in
+                    HStack(spacing: 8) {
+                        Text("No \(row.apartmentNumber)")
+                            .font(.manrope(12.5, .bold))
+                            .foregroundColor(Palette.ink)
+                        Text("\(row.days) gün")
+                            .font(.manrope(11, .semiBold))
+                            .foregroundColor(Palette.alertInk)
+                        Spacer()
+                        Text(Fmt.money(row.amount))
+                            .font(.sora(12.5, .bold))
+                            .foregroundColor(Palette.ink)
+                    }
+                    .padding(.top, 8)
+                }
+
+                // Kırpma SESSİZ olmuyor — portföy kartında düzeltilen hatanın
+                // aynısına düşmeyelim.
+                if overdue.count > 4 {
+                    Text("+\(overdue.count - 4) daire daha")
+                        .font(.manrope(11, .semiBold))
+                        .foregroundColor(Palette.textTertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 8)
+                }
+
+                Text("Vadesi geçmiş ve hâlâ kapanmamış tutar. Ödemeler vadelere sırayla mahsup edilir.")
+                    .font(.manrope(10.5, .medium))
+                    .foregroundColor(Palette.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 10)
+            }
         }
         .padding(16)
         .background(Palette.surface)
