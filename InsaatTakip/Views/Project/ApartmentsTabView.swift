@@ -303,6 +303,18 @@ struct ApartmentsTabView: View {
                         .padding(.top, 8)
                 }
 
+                // İZİN REDDEDİLDİYSE DÜRÜSTÇE SÖYLE. Liste çalışmaya devam
+                // ediyor; kaybolan tek şey hatırlatma. Sessiz kalsaydı
+                // kullanıcı bildirim beklerken hiç gelmediğini fark
+                // etmeyecekti — bu uygulamanın en sevmediği hata sınıfı.
+                if viewModel.remindersDenied {
+                    Text("Bildirim izni kapalı — vade hatırlatması gelmeyecek. Bu liste çalışmaya devam eder.")
+                        .font(.manrope(10.5, .semiBold))
+                        .foregroundColor(Palette.alertInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 10)
+                }
+
                 Text("Vadesi geçmiş ve hâlâ kapanmamış tutar. Ödemeler vadelere sırayla mahsup edilir.")
                     .font(.manrope(10.5, .medium))
                     .foregroundColor(Palette.textTertiary)

@@ -29,6 +29,9 @@ final class ProjectViewModel: ObservableObject {
     /// Taksit planı — BEKLENEN ödemeler (madde 21). `payments` gerçekleşeni
     /// tutuyor; ikisinin farkı "gecikmiş tahsilat".
     @Published var installments: [Installment] = []
+    /// Kullanıcı bildirim iznini REDDETTİ mi. Ekran bunu dürüstçe söylüyor:
+    /// gecikme listesi çalışmaya devam ediyor, yalnızca hatırlatma gelmiyor.
+    @Published var remindersDenied = false
     @Published var apartmentPhotos: [ApartmentPhoto] = []   // Daire görselleri
     /// Düzenleme ve silmelerin değişiklik kaydı (eski → yeni, kim, ne zaman).
     @Published var auditEntries: [AuditEntry] = []
@@ -60,6 +63,7 @@ final class ProjectViewModel: ObservableObject {
     /// ANINDA, buluta arkadan gider (madde 17).
     private let images: ImageStore?
     private let files: DocumentStore?
+    private let reminders = ReminderScheduler()
 
     /// Uçuştaki bulut aktarımları (yükleme + indirme). Bellek içi ve SÜRECE
     /// ÖZGÜ: uçuştaki bir aktarım süreçten uzun yaşayamaz, yani uygulama
@@ -162,6 +166,10 @@ final class ProjectViewModel: ObservableObject {
         // eklediği fotoğrafları bile yer tutucuya çevirirdi.
         hydrateImages()
         hydrateDocuments()
+        // Vade hatırlatmaları yüklenen plana göre kurulur. Uygulama başka bir
+        // cihazda güncellenmiş olabilir; yerel bildirimler o cihazda değil
+        // BURADA duruyor, dolayısıyla her yüklemede yeniden hizalanmalı.
+        Task { @MainActor [weak self] in await self?.refreshReminders() }
     }
 
     // MARK: - Görsel canlandırma ve yükleme (madde 17)
@@ -672,6 +680,20 @@ final class ProjectViewModel: ObservableObject {
                     ? $0.id.uuidString > $1.id.uuidString
                     : $0.date > $1.date
             }
+    }
+
+    // MARK: - Vade hatırlatıcı (madde 21)
+
+    /// Bekleyen vadeler için hatırlatmaları yeniden kurar.
+    ///
+    /// Plan, tahsilat ya da satış değiştiğinde çağrılıyor — hepsi mahsubu
+    /// etkiliyor, dolayısıyla hangi vadenin hâlâ açık olduğunu değiştiriyor.
+    func refreshReminders() async {
+        var collected: [UUID: Kurus] = [:]
+        for apartment in apartments { collected[apartment.id] = apartment.paidAmount }
+        await reminders.reschedule(installments: installments,
+                                   apartments: apartments,
+                                   collectedByApartment: collected)
     }
 
     // MARK: - Gecikmiş tahsilat (madde 21)
@@ -1664,6 +1686,7 @@ final class ProjectViewModel: ObservableObject {
                          timestamp: Date())))
         persist(writes, failureNote: "Tahsilat")
         flash("Tahsilat kaydedildi")
+        Task { @MainActor [weak self] in await self?.refreshReminders() }
         return true
     }
 
@@ -1683,6 +1706,7 @@ final class ProjectViewModel: ObservableObject {
                                               oldValue: Fmt.money(payment.amount), newValue: "silindi")])
         persist(writes, failureNote: "Tahsilat silme")
         flash("Tahsilat silindi")
+        Task { @MainActor [weak self] in await self?.refreshReminders() }
     }
 
     /// `paidAmount` ve ödeme durumu TEK yerden, ödeme kayıtlarından türetilir.
@@ -1966,6 +1990,17 @@ final class ProjectViewModel: ObservableObject {
                                         firstDueDate: noon)
             installments.append(contentsOf: plan)
             writes += plan.map { DocumentChange.installment($0) }
+
+            // İZİN BURADA İSTENİYOR, açılışta değil: açılışta sorulsaydı
+            // FirebaseAuth'un kendi APNs kaydıyla üst üste gelir ve kullanıcı
+            // SMS beklerken "İzin Verme"ye basardı. Plan kurmak, hatırlatmanın
+            // ne işe yaradığının belli olduğu tek an.
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let granted = await self.reminders.requestAuthorizationIfNeeded()
+                self.remindersDenied = !granted
+                await self.refreshReminders()
+            }
         }
 
         // Satış akışa `kind: .sale` olarak düşer. Koşul isNewSale DEĞİL "bu

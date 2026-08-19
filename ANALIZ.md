@@ -596,7 +596,43 @@ projesi kullanılmalı — kurallar zaten yayında.
       · KALAN (madde 20b, istenirse): gerçek cari hesap — ortağın koyduğu
         sermaye ve çektiği para için ayrı defter. Bugün kapsam kutusunda
         "henüz tutulmuyor" diye AÇIKÇA yazılı.
-- [ ] 21. Vade hatırlatıcı + gecikmiş tahsilat listesi
+- [x] 21. Vade hatırlatıcı + gecikmiş tahsilat listesi — **TAMAM (19 Ağu 2026)**
+      · İKİ BOŞLUK vardı: vade/taksit modeli YOK (`Payment` yalnızca
+        gerçekleşmiş ödemeyi tutuyor) ve bildirim altyapısı YOK.
+        `PaymentStatus.taksitli` bir ETİKETTİ — arkasında sayı, tutar, vade
+        hiçbir şey yoktu.
+      · **VADE ÖĞLEN 12:00'DE.** Gece yarısı üç yerden ısırırdı: yaz saatinde
+        tarih kayar; `DateInterval.contains` iki uçtan kapsayıcı olduğu için ay
+        sınırındaki vade iki aya birden sayılır; cihaz saat dilimi farklıysa
+        aynı vade farklı güne düşer.
+      · **"GECİKMİŞ" GÜN KARŞILAŞTIRMASI.** `vade < Date()` yazılsaydı bugün
+        vadesi olan taksit sabah gecikmemiş, akşam gecikmiş görünürdü.
+      · **MAHSUP FIFO**, yabancı anahtar değil: müteahhit parayı geldiği gibi
+        giriyor, her ödemeyi elle bir taksite işaretlemesi beklenemez ve yanlış
+        işaretleme listeyi sessizce bozardı. `Payment` modeline dokunulmadı.
+      · **YEREL BİLDİRİM**, sunucu push'u değil: push zamanlanmış işlev + FCM
+        jetonu + koleksiyon + kural + test demek, kapsamı ikiye katlardı.
+        FirebaseAuth `UNUserNotificationCenter`'a dokunmuyor, telefon girişi
+        bozulmuyor.
+      · **64 BİLDİRİM SINIRI.** iOS uygulama başına 64 bekleyen bildirim
+        tutuyor, fazlasını SESSİZCE atıyor. Taksit başına bildirim kurulsaydı
+        12 daire × 12 taksit = 144 istek olur, 80'i çöpe giderdi ve kullanıcı
+        hangi vadelerin hatırlatılacağını bilemezdi. Çözüm: GÜNE GÖRE TOPLAMA —
+        aynı gün vadesi gelen daireler tek bildirimde.
+      · **İZİN İLK PLAN KURULDUĞUNDA** isteniyor, açılışta değil: açılışta
+        sorulsa FirebaseAuth'un APNs kaydıyla üst üste gelir ve kullanıcı SMS
+        beklerken "İzin Verme"ye basardı. Reddedilirse liste çalışmaya devam
+        ediyor ve ekran bunu DÜRÜSTÇE söylüyor.
+      · DEMO VERİSİ: gecikme uydurulmadı, senaryodan doğdu — bir alıcı üç ay
+        önce ödemeyi kesti. İlk denemede liste boştu çünkü demo alıcıların
+        tamamı planın önünde gidiyordu (madde 25'teki düz çizgi dersinin
+        tekrarı).
+      · **FIFO ELLE DOĞRULANDI:** tahsilat ilk iki vadeyi tam, üçüncüsünü
+        kısmen kapatıyor; o vade 5 Temmuz, bugün 19 Ağustos ve uygulama
+        "45 gün" diyor — tam olarak doğru. Bildirim kurulumu da ölçüldü:
+        24 açık vade → 24 gün, sınırın altında.
+      · Kural (`installments`, ortağa açık — ortak zaten ödeme tarihlerini
+        görüyor) 158/158 testle korunuyor ve YAYINDA.
 - [x] 22. Daire/alıcı arama ve filtreleme — **TAMAM (18 Ağu 2026)**
       · Arama: daire numarası, tip, alan, kat etiketi, durum metni.
       · ALICI ADIYLA ARAMA YALNIZCA YÖNETİCİDE. Ortakta `buyerName` zaten nil
