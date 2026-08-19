@@ -38,6 +38,14 @@ protocol UserProfileStore {
     /// Kaydeder. ÖNCE yerel önbelleğe yazar, SONRA uzak kopyayı dener — uzak
     /// yazma hata verse bile kullanıcıya isim bir daha sorulmaz.
     func save(_ profile: UserProfile) async throws
+
+    /// Yerel kopyayı siler (madde 28).
+    ///
+    /// Önbellek normalde BİLEREK tutuluyor — aynı kişi tekrar girdiğinde isim
+    /// yeniden sorulmasın diye. Ama hesap SİLİNİRSE gereklilik bitiyor ve
+    /// kayıt E.164 telefon numarası taşıyor: KVKK kapsamında kişisel veri.
+    /// "Hesabımı sildim" diyen kullanıcının verisi cihazda kalmamalı.
+    func remove(uid: String)
 }
 
 // MARK: - Yerel uygulama
@@ -64,6 +72,10 @@ final class LocalUserProfileStore: UserProfileStore {
 
     /// Yerel uygulamada uzak kopya yok; önbellek zaten tek kaynak.
     func fetch(uid: String) async throws -> UserProfile? { cachedProfile(uid: uid) }
+
+    func remove(uid: String) {
+        defaults.removeObject(forKey: Self.prefix + uid)
+    }
 
     func save(_ profile: UserProfile) async throws {
         guard let data = try? JSONEncoder().encode(profile) else { return }
@@ -118,6 +130,11 @@ final class FirestoreUserProfileStore: UserProfileStore {
         try? await local.save(profile)
         return profile
     }
+
+    /// Yalnızca YEREL kopyayı siler. `users/{uid}` belgesini `deleteAccount`
+    /// Cloud Function'ı siliyor — kural istemciye izin vermiyor
+    /// (`allow delete: if false`) ve vermemesi doğru.
+    func remove(uid: String) { local.remove(uid: uid) }
 
     func save(_ profile: UserProfile) async throws {
         // ÖNCE yerel: uzak yazma başarısız olsa bile kullanıcıya isim bir daha

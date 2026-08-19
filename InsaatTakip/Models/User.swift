@@ -41,6 +41,15 @@ struct User: Codable, Identifiable, Equatable {
 
     /// Demo kimlikleri SABİT: önceden `UUID()` ile her açılışta yeniden
     /// üretiliyordu, yani "kurduğum proje" bağı uygulama kapanınca kopuyordu.
-    static let admin = User(id: "demo-admin", name: "Mehmet Kılıç", role: .admin)
-    static let partner = User(id: "demo-partner", name: "Serkan Aydın", role: .partner)
+    ///
+    /// TELEFON DA VAR: telefonsuz bırakıldığında hesap silme akışı demo
+    /// modunda hiç denenemiyordu — SMS turu `sendCode("")` ile daha ilk
+    /// adımda "Telefon numarası geçersiz" veriyordu ve kullanıcı hiçbir şey
+    /// yazmadığı hâlde suçlanmış oluyordu. Sahte servis gerçeğin yapmadığı bir
+    /// davranışı taklit etmemeli (aynı gerekçe FakeAuthService.sendCode'da da
+    /// yazılı).
+    static let admin = User(id: "demo-admin", name: "Mehmet Kılıç",
+                            role: .admin, phone: "+905551112233")
+    static let partner = User(id: "demo-partner", name: "Serkan Aydın",
+                              role: .partner, phone: "+905551112244")
 }

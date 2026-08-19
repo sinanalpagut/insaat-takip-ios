@@ -59,6 +59,34 @@ final class FirebaseAuthService: AuthService {
         do { try Auth.auth().signOut() } catch { throw Self.mapped(error) }
     }
 
+    /// Silme öncesi yeniden doğrulama (madde 28).
+    ///
+    /// `signIn(with:)` DEĞİL `reauthenticate(with:)`. Fark güvenlik açısından
+    /// belirleyici: `signIn` başka bir numarayla çağrılırsa oturum sessizce o
+    /// hesaba geçer ve ardından gelen silme YANLIŞ HESABI siler.
+    /// `reauthenticate` ise kimlik bilgisi mevcut kullanıcıya ait değilse
+    /// hata veriyor.
+    ///
+    /// Numara denetimi ayrıca YAPILIYOR: Firebase'in hatasına güvenmek yerine
+    /// istenmeyen durumu önce biz yakalıyoruz ve kullanıcıya ne olduğunu
+    /// söyleyen bir mesaj veriyoruz.
+    func reauthenticate(code: String, for request: VerificationRequest) async throws {
+        guard let user = Auth.auth().currentUser else { throw AuthError.notConfigured }
+        guard user.phoneNumber == request.phone else { throw AuthError.phoneMismatch }
+        let credential = PhoneAuthProvider.provider()
+            .credential(withVerificationID: request.id, verificationCode: code)
+        do {
+            _ = try await user.reauthenticate(with: credential)
+        } catch {
+            throw Self.mapped(error)
+        }
+    }
+
+    func deleteAccount() async throws {
+        guard let user = Auth.auth().currentUser else { throw AuthError.notConfigured }
+        do { try await user.delete() } catch { throw Self.mapped(error) }
+    }
+
     /// Info.plist'te Firebase'in beklediği geri çağrı şeması tanımlı mı?
     ///
     /// Firebase şemayı `CLIENT_ID`den (ters çevrilmiş) ya da o yoksa
@@ -99,6 +127,8 @@ final class FirebaseAuthService: AuthService {
             return .network
         case .operationNotAllowed:
             return .providerDisabled
+        case .requiresRecentLogin:
+            return .requiresRecentLogin
         case .notificationNotForwarded, .missingAppToken, .appNotVerified,
              .captchaCheckFailed, .invalidAppCredential:
             return .appVerificationFailed

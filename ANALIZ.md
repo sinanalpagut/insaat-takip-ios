@@ -736,7 +736,40 @@ projesi kullanılmalı — kurallar zaten yayında.
 ### Faz 4 — Yayın paketi
 
 - [ ] 27. KVKK aydınlatma + gizlilik politikası URL'i
-- [ ] 28. Hesap silme akışı (App Store 5.1.1v)
+- [x] 28. Hesap silme akışı (App Store 5.1.1v) — **TAMAM (19 Ağu 2026)**
+      · 5.1.1(v): hesap oluşturmaya izin veren uygulama, hesabın uygulama
+        İÇİNDEN silinmesine de izin vermek zorunda. Bugüne kadar silme yolu
+        SIFIRDI; tek çıkış "Oturumu Kapat"tı.
+      · **SUNUCU TARAFI ZORUNLU** — beş bağımsız sebep: kural proje/profil
+        silmeyi istemciye kapatıyor; ORTAK kendi uid'ini `memberUids`'ten
+        çıkaramıyor (istemci çözümü matematiksel olarak imkânsız); 13 alt
+        koleksiyon otomatik silinmiyor (`recursiveDelete` kullanıldı, elle
+        koleksiyon saymak yeni koleksiyon eklenince sessizce eksik kalırdı);
+        Storage istemciden listelenemiyor (Admin SDK önek silmesi YETİM
+        nesneleri de yakalıyor); Auth kaydı EN SON silinmeli, yoksa uid bir
+        daha üretilemez ve veri erişilemez öksüz kalır.
+      · **SAHİPLİK:** sahibin projeleri ve tüm verisi silinir; ORTAK olduğu
+        projelerden yalnızca kendisi düşer. Devir (ownerUid değişimi) kural
+        düzeyinde yasak ve devralanın rızası gerekir — ayrı madde olarak
+        bırakıldı.
+      · **GÜVENLİK — yanlış hesap silme tuzağı:** onay ekranı `verify()`
+        KULLANMIYOR, çünkü o `signIn(with:)` çağırıyor ve kullanıcı başka bir
+        numara girerse oturum sessizce o hesaba geçip silme YANLIŞ HESABI
+        silerdi. `reauthenticate(with:)` kullanılıyor ve numaranın oturumdakiyle
+        aynı olduğu ayrıca denetleniyor.
+      · **ONAY EKRANI RAKAMLA KONUŞUYOR:** "geri alınamaz" tek başına bilgi
+        taşımıyor. Ekran "5 proje ve içindeki 74 dairenin tüm kayıtları…
+        7 ortak erişimini kaybedecek" diyor.
+      · Yerel temizlik: profil önbelleği (ad + E.164 telefon, KVKK) siliniyor —
+        normalde bilerek tutuluyordu, hesap silinince gereklilik bitiyor.
+      · Yol üstünde iki kusur: (a) demo kullanıcısının telefonu yoktu ve akış
+        "Telefon numarası geçersiz" diyerek kullanıcıyı hiç yazmadığı bir şeyle
+        suçluyordu; (b) silme bitince `RootView` tüm ağacı değiştirdiği için
+        özet ekranı hiç görünmüyordu — kullanıcı düğmeye basıp kendini aniden
+        giriş ekranında buluyordu. Özet artık oturumdan bağımsız taşınıyor.
+      · 162/162 test. En kritik olanı: "ORTAK silince SAHİBİN PROJESİ DURUR" —
+        silme fazla geniş yazılsaydı projeden ayrılan bir ortak müteahhidin
+        bütün projesini götürürdü. İşlev YAYINDA.
 - [ ] 29. Davet deep link'i (WhatsApp bağlantısı çalışsın)
 - [ ] 30. `PrivacyInfo.xcprivacy` + Crashlytics + build numarası otomasyonu
 - [ ] 31. Erişilebilirlik paketi (kontrast, 44pt hedefler, VoiceOver, Dynamic Type)

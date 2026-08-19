@@ -17,8 +17,18 @@ final class AppState: ObservableObject {
 
     let auth: AuthService
     private let profiles: UserProfileStore
+    private let deletion: AccountDeletionService
 
-    init(auth: AuthService? = nil, profiles: UserProfileStore? = nil) {
+    /// Silme bitince karşılama ekranında gösterilecek özet.
+    ///
+    /// Neden burada: `deleteAccount` `currentUser`ı nil'liyor ve `RootView` o
+    /// anda TÜM ağacı değiştiriyor — silme ekranının kendi "bitti" adımı
+    /// yok olup gidiyordu. Kullanıcı düğmeye basıp kendini aniden giriş
+    /// ekranında buluyordu ve ne silindiğini hiç göremiyordu.
+    @Published var lastDeletionSummary: AccountDeletionSummary?
+
+    init(auth: AuthService? = nil, profiles: UserProfileStore? = nil,
+         deletion: AccountDeletionService? = nil) {
         // DİKKAT: aşağıda `service`/`store` yerel değişkenleri kullanılıyor.
         // Parametre adı `auth`, `self.auth`'u gölgeliyor; doğrudan `auth`
         // yazılırsa varsayılan çağrıda (auth: nil) oturum HİÇ geri yüklenmez.
@@ -31,6 +41,7 @@ final class AppState: ObservableObject {
                                  : LocalUserProfileStore())
         self.auth = service
         self.profiles = store
+        self.deletion = deletion ?? Self.makeDeletionService()
 
         // DEBUG: launch argümanıyla rol atlaması (ekran görüntüsü akışları için).
         if let role = LaunchConfig.role {
@@ -83,9 +94,26 @@ final class AppState: ObservableObject {
         if LaunchConfig.emulatorHost != nil { return FirebaseAuthService() }
         #endif
         #if targetEnvironment(simulator)
-        return FakeAuthService()
+        // Rol kısayolu kullanılıyorsa sahte oturum O KULLANICIYLA kuruluyor —
+        // gerekçesi FakeAuthService.init'te.
+        let shortcut: User? = LaunchConfig.role.map { $0 == .admin ? .admin : .partner }
+        return FakeAuthService(signedInAs: shortcut)
         #else
         return FirebaseAuthService()
+        #endif
+    }
+
+    /// Silme servisi, kimlik servisiyle AYNI ölçüte göre seçiliyor: sahte
+    /// kimlikle çalışan bir oturumun gerçek sunucu silmesi çağırması anlamsız
+    /// olurdu (uid sunucuda yok).
+    private static func makeDeletionService() -> AccountDeletionService {
+        #if DEBUG
+        if LaunchConfig.emulatorHost != nil { return FirebaseAccountDeletionService() }
+        #endif
+        #if targetEnvironment(simulator)
+        return FakeAccountDeletionService()
+        #else
+        return FirebaseAccountDeletionService()
         #endif
     }
 
@@ -157,6 +185,38 @@ final class AppState: ObservableObject {
     /// Profil önbelleği SİLİNMEZ: aynı kişi tekrar girdiğinde isim yeniden
     /// sorulmasın. Kayıt uid'e bağlı olduğu için başka bir hesapla girildiğinde
     /// o hesabın adı okunur, bu ad sızmaz.
+    /// Hesabı ve tüm verisini siler (madde 28 · App Store 5.1.1(v)).
+    ///
+    /// SIRA TEK YÖNLÜ KAPI ve değiştirilemez:
+    ///   1. SUNUCU VERİSİ — Cloud Function. Auth kaydı hâlâ duruyor, yani
+    ///      işlevin `request.auth.uid`'i var ve kurallar çözülebiliyor.
+    ///   2. AUTH KAYDI — işlev zaten Admin SDK ile sildi; istemcideki
+    ///      `deleteAccount()` yalnızca yerel oturumu geçersiz kılıyor ve
+    ///      başarısız olması akışı durdurmuyor.
+    ///   3. YEREL TEMİZLİK — en son. Önce yapılsaydı ve sunucu adımı
+    ///      başarısız olsaydı, kullanıcı verisini kaybetmiş ama hesabı duran
+    ///      bir hâlde kalırdı.
+    ///
+    /// Yeniden kimlik doğrulama BU METODUN DIŞINDA, çağıran ekranda yapılıyor
+    /// (SMS turu) — `AuthService.reauthenticate` ile, `verify` ile DEĞİL.
+    func deleteAccount() async throws -> AccountDeletionSummary {
+        let summary = try await deletion.deleteServerData()
+
+        // Auth kaydını işlev sildi; bu çağrı yerel oturumu düşürüyor. Hata
+        // yutuluyor çünkü sunucu tarafı zaten bitti ve kullanıcıyı "silindi mi
+        // silinmedi mi" belirsizliğinde bırakmak daha kötü.
+        try? await auth.deleteAccount()
+
+        if let uid = currentUser?.id { profiles.remove(uid: uid) }
+        try? auth.signOut()
+        withAnimation(.easeInOut(duration: 0.25)) {
+            currentUser = nil
+            pendingNameSession = nil
+            lastDeletionSummary = summary
+        }
+        return summary
+    }
+
     func signOut() {
         try? auth.signOut()
         withAnimation(.easeInOut(duration: 0.25)) {

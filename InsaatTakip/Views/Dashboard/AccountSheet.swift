@@ -10,6 +10,8 @@ struct AccountSheet: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showDeleteFlow = false
+
     private var user: User? { appState.currentUser }
 
     @State private var isEditingName = false
@@ -64,10 +66,32 @@ struct AccountSheet: View {
             }
             .padding(.top, 20)
 
+            // HESAP SİLME — App Store 5.1.1(v) zorunluluğu.
+            //
+            // Apple silme girişinin uygulama İÇİNDE ve bulunabilir olmasını
+            // istiyor; web sayfasına yönlendirme reddediliyor. Hakem hesap
+            // ekranına bakacak, bu yüzden burada.
+            //
+            // Görsel olarak "Oturumu Kapat"tan AYRI ve daha sessiz: ikisi
+            // eşit ağırlıkta dursaydı yanlışlıkla silme riski artardı.
+            Button {
+                showDeleteFlow = true
+            } label: {
+                Text("Hesabı Sil")
+                    .font(.manrope(13, .semiBold))
+                    .foregroundColor(Palette.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+            }
+            .padding(.top, 4)
+
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
         .background(Palette.surface)
+        .fullScreenCover(isPresented: $showDeleteFlow) {
+            DeleteAccountView()
+        }
         .sheetHeight(0.62)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()

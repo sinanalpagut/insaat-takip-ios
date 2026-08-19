@@ -25,12 +25,25 @@ final class FakeAuthService: AuthService {
     /// Bu numarayla daha önce girildi mi — `isNewAccount` bayrağını üretmek için.
     private var knownPhones: Set<String>
 
-    init(startSignedIn: Bool = false, defaults: UserDefaults = .standard) {
+    /// `signedInAs` — DEBUG rol kısayolu (`-role admin`) kimlik servisini
+    /// tamamen atlayıp `currentUser`ı doğrudan kuruyor. O yolda oturum
+    /// seedlenmezse sahte servis oturumsuz kalıyor ve kimlik gerektiren her
+    /// akış (ör. hesap silme) simülatörde `notConfigured` ile duruyordu —
+    /// yani ekran doğrulaması yalnızca gerçek cihazda mümkün oluyordu.
+    ///
+    /// Oturum KULLANICIYLA tutarlı kuruluyor (uid + telefon): sabit bir test
+    /// numarası kullanılsaydı, silme akışındaki "numara oturumdakiyle aynı mı"
+    /// denetimi rol kısayolunda hep düşerdi ve gerçek bir kusur sanılırdı.
+    init(startSignedIn: Bool = false, signedInAs user: User? = nil,
+         defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let stored = defaults.stringArray(forKey: Self.knownPhonesKey) ?? []
         self.knownPhones = Set(stored).union([Self.testPhone])
 
-        if startSignedIn {
+        if let user, !user.phone.isEmpty {
+            session = AuthSession(uid: user.id, phone: user.phone, isNewAccount: false)
+            knownPhones.insert(user.phone)
+        } else if startSignedIn {
             session = AuthSession(uid: User.admin.id, phone: Self.testPhone, isNewAccount: false)
         } else if let data = defaults.data(forKey: Self.sessionKey) {
             session = try? JSONDecoder().decode(StoredSession.self, from: data).asSession
@@ -70,6 +83,31 @@ final class FakeAuthService: AuthService {
     func signOut() throws {
         session = nil
         defaults.removeObject(forKey: Self.sessionKey)
+    }
+
+    /// Sahte yeniden doğrulama (madde 28).
+    ///
+    /// Gerçek servisteki güvenlik kapısının AYNISI burada da var: numara
+    /// oturumdakiyle eşleşmiyorsa reddediliyor. Sahte servis gevşek
+    /// bırakılsaydı silme akışı simülatörde "çalışıyor" görünür, gerçek
+    /// cihazda ise `phoneMismatch` ile durur ve fark ancak sahada anlaşılırdı.
+    func reauthenticate(code: String, for request: VerificationRequest) async throws {
+        guard let session else { throw AuthError.notConfigured }
+        guard session.phone == request.phone else { throw AuthError.phoneMismatch }
+        guard code == Self.testCode else { throw AuthError.invalidCode }
+    }
+
+    /// Sahte silme: oturumu ve bu cihazda tanınan numarayı kaldırır.
+    ///
+    /// `knownPhones` de temizleniyor — yoksa simülatörde "silme sonrası temiz
+    /// cihaz" senaryosu doğru denenemezdi: aynı numarayla girişte kullanıcı
+    /// yeni değil "tanınan" sayılırdı.
+    func deleteAccount() async throws {
+        guard let session else { throw AuthError.notConfigured }
+        var known = Set(defaults.stringArray(forKey: Self.knownPhonesKey) ?? [])
+        known.remove(session.phone)
+        defaults.set(Array(known), forKey: Self.knownPhonesKey)
+        try signOut()
     }
 
     /// Oturumu DİSKE yazar. Firebase oturumu kendi başına kalıcı tutuyor;

@@ -44,6 +44,12 @@ enum AuthError: LocalizedError, Equatable {
     /// hata ilk kez gerçek cihazda görülüyor. Kullanıcı hatası değil, kurulum
     /// eksiği — o yüzden ayrı bir durum.
     case providerDisabled
+    /// Firebase silme/hassas işlem için yakın oturum istiyor (17014).
+    /// Kullanıcı GİRİŞ yapmıyor, hesabını siliyor — "Giriş yapılamadı" demek
+    /// yaptığı işle alakasız ve yanıltıcı olurdu.
+    case requiresRecentLogin
+    /// Yeniden doğrulamada girilen numara oturumdakinden FARKLI.
+    case phoneMismatch
     /// APNs/uygulama doğrulaması başarısız (17054, 17093, 17095…).
     ///
     /// Firebase telefon doğrulamasında uygulamanın gerçekliğini sessiz bir push
@@ -64,6 +70,10 @@ enum AuthError: LocalizedError, Equatable {
         case .network:          return "Bağlantı yok"
         case .notConfigured:    return "Telefon girişi bu derlemede yapılandırılmadı"
         case .providerDisabled: return "Telefonla giriş bu projede açık değil · Firebase konsolunda etkinleştirilmeli"
+        case .requiresRecentLogin:
+            return "Güvenlik için numaranı yeniden doğrulaman gerekiyor"
+        case .phoneMismatch:
+            return "Bu numara hesabına ait değil"
         case .appVerificationFailed:
             return "Uygulama doğrulaması yapılamadı · bildirim ayarları eksik"
         case .unknown:          return "Giriş yapılamadı"
@@ -86,6 +96,20 @@ protocol AuthService {
     func verify(code: String, for request: VerificationRequest) async throws -> AuthSession
 
     func signOut() throws
+
+    /// Silme öncesi kimliği YENİDEN doğrular (madde 28).
+    ///
+    /// `verify(code:for:)` KULLANILAMAZ ve bu ayrım güvenlik açısından kritik:
+    /// o metot `signIn(with:)` çağırıyor, yani kullanıcı BAŞKA bir numara
+    /// girerse oturum sessizce o hesaba geçer ve ardından gelen "hesabımı sil"
+    /// düğmesi YANLIŞ HESABI siler. Yeniden doğrulama `reauthenticate(with:)`
+    /// kullanmak ve numaranın oturumdakiyle aynı olduğunu denetlemek zorunda.
+    func reauthenticate(code: String, for request: VerificationRequest) async throws
+
+    /// Firebase Auth kaydını siler. Sunucu tarafı veri silme AYRI: bu çağrıdan
+    /// ÖNCE `deleteAccount` işlevi koşmalı, çünkü Auth kaydı gidince uid bir
+    /// daha üretilemez ve veri erişilemez öksüz kalır.
+    func deleteAccount() async throws
 }
 
 // MARK: - Telefon numarası normalleştirme

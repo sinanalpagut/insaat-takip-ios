@@ -9,6 +9,19 @@ struct WelcomeView: View {
     @State private var showJoin = false
     @State private var showPhoneSignIn = false
 
+    /// Ne yapıldığını SAYIYLA söyler: "silindi" tek başına doğrulanabilir bir
+    /// bilgi taşımıyor.
+    private func deletionText(_ summary: AccountDeletionSummary) -> String {
+        var parts = ["Profil bilgilerin kaldırıldı."]
+        if summary.deletedProjects > 0 {
+            parts.append("\(summary.deletedProjects) proje ve tüm kayıtları silindi.")
+        }
+        if summary.leftProjects > 0 {
+            parts.append("\(summary.leftProjects) projeden çıkarıldın.")
+        }
+        return parts.joined(separator: " ")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer().frame(height: 84)
@@ -25,6 +38,32 @@ struct WelcomeView: View {
                 .foregroundColor(.white.opacity(0.55))
                 .lineSpacing(4)
                 .padding(.top, 12)
+
+            // SİLME ÖZETİ — madde 28.
+            //
+            // Silme bitince `RootView` tüm ağacı değiştiriyor ve silme
+            // ekranının kendi "bitti" adımı yok oluyordu: kullanıcı düğmeye
+            // basıp kendini aniden burada buluyor, ne olduğunu göremiyordu.
+            // Özet oturumdan BAĞIMSIZ taşınıyor ve okunduktan sonra
+            // temizleniyor.
+            if let summary = appState.lastDeletionSummary {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Hesabın silindi")
+                        .font(.manrope(14, .bold))
+                        .foregroundColor(.white)
+                    Text(deletionText(summary))
+                        .font(.manrope(12.5, .medium))
+                        .foregroundColor(.white.opacity(0.6))
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .background(Color.white.opacity(0.07))
+                .cornerRadius(14)
+                .padding(.top, 22)
+                .onTapGesture { appState.lastDeletionSummary = nil }
+            }
 
             Spacer()
 
