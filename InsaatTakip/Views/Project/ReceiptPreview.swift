@@ -32,7 +32,7 @@ private struct ReceiptPreviewModifier: ViewModifier {
                     payload = nil
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .semibold))
+                        .iconFont(15, weight: .semibold)
                         .foregroundColor(.white)
                         .frame(width: 40, height: 40)
                         .background(Color.black.opacity(0.45))

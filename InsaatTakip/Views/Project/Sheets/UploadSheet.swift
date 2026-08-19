@@ -159,7 +159,7 @@ struct UploadSheet: View {
             }
 
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 16, weight: .semibold))
+                .iconFont(16, weight: .semibold)
                 .foregroundColor(Palette.success)
         }
         .padding(12)

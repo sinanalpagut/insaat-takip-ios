@@ -58,7 +58,7 @@ struct InviteSheet: View {
         VStack(spacing: 0) {
             VStack(spacing: 10) {
                 Image(systemName: "qrcode")
-                    .font(.system(size: 26, weight: .medium))
+                    .iconFont(26, weight: .medium)
                     .foregroundColor(Palette.textTertiary)
                 Text("Henüz kod üretilmedi")
                     .font(.manrope(11.5, .medium))
@@ -137,7 +137,7 @@ struct InviteSheet: View {
         } label: {
             HStack(spacing: 9) {
                 Image(systemName: "message.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .iconFont(15, weight: .semibold)
                 Text("WhatsApp ile Paylaş")
                     .font(.manrope(15, .bold))
             }

@@ -328,9 +328,11 @@ struct ProjectDetailView: View {
     /// Koyu başlıktaki 34px ikon butonu görünümü (NavigationLink etiketi).
     private func darkHeaderIcon(_ systemName: String) -> some View {
         Image(systemName: systemName)
-            .font(.system(size: 13, weight: .semibold))
+            .iconFont(13, weight: .semibold)
             .foregroundColor(.white)
             .frame(width: 34, height: 34)
+                        .contentShape(Rectangle())
+                        .frame(width: 44, height: 44)
             .background(Color.white.opacity(0.08))
             .cornerRadius(11)
     }

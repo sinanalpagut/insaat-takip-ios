@@ -80,7 +80,7 @@ struct ExpenseSheet: View {
                         } label: {
                             HStack(spacing: 9) {
                                 Image(systemName: receiptImage == nil ? "camera.fill" : "checkmark")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .iconFont(14, weight: .semibold)
                                 Text(receiptImage == nil ? "Belge Fotoğrafı Ekle" : "Belge eklendi")
                                     .font(.manrope(13.5, .bold))
                             }
@@ -95,7 +95,7 @@ struct ExpenseSheet: View {
                                 receiptImage = nil
                             } label: {
                                 Image(systemName: "xmark")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .iconFont(13, weight: .semibold)
                                     .foregroundColor(Palette.textMuted)
                                     .frame(width: 52, height: 52)
                                     .background(Palette.fillMuted)
@@ -147,7 +147,7 @@ struct ExpenseSheet: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: option.icon)
-                    .font(.system(size: 10, weight: .semibold))
+                    .iconFont(10, weight: .semibold)
                 Text(option.shortName)
                     .font(.manrope(12.5, .bold))
             }

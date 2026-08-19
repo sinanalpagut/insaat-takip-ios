@@ -122,7 +122,7 @@ struct ApartmentsTabView: View {
     private var searchBar: some View {
         HStack(spacing: 9) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
+                .iconFont(13, weight: .medium)
                 .foregroundColor(Palette.textTertiary)
 
             TextField(isAdmin ? "Daire no, tip, kat veya alıcı" : "Daire no, tip veya kat",
@@ -137,7 +137,7 @@ struct ApartmentsTabView: View {
                     searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
+                        .iconFont(14, weight: .regular)
                         .foregroundColor(Palette.textTertiary)
                         // Glif 14pt (tasarım değişmiyor) ama dokunma hedefi
                         // 44pt: sembolün gerçek kutusu 16×16'ydı, yani
@@ -197,7 +197,7 @@ struct ApartmentsTabView: View {
     private var noMatchState: some View {
         VStack(spacing: 7) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 20, weight: .light))
+                .iconFont(20, weight: .light)
                 .foregroundColor(Palette.textTertiary)
             Text("Eşleşen daire yok")
                 .font(.manrope(13.5, .bold))
@@ -363,6 +363,36 @@ struct ApartmentCellView: View {
             }
         }
         .frame(minHeight: 142)
+        // KART TEK BİR ÖĞE OLARAK OKUNUYOR (madde 31).
+        //
+        // Önceden VoiceOver kartı beş ayrı parça hâlinde okuyordu (no, kat,
+        // ad, bedel, tarih, çip) ve aralarındaki ilişki kayboluyordu; 20
+        // daireli bir projede kaydırarak ilerlemek işkenceydi.
+        //
+        // Ayrıca SATILAN dairede durum yalnızca YEŞİL RENKLE taşınıyordu —
+        // "SATILDI" metni hiçbir yerde çizilmiyor (diğer üç durumda çiziliyor).
+        // Renk körü bir kullanıcı için o bilgi hiç yoktu; etikette açıkça
+        // geçiyor.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(voiceOverLabel)
+    }
+
+    /// Kartın VoiceOver'da okunacak tam cümlesi.
+    private var voiceOverLabel: String {
+        var parts = ["Daire \(apartment.apartmentNumber)",
+                     Apartment.floorLabel(for: apartment.floor)]
+        if apartment.type != "—" { parts.append(apartment.type) }
+        if let area = apartment.areaM2 { parts.append("\(Fmt.qty(area)) metrekare") }
+        parts.append(apartment.status.label)
+
+        if apartment.status == .sold || apartment.status == .reserved {
+            if let buyer = apartment.buyerName, !buyer.isEmpty { parts.append(buyer) }
+            parts.append("bedel \(Fmt.money(apartment.price))")
+            parts.append("tahsil edilen \(Fmt.money(apartment.paidAmount))")
+            let remaining = max(.zero, apartment.price - apartment.paidAmount)
+            if remaining > .zero { parts.append("kalan \(Fmt.money(remaining))") }
+        }
+        return parts.joined(separator: ", ")
     }
 
     /// Satılan daire: yeşil zemin, alıcı + bedel + tahsilat barı + ödeme çipi.

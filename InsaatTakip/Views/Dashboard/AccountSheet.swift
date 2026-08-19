@@ -54,7 +54,7 @@ struct AccountSheet: View {
             } label: {
                 HStack(spacing: 9) {
                     Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
+                        .iconFont(14, weight: .semibold)
                     Text("Oturumu Kapat")
                         .font(.manrope(14, .bold))
                 }
@@ -153,7 +153,7 @@ struct AccountSheet: View {
                 }
             } label: {
                 Image(systemName: isEditingName ? "checkmark" : "pencil")
-                    .font(.system(size: 14, weight: .semibold))
+                    .iconFont(14, weight: .semibold)
                     .foregroundColor(.white.opacity(0.75))
                     .frame(width: 36, height: 36)
                     .background(Color.white.opacity(0.09))
@@ -186,7 +186,7 @@ struct AccountSheet: View {
         } label: {
             HStack(spacing: 13) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .medium))
+                    .iconFont(15, weight: .medium)
                     .foregroundColor(isActive ? Palette.accent : Palette.textMuted)
                     .frame(width: 42, height: 42)
                     .background(isActive ? Palette.accentTint : Palette.fillMuted)
@@ -207,7 +207,7 @@ struct AccountSheet: View {
 
                 if isActive {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .bold))
+                        .iconFont(13, weight: .bold)
                         .foregroundColor(Palette.accent)
                 }
             }

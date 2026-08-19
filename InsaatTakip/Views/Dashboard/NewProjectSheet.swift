@@ -95,9 +95,11 @@ struct NewProjectSheet: View {
                     if value.wrappedValue > range.lowerBound { value.wrappedValue -= 1 }
                 } label: {
                     Image(systemName: "minus")
-                        .font(.system(size: 12, weight: .bold))
+                        .iconFont(12, weight: .bold)
                         .foregroundColor(Palette.textMuted)
                         .frame(width: 34, height: 34)
+                        .contentShape(Rectangle())
+                        .frame(width: 44, height: 44)
                         .background(Palette.fillMuted)
                         .cornerRadius(10)
                 }
@@ -110,9 +112,11 @@ struct NewProjectSheet: View {
                     if value.wrappedValue < range.upperBound { value.wrappedValue += 1 }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
+                        .iconFont(12, weight: .bold)
                         .foregroundColor(Palette.accent)
                         .frame(width: 34, height: 34)
+                        .contentShape(Rectangle())
+                        .frame(width: 44, height: 44)
                         .background(Palette.accentTint)
                         .cornerRadius(10)
                 }

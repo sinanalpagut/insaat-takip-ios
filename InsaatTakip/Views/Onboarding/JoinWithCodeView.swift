@@ -26,7 +26,7 @@ struct JoinWithCodeView: View {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .semibold))
+                        .iconFont(13, weight: .semibold)
                         .foregroundColor(.white.opacity(0.7))
                         .frame(width: 34, height: 34)
                         .background(Color.white.opacity(0.08))

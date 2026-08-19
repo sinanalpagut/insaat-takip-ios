@@ -142,7 +142,7 @@ struct ExpensesTabView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "hammer")
-                .font(.system(size: 24, weight: .light))
+                .iconFont(24, weight: .light)
                 .foregroundColor(Palette.textTertiary)
             Text("Henüz gider kaydı yok")
                 .font(.manrope(13.5, .bold))
@@ -179,7 +179,7 @@ struct ExpenseRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: expense.category.icon)
-                .font(.system(size: 14, weight: .medium))
+                .iconFont(14, weight: .medium)
                 .foregroundColor(Palette.alertInk)
                 .frame(width: 40, height: 40)
                 .background(Palette.alertTint)
@@ -192,7 +192,7 @@ struct ExpenseRowView: View {
                         .foregroundColor(Palette.ink)
                     if hasReceipt {
                         Image(systemName: "paperclip")
-                            .font(.system(size: 9, weight: .semibold))
+                            .iconFont(9, weight: .semibold)
                             .foregroundColor(Palette.textTertiary)
                     }
                 }
@@ -221,7 +221,7 @@ struct ExpenseRowView: View {
                         .onTapGesture { onReceiptTap(receipt) }
                 } else {
                     Image(systemName: "doc.text")
-                        .font(.system(size: 12, weight: .light))
+                        .iconFont(12, weight: .light)
                         .foregroundColor(Palette.textTertiary)
                         .frame(width: 30, height: 30)
                         .background(Palette.fillMuted)

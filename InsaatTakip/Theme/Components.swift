@@ -69,11 +69,22 @@ struct CodeBadge: View {
     var critical: Bool = false
     var size: CGFloat = 40
 
+    /// Kutu YAZIYLA BİRLİKTE büyüyor (madde 31).
+    ///
+    /// Sabit 40pt'de AX5'te Sora 11 → 30pt'ye çıkıyor, "Ø12" sığmayıp iki
+    /// satıra sarılıyor ve `cornerRadius` hepsini kırpıyordu: rozet ekranda
+    /// SADECE üç nokta gösteriyordu. Rozet her malzeme satırının birincil
+    /// kimliği, yani %100 bilgi kaybı. Tavan var çünkü liste satırı da
+    /// büyüyor; sınırsız bırakılırsa satır rozetten ibaret kalır.
+    @ScaledMetric(relativeTo: .body) private var scaled: CGFloat = 40
+
     var body: some View {
         Text(code)
             .font(.sora(11, .bold))
             .foregroundColor(critical ? Palette.alertInk : Palette.accent)
-            .frame(width: size, height: size)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .frame(width: min(scaled, size * 1.5), height: min(scaled, size * 1.5))
             .background(critical ? Palette.alertTint : Palette.accentTint)
             .cornerRadius(12)
     }
@@ -139,7 +150,7 @@ struct SheetHeader: View {
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
+                        .iconFont(14, weight: .semibold)
                         .foregroundColor(Palette.textMuted)
                         .frame(width: 40, height: 40)
                         .background(Palette.fillMuted)
@@ -181,7 +192,7 @@ struct PrimaryButton: View {
             HStack(spacing: 9) {
                 if let icon {
                     Image(systemName: icon)
-                        .font(.system(size: 15, weight: .semibold))
+                        .iconFont(15, weight: .semibold)
                 }
                 Text(title).font(.manrope(15, .bold))
             }
@@ -232,7 +243,7 @@ struct DarkHeaderButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 13, weight: .semibold))
+                .iconFont(13, weight: .semibold)
                 .foregroundColor(.white)
                 // GÖRSEL 34pt, DOKUNMA HEDEFİ 44pt. Tasarımdaki kare
                 // korunuyor; yalnızca dokunulabilir alan Apple'ın asgarisine
@@ -267,6 +278,38 @@ struct AdaptiveTileRow<Content: View>: View {
         } else {
             HStack(spacing: spacing) { content }
         }
+    }
+}
+
+/// Dynamic Type ile ÖLÇEKLENEN ikon fontu (madde 31).
+///
+/// `.font(.system(size:))` Dynamic Type'a HİÇ tepki vermiyor: uygulamadaki 56
+/// SF Symbol çağrısı bu formda yazıldığı için yazı üç katına çıkarken geri oku,
+/// kamera ve zil ikonu aynı boyutta kalıyordu. Yanlarındaki metin büyüdükçe
+/// ikonlar görece küçülüyor ve hizalama bozuluyordu.
+///
+/// TAVAN VAR: ikon sınırsız büyürse satır düzenleri (rozet + metin + değer)
+/// dağılıyor. Varsayılan boyutta ölçü tasarımdakiyle birebir aynı.
+private struct ScaledIconFont: ViewModifier {
+    @ScaledMetric private var scaled: CGFloat
+    private let base: CGFloat
+    private let weight: Font.Weight
+
+    init(size: CGFloat, weight: Font.Weight) {
+        _scaled = ScaledMetric(wrappedValue: size, relativeTo: .body)
+        base = size
+        self.weight = weight
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: min(scaled, base * 1.6), weight: weight))
+    }
+}
+
+extension View {
+    /// SF Symbol'ler için ölçeklenen font. Gerekçe `ScaledIconFont`ta.
+    func iconFont(_ size: CGFloat, weight: Font.Weight = .semibold) -> some View {
+        modifier(ScaledIconFont(size: size, weight: weight))
     }
 }
 
@@ -307,7 +350,7 @@ struct ToastView: View {
             ZStack {
                 Circle().fill(Palette.whatsapp).frame(width: 18, height: 18)
                 Image(systemName: "checkmark")
-                    .font(.system(size: 9, weight: .bold))
+                    .iconFont(9, weight: .bold)
                     .foregroundColor(.white)
             }
             Text(message)

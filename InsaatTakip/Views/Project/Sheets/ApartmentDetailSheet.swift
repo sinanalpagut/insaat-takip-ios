@@ -309,7 +309,7 @@ struct ApartmentDetailSheet: View {
                 // Tasarımdaki yer tutucu kare (henüz fotoğraf yüklenmemiş yuva)
                 VStack(spacing: 8) {
                     Image(systemName: "photo")
-                        .font(.system(size: 20, weight: .light))
+                        .iconFont(20, weight: .light)
                         .foregroundColor(Palette.textTertiary)
                     Text(photo.label)
                         .font(.manrope(12, .semiBold))
@@ -341,9 +341,11 @@ struct ApartmentDetailSheet: View {
     private func addTile(icon: String, title: String) -> some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .medium))
+                .iconFont(15, weight: .medium)
                 .foregroundColor(Palette.accent)
                 .frame(width: 34, height: 34)
+                        .contentShape(Rectangle())
+                        .frame(width: 44, height: 44)
                 .background(Palette.accentTint)
                 .cornerRadius(10)
             Text(title)
@@ -438,7 +440,7 @@ struct ApartmentDetailSheet: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus")
-                            .font(.system(size: 12, weight: .bold))
+                            .iconFont(12, weight: .bold)
                         Text("Ödeme Ekle")
                             .font(.manrope(13.5, .bold))
                     }
@@ -456,7 +458,7 @@ struct ApartmentDetailSheet: View {
     private func paymentRow(_ payment: Payment) -> some View {
         HStack(spacing: 11) {
             Image(systemName: payment.method.icon)
-                .font(.system(size: 11, weight: .medium))
+                .iconFont(11, weight: .medium)
                 .foregroundColor(Palette.success)
                 .frame(width: 28, height: 28)
                 .background(Palette.successTint)
@@ -516,7 +518,7 @@ struct ApartmentDetailSheet: View {
                 .onTapGesture { previewedReceipt = SharePayloadImage(image: receipt) }
         } else {
             Image(systemName: "doc.text")
-                .font(.system(size: 12, weight: .light))
+                .iconFont(12, weight: .light)
                 .foregroundColor(Palette.textTertiary)
                 .frame(width: 30, height: 30)
                 .background(Palette.fillMuted)

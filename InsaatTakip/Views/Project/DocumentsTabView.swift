@@ -81,7 +81,7 @@ struct DocumentsTabView: View {
                 if groupedDocuments.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "doc.text")
-                            .font(.system(size: 24, weight: .light))
+                            .iconFont(24, weight: .light)
                             .foregroundColor(Palette.textTertiary)
                         Text(filter == .tumu ? "Henüz dosya yok" : "Bu kategoride dosya yok")
                             .font(.manrope(13.5, .bold))
@@ -196,7 +196,7 @@ struct DocumentRowView: View {
                     // Yalnızca yöneticinin görebildiği dosyalara kilit işareti
                     if !document.partnerVisible {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 9, weight: .semibold))
+                            .iconFont(9, weight: .semibold)
                             .foregroundColor(Palette.textTertiary)
                     }
                 }
@@ -209,7 +209,7 @@ struct DocumentRowView: View {
 
             Button(action: onDownload) {
                 Image(systemName: "arrow.down")
-                    .font(.system(size: 13, weight: .semibold))
+                    .iconFont(13, weight: .semibold)
                     .foregroundColor(Palette.textMuted)
                     .frame(width: 40, height: 40)
                     .background(Palette.fillMuted)

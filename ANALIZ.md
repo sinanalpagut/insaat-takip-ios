@@ -802,7 +802,40 @@ projesi kullanılmalı — kurallar zaten yayında.
         eklendiği an App Privacy etiketi ve GİZLİLİK POLİTİKASI da güncellenmek
         zorunda, o da alan adına bağlı ve henüz yayında değil. Şimdi eklenirse
         politika onu kapsamadan yayına çıkmış olurdu.
-- [ ] 31. Erişilebilirlik paketi (kontrast, 44pt hedefler, VoiceOver, Dynamic Type)
+- [x] 31. Erişilebilirlik paketi — **TAMAM (19 Ağu 2026)**
+      · **EN AĞIR BULGU — büyük yazıda para rakamları kırpılıyordu ve kesilen
+        parça TAM OLARAK BÜYÜKLÜK EKİYDİ:** "42,65 M ₺" → "42,...", yani 42 bin
+        ile 42 milyon ayırt edilemiyordu. Bu, maddelerin çoğunda kovaladığımız
+        "yanıltıcı rakam" sınıfı. Kırpma kaldırıldı; AX boyutunda karolar
+        dikeye geçiyor (`AdaptiveTileRow`).
+      · **KONTRAST — ironi buradaydı.** Eşik altındaki üç renk (textTertiary
+        2,33:1 · textSecondary 3,57:1 · tabInactive 2,55:1) tam olarak KAPSAM
+        NOTLARINDA kullanılıyordu: "kalan inşaat maliyeti düşülmemiştir",
+        "sermaye henüz tutulmuyor". Rakamları dürüst kılan metinler
+        uygulamanın en okunmaz metinleriydi. Tonlar AA'ya çekildi, hiyerarşi
+        korundu; koyu zemindeki `.white.opacity(0.45)` (4,22:1) → 0,62 (6,68:1).
+      · **`cornerRadius` İÇERİĞİ kırpıyor** (arka planı değil). Sabit
+        `.frame(height:)` ile birleşince buton yazıları kesiliyordu ve boş
+        durum kutularında yol gösterici cümlenin %42'si gidiyordu → `minHeight`.
+      · **`CodeBadge` %100 bilgi kaybı veriyordu** — AX5'te yalnızca "..."
+        görünüyordu, malzeme kodunun tamamı kayboluyordu. Kutu yazıyla birlikte
+        ölçekleniyor (tavanlı).
+      · **56 SF Symbol ikonu Dynamic Type'a hiç tepki vermiyordu**
+        (`.font(.system(size:))` ölçeklenmiyor). Hepsi `iconFont` yardımcısına
+        dönüştürüldü — ölçeklenir ama tavanlı, yoksa satır düzenleri dağılıyor.
+      · **VoiceOver:** uygulamada TEK BİR etiket yoktu; 56 ikon-buton İngilizce
+        sembol adıyla okunuyordu. Merkezî bileşenlerden kapatıldı (geri/kapat,
+        13 sheet'in ✕'i, arama temizleme, fiş kaldırma, hesap menüsü, zil).
+        Daire kartları tek öğe olarak gruplandı ve **satılan dairede yalnızca
+        RENKLE taşınan durum** artık etikette geçiyor — renk körü kullanıcı için
+        o bilgi hiç yoktu.
+      · **Dokunma hedefleri 44pt'ye çıkarıldı**, görsel ölçüler korunarak
+        (`.contentShape`): arama temizleme 16×16'ydı (asgarinin %13'ü), fiş
+        kaldırma 30×30 ve GERİ ALINAMAZ bir işlem, başlık butonları 34×34.
+      · Varsayılan boyutta tasarım BİREBİR korunuyor — simülatörde iki boyutta
+        da doğrulandı.
+      · KALAN (küçük): AX5'te proje başlığı ve rol çipi kırpılıyor (krom öğe,
+        bilgi kaybı değil); fiş küçük resimlerinin dokunma hedefi hâlâ 30–34pt.
 
 ---
 

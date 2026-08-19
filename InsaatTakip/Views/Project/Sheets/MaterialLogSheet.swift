@@ -52,7 +52,7 @@ struct MaterialLogSheet: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
+                            .iconFont(14, weight: .semibold)
                             .foregroundColor(Palette.textMuted)
                             .frame(width: 40, height: 40)
                             .background(Palette.fillMuted)
@@ -142,7 +142,7 @@ struct MaterialLogSheet: View {
                     previewedReceipt = nil
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .semibold))
+                        .iconFont(15, weight: .semibold)
                         .foregroundColor(.white)
                         .frame(width: 40, height: 40)
                         .background(Color.black.opacity(0.45))
@@ -272,14 +272,18 @@ struct MaterialLogSheet: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: 34, height: 34)
+                        .contentShape(Rectangle())
+                        .frame(width: 44, height: 44)
                 .clipped()
                 .cornerRadius(9)
                 .onTapGesture { previewedReceipt = SharePayloadImage(image: receipt) }
         } else {
             Image(systemName: "doc.text")
-                .font(.system(size: 13, weight: .light))
+                .iconFont(13, weight: .light)
                 .foregroundColor(Palette.textTertiary)
                 .frame(width: 34, height: 34)
+                        .contentShape(Rectangle())
+                        .frame(width: 44, height: 44)
                 .background(Palette.fillMuted)
                 .cornerRadius(9)
                 .task(id: log.id) {
@@ -291,7 +295,7 @@ struct MaterialLogSheet: View {
     private func logRow(_ log: MaterialLog, unit: String) -> some View {
         HStack(spacing: 11) {
             Image(systemName: log.type == .entry ? "arrow.down" : "arrow.up")
-                .font(.system(size: 11, weight: .bold))
+                .iconFont(11, weight: .bold)
                 .foregroundColor(log.type == .entry ? Palette.success : Palette.textFaded)
                 .frame(width: 26, height: 26)
                 .background(log.type == .entry ? Palette.successTint : Palette.fillMuted)

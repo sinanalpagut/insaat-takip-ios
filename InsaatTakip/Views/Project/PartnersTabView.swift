@@ -62,7 +62,7 @@ struct PartnersTabView: View {
                 if !isAdmin {
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "info.circle")
-                            .font(.system(size: 13, weight: .medium))
+                            .iconFont(13, weight: .medium)
                             .foregroundColor(Palette.accent)
                             .padding(.top, 1)
                         Text("Bu projeyi salt okunur takip ediyorsun. Yeni ortak daveti yalnızca yönetici tarafından yapılabilir.")

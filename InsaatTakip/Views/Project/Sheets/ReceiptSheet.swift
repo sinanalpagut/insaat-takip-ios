@@ -163,7 +163,7 @@ struct ReceiptSheet: View {
                             showCamera = true
                         } label: {
                             Image(systemName: receiptImage == nil ? "camera.fill" : "checkmark")
-                                .font(.system(size: 16, weight: .semibold))
+                                .iconFont(16, weight: .semibold)
                                 .foregroundColor(receiptImage == nil ? Palette.accent : .white)
                                 .frame(width: 52, height: 52)
                                 .background(receiptImage == nil ? Palette.accentTint : Palette.success)
@@ -202,7 +202,7 @@ struct ReceiptSheet: View {
                                     self.receiptCleared = true
                                 } label: {
                                     Image(systemName: "xmark")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .iconFont(12, weight: .semibold)
                                         .foregroundColor(Palette.textMuted)
                                         .frame(width: 30, height: 30)
                                         .background(Palette.fillMuted)
@@ -326,7 +326,7 @@ struct ReceiptSheet: View {
 
             HStack(spacing: 6) {
                 Image(systemName: "text.viewfinder")
-                    .font(.system(size: 11, weight: .semibold))
+                    .iconFont(11, weight: .semibold)
                 Text("Fişten okundu")
                     .font(.manrope(10.5, .extraBold))
                     .tracking(0.8)
@@ -385,7 +385,7 @@ struct ReceiptSheet: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "plus")
-                    .font(.system(size: 10, weight: .bold))
+                    .iconFont(10, weight: .bold)
                 Text("Yeni Malzeme")
                     .font(.manrope(12.5, .bold))
             }

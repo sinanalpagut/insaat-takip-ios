@@ -109,7 +109,7 @@ struct SitePhotosView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "camera")
-                .font(.system(size: 24, weight: .light))
+                .iconFont(24, weight: .light)
                 .foregroundColor(Palette.textTertiary)
             Text("Henüz şantiye fotoğrafı yok")
                 .font(.manrope(13.5, .bold))
@@ -162,7 +162,7 @@ struct SitePhotosView: View {
                 .overlay(
                     VStack(spacing: 7) {
                         Image(systemName: "photo")
-                            .font(.system(size: 20, weight: .light))
+                            .iconFont(20, weight: .light)
                             .foregroundColor(Palette.textTertiary)
                         Text(photo.dateText)
                             .font(.manrope(11.5, .semiBold))
@@ -185,7 +185,7 @@ struct SitePhotosView: View {
             .overlay(
                 VStack(spacing: 7) {
                     Image(systemName: "camera")
-                        .font(.system(size: 15, weight: .light))
+                        .iconFont(15, weight: .light)
                         .foregroundColor(Palette.textTertiary)
                     Text(photo.dateText)
                         .font(.manrope(11, .medium))

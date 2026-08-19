@@ -104,7 +104,7 @@ struct DashboardView: View {
                 NavigationLink(value: Route.activity) {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: "bell")
-                            .font(.system(size: 15, weight: .medium))
+                            .iconFont(15, weight: .medium)
                             .foregroundColor(.white)
                             .frame(width: 40, height: 40)
                             .background(Color.white.opacity(0.06))
@@ -176,7 +176,7 @@ struct DashboardView: View {
             if !isAdmin {
                 HStack(spacing: 7) {
                     Image(systemName: "eye")
-                        .font(.system(size: 10, weight: .semibold))
+                        .iconFont(10, weight: .semibold)
                     Text("İzleyici · salt okunur erişim")
                         .font(.manrope(10.5, .extraBold))
                         .tracking(0.5)
@@ -209,7 +209,7 @@ struct DashboardView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "building.2")
-                .font(.system(size: 22, weight: .regular))
+                .iconFont(22, weight: .regular)
                 .foregroundColor(Palette.accent)
                 .frame(width: 54, height: 54)
                 .background(Palette.accentTint)

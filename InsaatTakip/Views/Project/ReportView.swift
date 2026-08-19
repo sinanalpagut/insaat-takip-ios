@@ -51,7 +51,7 @@ struct ReportView: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "tablecells")
-                                .font(.system(size: 14, weight: .semibold))
+                                .iconFont(14, weight: .semibold)
                             Text("Excel (CSV) ve Yedek")
                                 .font(.manrope(14, .bold))
                         }
@@ -200,7 +200,7 @@ struct ReportView: View {
             // Bu kart ortaklara PDF olarak dağıtılıyor; kapsamı yazılı olmalı.
             HStack(alignment: .top, spacing: 7) {
                 Image(systemName: "info.circle")
-                    .font(.system(size: 11, weight: .medium))
+                    .iconFont(11, weight: .medium)
                     .padding(.top, 1)
                 Text(scopeNote)
                     .font(.manrope(11, .medium))

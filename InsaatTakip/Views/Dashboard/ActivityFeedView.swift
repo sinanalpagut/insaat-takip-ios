@@ -145,7 +145,7 @@ struct ActivityRow: View {
             }
         }()
         return Image(systemName: symbol)
-            .font(.system(size: 12, weight: .semibold))
+            .iconFont(12, weight: .semibold)
             .foregroundColor(fg)
             .frame(width: 28, height: 28)
             .background(bg)
