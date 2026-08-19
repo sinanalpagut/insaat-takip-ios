@@ -175,6 +175,10 @@ struct ProjectExporter {
         let giderler: [Expense]
         let daireler: [Apartment]
         let tahsilatlar: [Payment]
+        /// Taksit planı (madde 21). Madde 26'dan SONRA eklendi ve yedeğe
+        /// alınması unutulmuştu — gerçek cihaz turunda dışa aktarılan dosya
+        /// denetlenirken yakalandı.
+        let taksitler: [Installment]
         let ortaklar: [Partner]
         let belgeler: [ProjectDocument]
         let alicilar: [ApartmentBuyer]

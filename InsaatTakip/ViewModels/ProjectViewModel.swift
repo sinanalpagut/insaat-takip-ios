@@ -865,6 +865,7 @@ final class ProjectViewModel: ObservableObject {
             giderler: projectExpenses,
             daireler: projectApartments,
             tahsilatlar: projectPayments,
+            taksitler: installments.filter { $0.projectId == projectId },
             ortaklar: partners(for: projectId),
             belgeler: documents.filter { $0.projectId == projectId && (isAdmin || $0.partnerVisible) },
             alicilar: isAdmin ? buyersSnapshot(for: projectId) : [],
