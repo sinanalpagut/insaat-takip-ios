@@ -158,6 +158,14 @@ final class ImageStore {
         let path = storagePath ?? objectPath(bucket, projectId, id)
         do { try await storage.reference(withPath: path).delete() }
         catch {
+            // `objectNotFound` ARIZA DEĞİL: silinecek nesne yoksa amaç zaten
+            // gerçekleşmiştir. Yol yukarıdaki gerekçeyle HESAPLANARAK siliniyor,
+            // dolayısıyla hiç yüklenmemiş bir görsel için bu sonuç NORMAL yoldur.
+            // Ayırmak şart: tanılama günlüğü cihaz turlarında "sessizlik =
+            // başarı" varsayımıyla okunuyor ve normal akışta düşen bir
+            // "silinemedi" satırı o varsayımı çürütüyor — gerçek arıza
+            // (yetki reddi, ağ) yanlış alarmların arasında kayboluyordu.
+            if case StorageError.objectNotFound = error { return }
             #if DEBUG
             print("[image] bulut silinemedi \(path): \(error)")
             #endif

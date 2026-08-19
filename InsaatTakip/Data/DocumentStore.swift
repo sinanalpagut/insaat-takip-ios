@@ -106,8 +106,16 @@ final class DocumentStore {
         do {
             try await storage.reference(withPath: path).delete()
         } catch {
+            // `objectNotFound` ARIZA DEĞİL: silinecek nesne yoksa amaç zaten
+            // gerçekleşmiştir. Yol yukarıdaki gerekçeyle HESAPLANARAK siliniyor,
+            // dolayısıyla hiç yüklenmemiş bir belge için bu sonuç NORMAL yoldur.
+            // Ayırmak şart: tanılama günlüğü cihaz turlarında "sessizlik =
+            // başarı" varsayımıyla okunuyor ve normal akışta düşen bir
+            // "silinemedi" satırı o varsayımı çürütüyor — gerçek arıza
+            // (yetki reddi, ağ) yanlış alarmların arasında kayboluyordu.
+            if case StorageError.objectNotFound = error { return }
             #if DEBUG
-            print("[document] bulut silme atlandı \(path): \(error)")
+            print("[document] bulut silinemedi \(path): \(error)")
             #endif
         }
     }
