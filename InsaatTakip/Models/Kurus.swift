@@ -111,6 +111,36 @@ struct Kurus: Codable, Equatable, Hashable, Comparable, AdditiveArithmetic {
         return shares
     }
 
+    /// Bir tutarı `count` **eşit** paya böler.
+    ///
+    /// Neden `byPercents` ile yapılmıyor: eşit bölmeyi yüzdeye çevirmek için
+    /// `100 / count` yazmak gerekiyor ve bu TAM SAYI bölmesi. count=12'de 8
+    /// çıkıyor, yüzdeler toplamı 96 oluyor ve tutarın %4'ü dağıtılmadan
+    /// kalıyor. Çağıran bunu "kalanı sona ekle" diye telafi ettiğinde son pay
+    /// diğerlerinin 1,5 katı oluyordu; count=36'da 15 KATI, count=60'ta 41 katı.
+    /// Toplam her seferinde doğru çıktığı için hiçbir toplam denetimi bunu
+    /// yakalamıyordu — bozulan şey toplam değil, PAYLARIN EŞİTLİĞİYDİ.
+    ///
+    /// Yüzde bir oran aracıdır (ortak payları gibi); eşit bölme ise doğrudan
+    /// bölmedir. İkisini birbirinin yerine kullanmak hatanın kaynağıydı.
+    ///
+    /// Artan kuruşlar baştan başlayarak birer birer dağıtılır: paylar arasındaki
+    /// fark en fazla 1 kuruş, toplamları tutara BİREBİR eşit. Baştan dağıtmak
+    /// bilinçli — erken taksit bir kuruş fazla, geç taksit bir kuruş eksik olur;
+    /// tersi, vadesi en uzak taksiti şişirir ki bu tam da kaçındığımız görüntü.
+    static func split(_ total: Kurus, into count: Int) -> [Kurus] {
+        guard count > 0 else { return [] }
+        let sign: Int64 = total.raw < 0 ? -1 : 1
+        let magnitude = abs(total.raw)
+        let base = magnitude / Int64(count)
+        var leftover = magnitude % Int64(count)
+        return (0..<count).map { _ in
+            let extra: Int64 = leftover > 0 ? 1 : 0
+            if leftover > 0 { leftover -= 1 }
+            return Kurus(raw: sign * (base + extra))
+        }
+    }
+
     // MARK: Aritmetik
 
     static func + (lhs: Kurus, rhs: Kurus) -> Kurus { Kurus(raw: lhs.raw + rhs.raw) }

@@ -121,9 +121,9 @@ extension Installment {
 
     /// Satış bedelinden plan üretir: peşinat + eşit aylık taksitler.
     ///
-    /// Kuruş artığı `Kurus.split` ile dağıtılıyor, yani taksitlerin toplamı
-    /// bedele BİREBİR eşit — 3 taksite bölünen bir bedelde son taksite kalan
-    /// kuruşun eklenmesi gibi sessiz sapmalar olmuyor.
+    /// Taksitler `Kurus.split(_:into:)` ile EŞİT bölünüyor: toplamları bedele
+    /// birebir eşit VE aralarındaki fark en fazla 1 kuruş. İki güvence ayrı
+    /// ayrı gerekli — eski kod toplamı tutturuyor ama eşitliği bozuyordu.
     static func plan(apartmentId: UUID, projectId: UUID,
                      price: Kurus, downPayment: Kurus,
                      count: Int, firstDueDate: Date) -> [Installment] {
@@ -142,13 +142,14 @@ extension Installment {
         }
 
         let rest = price - downPayment
-        let shares = Kurus.split(rest, byPercents: Array(repeating: 100 / count, count: count))
-        // `split` yüzde tabanlı; eşit bölmede kalan kuruşu telafi et.
-        let distributed = shares.reduce(Kurus.zero, +)
-        var amounts = shares
-        if distributed != rest, let last = amounts.indices.last {
-            amounts[last] = amounts[last] + (rest - distributed)
-        }
+        // EŞİT bölme — yüzde ÜZERİNDEN DEĞİL. Önceden burada
+        // `byPercents: Array(repeating: 100 / count, ...)` vardı; `100 / count`
+        // tam sayı bölmesi olduğu için 12 taksitte yüzdeler toplamı 96 çıkıyor,
+        // eksik kalan %4 de "kalanı sona ekle" telafisiyle SON taksite biniyordu.
+        // Sonuç: 12 taksitte son taksit %50, 36 taksitte 15 KAT şişkin. Toplam
+        // her zaman bedele eşit çıktığı için ekranda hiçbir şey yanlış
+        // görünmüyordu; bozulan şey taksitlerin eşitliğiydi.
+        let amounts = Kurus.split(rest, into: count)
 
         for index in 0..<count {
             let due = Fmt.calendar.date(byAdding: .month, value: index + 1,
