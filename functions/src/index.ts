@@ -1,13 +1,19 @@
 import { setGlobalOptions } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getStorage } from "firebase-admin/storage";
 import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // İnşaat Takip — Cloud Functions
 //
-// TEK İŞLEV VAR ve olması ZORUNLU. Sistemdeki tek "kullanıcı kendi yetkisini
-// yükseltiyor" işlemi bu: davet edilen kişi kendini bir projenin üyesi yapıyor.
+// İKİ İŞLEV VAR ve ikisi de ZORUNLU — istemciden güvenli yapılamayacak iki iş.
+//
+// 1) redeemInvite — sistemdeki tek "kullanıcı kendi yetkisini yükseltiyor"
+//    işlemi: davet edilen kişi kendini bir projenin üyesi yapıyor.
+// 2) deleteAccount — App Store 5.1.1(v) zorunluluğu; gerekçesi kendi
+//    bloğunda yazılı.
 //
 // Güvenlik kuralları bunu yapamaz ve yapmaması doğru:
 //   · Davet edilen kişi henüz ÜYE OLMADIĞI projeyi okuyamaz (kural öyle), o
@@ -164,4 +170,100 @@ export const redeemInvite = onCall<{ code?: string }, Promise<RedeemResult>>(
       return { projectId, projectTitle: title, alreadyMember: false };
     });
   }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HESAP SİLME (madde 28) — App Store Guideline 5.1.1(v)
+//
+// Hesap oluşturmaya izin veren uygulama, hesabın uygulama İÇİNDEN silinmesine
+// de izin vermek ZORUNDA. Bu olmadan gönderim doğrudan reddediliyor.
+//
+// NEDEN İSTEMCİDEN YAPILAMAZ — beş bağımsız sebep:
+//
+//  1. `projects/{pid}` ve `users/{uid}` için kural `allow delete: if false`.
+//     (Kuralın kendi yorumu zaten bu işlevi işaret ediyordu.)
+//  2. ORTAK kendi uid'ini `memberUids`'ten ÇIKARAMAZ: projeye yazma yalnızca
+//     sahibe açık. Yani hesabını silen ortak için istemci çözümü matematiksel
+//     olarak imkânsız — `redeemInvite`'ı zorunlu kılan gerekçenin aynası.
+//  3. Firestore alt koleksiyonları üst belge silinince OTOMATİK SİLİNMİYOR.
+//     13 alt koleksiyon var; "proje belgesini sil" deyip geçmek, kullanıcıya
+//     "silindi" derken alıcı adlarını ve tahsilatları veritabanında bırakmak
+//     olurdu.
+//  4. Storage nesneleri istemciden LİSTELENEMİYOR (kurallar yalnızca tam
+//     dosya yollarını eşliyor, önek listelemeye izin yok). Admin SDK'nın önek
+//     silmesi ayrıca YETİM nesneleri de yakalıyor — yüklemesi yarım kalmış,
+//     belgede yolu yazılmamış dosyalar.
+//  5. Auth kaydı EN SON silinmeli. Önce silinseydi aynı uid bir daha
+//     üretilemeyeceği için `isOwner`/`isMember` sonsuza dek false döner ve veri
+//     erişilemez öksüz kalırdı. Sıra bir tercih değil, tek yönlü kapı.
+//
+// SAHİPLİK KARARI: sahibin projeleri ve tüm verisi SİLİNİR. Devir (ownerUid
+// değişimi) kural düzeyinde yasak, devir akışı yok ve devralanın rızası
+// gerekir; o ayrı bir madde. İstemci onay ekranında ne kaybedileceğini
+// rakamla söylüyor (kaç proje, kaç ortak erişimini kaybedecek).
+//
+// YENİDEN KİMLİK DOĞRULAMA İSTEMCİDE: `user.reauthenticate(with:)` ile SMS
+// turu orada dönüyor. Bu işlev yalnızca doğrulanmış çağrıya güveniyor —
+// `request.auth` olmadan hiçbir şey yapmıyor.
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface DeleteResult {
+  deletedProjects: number;
+  leftProjects: number;
+}
+
+export const deleteAccount = onCall<unknown, Promise<DeleteResult>>(
+  async (request): Promise<DeleteResult> => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "signed-in-required");
+    }
+
+    // ---- 1) SAHİBİ OLDUĞU PROJELER: tamamen sil --------------------------
+    const owned = await db.collection("projects").where("ownerUid", "==", uid).get();
+    const bucket = getStorage().bucket();
+
+    for (const project of owned.docs) {
+      // `recursiveDelete` alt koleksiyonların TAMAMINI geziyor; tek tek
+      // koleksiyon adı yazmak yeni bir koleksiyon eklendiğinde sessizce
+      // eksik kalırdı (13 tane var ve madde 21'de bir tane daha eklendi).
+      await db.recursiveDelete(project.ref);
+
+      // Storage ÖNEK silmesi: belgeye bakan bir silme, yüklemesi yarım kalmış
+      // ve yolu belgeye hiç yazılmamış nesneleri kaçırırdı.
+      await bucket.deleteFiles({ prefix: `projects/${project.id}/` });
+    }
+
+    // ---- 2) ORTAK OLDUĞU PROJELER: yalnızca kendini çıkar ----------------
+    // Başkasının verisi silinmiyor; kullanıcı listeden düşüyor.
+    const member = await db.collection("projects")
+      .where("memberUids", "array-contains", uid).get();
+
+    let left = 0;
+    for (const project of member.docs) {
+      if (project.get("ownerUid") === uid) continue;   // 1. adımda silindi
+      const batch = db.batch();
+      batch.update(project.ref, { memberUids: FieldValue.arrayRemove(uid) });
+
+      // Ortak kaydı da düşüyor: adı taşıyor (KVKK) ve kişi artık projede
+      // değil. Hisse yüzdesi kayboluyor — yöneticinin yeniden tanımlaması
+      // gerekiyor, ama kimliği tutmaktan iyi.
+      const partners = await project.ref.collection("partners")
+        .where("userUid", "==", uid).get();
+      partners.docs.forEach((doc) => batch.delete(doc.ref));
+
+      await batch.commit();
+      left += 1;
+    }
+
+    // ---- 3) Profil belgesi ------------------------------------------------
+    await db.collection("users").doc(uid).delete();
+
+    // ---- 4) Auth kaydı — EN SON ------------------------------------------
+    // Buraya kadar her şey silindi; bundan sonra uid'in bir daha üretilme
+    // ihtimali yok ve olması da gerekmiyor.
+    await getAuth().deleteUser(uid);
+
+    return { deletedProjects: owned.size, leftProjects: left };
+  },
 );

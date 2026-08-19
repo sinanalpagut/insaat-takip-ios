@@ -18,6 +18,7 @@ const FIRESTORE = `http://127.0.0.1:8080/v1/projects/${PROJECT_ID}/databases/(de
 const AUTH = `http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1`;
 // Bölge, functions/src/index.ts'teki `setGlobalOptions` ile AYNI olmak zorunda.
 const CALLABLE = `http://127.0.0.1:5001/${PROJECT_ID}/europe-west1/redeemInvite`;
+const DELETE_FN = `http://127.0.0.1:5001/${PROJECT_ID}/europe-west1/deleteAccount`;
 
 const OWNER = 'uid-owner';
 const P1 = 'project-1';
@@ -77,6 +78,19 @@ async function redeem(idToken, code) {
       ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
     },
     body: JSON.stringify({ data: { code } }),
+  });
+  const body = await res.json().catch(() => ({}));
+  return { status: res.status, result: body.result, error: body.error };
+}
+
+async function deleteAccount(idToken) {
+  const res = await fetch(DELETE_FN, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+    },
+    body: JSON.stringify({ data: {} }),
   });
   const body = await res.json().catch(() => ({}));
   return { status: res.status, result: body.result, error: body.error };
@@ -284,5 +298,84 @@ describe('redeemInvite — ad sunucudan çözülür', () => {
     // ortakların cihazına iniyordu (KVKK). Kişi numarayı kimlik doğrulaması
     // için verdi, ortaklara gösterilsin diye değil.
     assert.equal(mine.fields.name.stringValue, 'Yeni ortak');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HESAP SİLME (madde 28) — App Store 5.1.1(v)
+//
+// En kritik test "ortağın hesabı silinince SAHİBİN VERİSİ DURUYOR MU": silme
+// fazla geniş yazılsaydı, projeden ayrılan bir ortak müteahhidin bütün
+// projesini götürürdü.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('deleteAccount — hesap silme', () => {
+
+  it('oturum yoksa reddedilir', async () => {
+    const { status, error } = await deleteAccount(null);
+    assert.equal(status, 401);
+    assert.equal(error?.message, 'signed-in-required');
+  });
+
+  it('SAHİP silince projesi ve alt koleksiyonları gider', async () => {
+    const owner = await newUser();
+    const pid = `sil-${owner.uid}`;
+    await putDoc(`projects/${pid}`, {
+      id: str(pid), ownerUid: str(owner.uid), memberUids: arr([owner.uid]),
+      blockNumber: str('900'), parcelNumber: str('1'), createdAt: ts(new Date()),
+    });
+    await putDoc(`projects/${pid}/apartments/d1`, { id: str('d1'), projectId: str(pid) });
+    await putDoc(`projects/${pid}/buyers/d1`, {
+      apartmentId: str('d1'), projectId: str(pid), name: str('Ahmet Yılmaz'),
+    });
+
+    const { status, result } = await deleteAccount(owner.idToken);
+    assert.equal(status, 200);
+    assert.equal(result?.deletedProjects, 1);
+
+    // Proje belgesi VE alt koleksiyon belgeleri gitmeli — Firestore alt
+    // koleksiyonları üst belge silinince otomatik silmiyor, bu yüzden ayrıca
+    // denetleniyor. Alıcı adı (KVKK) da bu ağacın içinde.
+    const apartments = await listDocs(`projects/${pid}/apartments`);
+    const buyers = await listDocs(`projects/${pid}/buyers`);
+    assert.equal(apartments.length, 0);
+    assert.equal(buyers.length, 0);
+  });
+
+  it('ORTAK silince SAHİBİN PROJESİ DURUR — yalnızca kendisi düşer', async () => {
+    const owner = await newUser();
+    const partner = await newUser();
+    const pid = `kal-${owner.uid}`;
+    await putDoc(`projects/${pid}`, {
+      id: str(pid), ownerUid: str(owner.uid),
+      memberUids: arr([owner.uid, partner.uid]),
+      blockNumber: str('901'), parcelNumber: str('2'), createdAt: ts(new Date()),
+    });
+    await putDoc(`projects/${pid}/apartments/d1`, { id: str('d1'), projectId: str(pid) });
+    await putDoc(`projects/${pid}/partners/p1`, {
+      id: str('p1'), projectId: str(pid), userUid: str(partner.uid),
+      name: str('Serkan Aydın'),
+    });
+
+    const { status, result } = await deleteAccount(partner.idToken);
+    assert.equal(status, 200);
+    assert.equal(result?.deletedProjects, 0);
+    assert.equal(result?.leftProjects, 1);
+
+    // Proje ve verisi YERİNDE.
+    const apartments = await listDocs(`projects/${pid}/apartments`);
+    assert.equal(apartments.length, 1);
+
+    // Ortağın kaydı düştü (adı KVKK kapsamında) ve üyelikten çıkarıldı.
+    const partners = await listDocs(`projects/${pid}/partners`);
+    assert.equal(partners.length, 0);
+  });
+
+  it('profil belgesi siliniyor', async () => {
+    const u = await newUser();
+    await putDoc(`users/${u.uid}`, { name: str('Silinecek Kişi') });
+    const { status } = await deleteAccount(u.idToken);
+    assert.equal(status, 200);
+    assert.equal(await getFields(`users/${u.uid}`), null);
   });
 });
