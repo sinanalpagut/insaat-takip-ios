@@ -845,6 +845,201 @@ projesi kullanılmalı — kurallar zaten yayında.
 
 ---
 
+### Faz 5 — Para zinciri denetimi (19 Ağu 2026)
+
+Uçtan uca cihaz turunda taksit planında bir kusur bulununca (aşağıda 32),
+**aynı sınıftan başka kusur var mı** diye dört mercekli bir tarama koşturuldu:
+bölme/paylaştırma, türetilen rakamlar, tarih/vade, rapor/dışa aktarma.
+Ajanlara kodu iddia etmek yerine **derleyip çalıştırma** aracı verildi
+(`Kurus` ve `Installment` yalnız `Foundation` kullanıyor, tek başına
+derlenebiliyor); ardından her bulguyu çürütmeye çalışan ayrı bir tur koşturuldu.
+
+**ARANAN SINIF: toplamı doğru, detayı yanlış.** Her toplam denetiminden geçen
+ama tek tek rakamları bozan hatalar. Bunlar sessizdir — ekranda tutarlı
+görünürler. 32 numaralı kusur tam olarak böyleydi ve bu yüzden aylarca fark
+edilmedi.
+
+**18 ayrı bulgu çıktı; 5'i çürütme turundan geçti, 13'ü HENÜZ DOĞRULANMADI**
+(tarama teslim edilmeden düştü). Doğrulanmamış olanlar "muhtemel" sayılmalı.
+
+- [x] 32. **Taksit planı eşit bölünmüyordu** — **TAMAM (19 Ağu 2026)**
+      · `Installment.plan` eşit taksitleri yüzde üzerinden üretiyordu:
+        `byPercents: Array(repeating: 100 / count, count: count)`. `100 / count`
+        TAM SAYI bölmesi — count=12'de 8, yüzde toplamı 96, bedelin %4'ü
+        dağıtılmadan kalıyor ve "kalanı sona ekle" telafisi artığın TAMAMINI
+        son taksite yüklüyordu.
+      · Ölçülen: 12 taksitte son taksit **%50**, 36 taksitte **15 kat**,
+        60 taksitte **41 kat** şişkin. Form 1...240 arası her sayıya izin
+        veriyor; yalnızca 100'ün tam bölenlerinde doğru sonuç çıkıyordu —
+        **240 seçenekten 231'i hatalı takvim üretiyordu.**
+      · SESSİZ KALMA SEBEBİ: telafi satırı TOPLAMI tutturuyordu. Bozulan şey
+        toplam değil, taksitlerin EŞİTLİĞİYDİ. Hiçbir toplam denetimi
+        yakalayamazdı; ekranda hiçbir şey yanlış görünmüyordu.
+      · ÇÖZÜM yüzdeyi düzeltmek değil, eşit bölmede yüzde kullanmayı bırakmak:
+        `Kurus.split(_:into:)` eklendi. Yüzde bir ORAN aracıdır (ortak payları)
+        ve tek gerçek çağrısı artık orası.
+      · KANIT: 12.960 vaka koşturuldu (6 bedel × 3 kuruş artığı × 3 peşinat ×
+        1...240 taksit) — toplam hatası 0, eşitlik hatası 0, taksitler arası en
+        büyük fark 1 kuruş. Ayrıca **üretim verisinde** doğrulandı: 4.000.000 ₺
+        bedel / 200.000 ₺ peşinat / 12 taksit → 8 adet 316.666,67 ₺ + 4 adet
+        316.666,66 ₺.
+
+- [x] 33. **Satış önizlemesi üçüncü yuvarlama noktasıydı** — **TAMAM (19 Ağu 2026)**
+      · `rest.raw / Int64(installmentCount)` ile ayrıca hesaplanıyordu; ekranla
+        veritabanının sessizce ayrışabildiği bir yer — ve gerçekten ayrışmıştı:
+        plan son taksiti şişirirken bu satır DOĞRU eşit tutarı gösteriyordu.
+        Ekran doğruyu söylüyor, kaydedilen plan başka şey saklıyordu; farkı
+        "yaklaşık" kelimesi örtüyordu.
+      · Artık `Kurus.split(rest, into:)` sonucunun ilk payı gösteriliyor.
+
+- [x] 34. **Silmede `objectNotFound` arıza sayılıyordu** — **TAMAM (19 Ağu 2026)**
+      · Görsel/belge silme yolu HESAPLAYARAK siliyor (uçuştaki yükleme yetim
+        nesne bırakmasın diye). Doğal sonucu: hiç yüklenmemiş bir dosyada
+        `objectNotFound`. Bu normal yol "silinemedi" diye günlüğe düşüyordu.
+      · Cihaz turlarında tanılama günlüğü **"sessizlik = başarı"** varsayımıyla
+        okunuyor; normal akışta düşen bir arıza satırı o varsayımı çürütür ve
+        gerçek arızayı yanlış alarmların arasında kaybeder.
+
+#### DOĞRULANMIŞ — çürütme turundan geçti
+
+- [ ] 35. **Satış kaydını düzenlemek taksit planını sessizce sıfırlıyor** (YÜKSEK)
+      `Views/Project/Sheets/SaleFormSheet.swift:288`
+      · `prefill()` kayıtlı planın taksit adedini ve ilk vadesini forma
+        YÜKLEMİYOR; `installmentCount` 12 ve `firstDueDate = Date()`
+        varsayılanlarında kalıyor. `save()` bu varsayılanları kaydediyor,
+        `ProjectViewModel:1974` eski planı silip yenisini
+        `downPayment: after.paidAmount` — yani BUGÜNE KADARKİ TÜM TAHSİLAT —
+        ile kuruyor.
+      · Alıcı adındaki bir yazım hatasını düzeltmek 36 aylık planı 12 aylığa
+        çeviriyor, tüm vadeleri bugüne kaydırıyor ve **gecikmiş tahsilatı yok
+        ediyor** (333.333,32 ₺ / 110 gün → 0 ₺).
+      · GERİ ALINAMAZ: kullanıcı 36'yı ve orijinal vadeyi elle geri girse bile
+        peşinat satırı tahsilatla kirlendiği için eski plan geri gelmiyor.
+      · Plan toplamı her iki durumda da bedele birebir eşit kaldığı için hiçbir
+        toplam denetimi yakalamıyor.
+
+- [ ] 36. **"İlk vade" seçilen tarihe hiçbir taksit düşmüyor** (YÜKSEK)
+      `Models/Installment.swift:155`
+      · Vadeler `date(byAdding: .month, value: index + 1, to: firstDueDate)`
+        ile üretiliyor — 1. taksit seçilen tarihin kendisine değil, BİR AY
+        SONRASINA düşüyor. `firstDueDate` yalnızca peşinat satırına veriliyor;
+        peşinat girilmemişse kullanıcının seçtiği tarih planın HİÇBİR yerinde
+        yok.
+      · Parametre adı, DatePicker etiketi ("İlk vade") ve özet metni üçü birden
+        yanlış tarihi vaat ediyor → "yanıltıcı rakam yasak" ilkesinin ihlali.
+      · NOT: ay sonu davranışı DOĞRU — çapa sabit olduğu için 31 Ocak'tan
+        başlayan planda gün kırpılsa da sonraki aylarda 31'e dönüyor.
+
+- [ ] 37. **`Kurus.cost` taşmada TUZAK atıyor — fiş formunda yazarken çökme** (YÜKSEK)
+      `Models/Kurus.swift:59`
+      · `Int64((quantity * Double(unitPrice.raw)).rounded())` — `guard
+        quantity.isFinite` yalnızca NaN/sonsuzu eliyor, ÇARPIMIN Int64
+        aralığında kalıp kalmadığını kimse denetlemiyor. Swift'te aralık dışı
+        `Int64(Double)` sarmalanmaz, **TUZAK atar (SIGTRAP)** — yanlış rakam
+        değil, ANINDA ÇÖKME.
+      · İki tavan ayrı ayrı "güvenli" seçilmiş ama ÇARPIMLARI denetlenmemiş:
+        `parseNumber` 1e12'ye, `parseMoney` 1e14 kuruşa kırpıyor; 1e12 × 1e14 =
+        1e26, `Int64.max` = 9,22e18.
+      · Çağrı yolu Kaydet düğmesi DEĞİL: `ReceiptSheet:70` `totalAmount` bir
+        computed property ve `body` içinde okunuyor — **her tuş vuruşunda**.
+        Kullanıcı daha kaydetmeden, alana yazarken uygulama kapanıyor.
+      · Ayrıca 2^53 kuruş üstünde çökmeyen ama sessizce yanlış rakam üreten bir
+        bant var (ölçüldü: 48 kuruş eksik, hiçbir uyarı yok).
+
+- [ ] 38. Ortak kartındaki "Aradaki fark" — **ÇÜRÜTÜLDÜ (mekanizma gerçek, zarar değil)**
+      `ViewModels/ProjectViewModel.swift:2153`
+      · `share(of:)` beş ayrı `Kurus.split` çağırıyor ve modelde
+        `dilim(A−B) ≠ dilim(A)−dilim(B)` gerçekten üretilebiliyor; ancak
+        çürütme turu iddia edilen ZARARI doğrulayamadı. Kayıt olarak duruyor.
+
+#### DOĞRULANMADI — tarama teslim edilmeden düştü, "muhtemel" sayılmalı
+
+- [ ] 39. **m² maliyetinin PAYDASI eksik** (YÜKSEK) `ViewModels/ProjectViewModel.swift:931`
+      · Pay tüm projenin gideri, payda yalnızca **alanı GİRİLMİŞ** dairelerin
+        alanı. Kendi doküman yorumu (satır 915-920) tersini söylüyor.
+      · Ölçülen şişme: 12/20 daire girili → 1,7 kat; 4/20 → 5 kat; 1/20 → 20 kat.
+      · `addProject` her daireyi `areaM2: nil` açıyor, yani müteahhit ilk alanı
+        girdiği anda rakam bozuluyor — "1. gün" senaryosu.
+      · Dashboard karşılaştırma tablosu kapsamı YAZMIYOR ve YAZAMAZ
+        (`ProjectComparison` `missingCount` taşımıyor), üstelik tabloyu bu
+        şişmiş rakama göre SIRALIYOR.
+
+- [ ] 40. **Rapor "Malzeme gideri" ile Malzeme-Hareketleri.csv iki ayrı taban** (YÜKSEK)
+      `Data/ProjectExporter.swift:85`
+      · Ekran DEVİR + fişleri topluyor (`accruedCost = openingCost + entries`);
+        CSV yalnız `materialLogs` geziyor, `openingCost` hiçbir satırda yok,
+        kapsam notu da yok. Ölçülen kayıp: %90–%100.
+      · Hiç fişi olmayan projede dosya HİÇ üretilmiyor → mali müşavir malzeme
+        maliyeti diye 0 ₺ görüyor.
+      · Aynı paylaşımdaki Yedek.json devri TAŞIYOR — iki dosya çelişiyor.
+
+- [ ] 41. **Daireler.csv "Bedel"/"Kalan" satılmamış daireleri de dolduruyor** (YÜKSEK)
+      `Data/ProjectExporter.swift:119`
+      · Ekran `countsAsRevenue` ile yalnız satılanı sayıyor; CSV TÜM daireleri
+        koşulsuz yazıyor. Boş daire `price` alanında liste fiyatı taşıyor.
+      · Ölçülen: ekran "Kalan alacak 14,82 M ₺", CSV sütun toplamı 20,70 M ₺ —
+        **%39,7 şişkin**. Sütun adı ekranla AYNI, kapsamı farklı, dosyada bunu
+        söyleyen tek satır yok.
+      · `scopeNote` yalnızca PDF'e giriyor, CSV'ye değil.
+
+- [ ] 42. Fiş tarayıcı ÜÇÜNCÜ yuvarlama noktası açıyor (ORTA)
+      `Views/Project/Sheets/ReceiptSheet.swift:376`
+      · Fişten birim fiyat türetiliyor, sonra miktarla çarpılıyor: deftere geçen
+        gider fişin toplamı DEĞİL. Ölçülen: 22.345,67 ₺'lik fiş → 22.350,00 ₺
+        (fişte olmayan 4,33 ₺).
+
+- [ ] 43. Rapor özet kartının dört rakamı birbirini tutmuyor (ORTA)
+      `Views/Project/ReportView.swift:177,186`
+      · Her satır AYRI `compactMoney` yuvarlamasından geçiyor; ortağın kâğıt
+        üstünde yaptığı çıkarma karttaki "net" ile tutmuyor. **Ortaklara
+        dağıtılan PDF'te de aynı.**
+
+- [ ] 44. CSV kaçışlaması satır sonunu kaçırıyor (ORTA) `Data/ProjectExporter.swift:70`
+      · Swift'te `"\r\n"` TEK grapheme; `contains("\n")` **false** dönüyor.
+        Excel'den kopyalanmış iki satırlık açıklama CSV'yi bozuyor.
+
+- [ ] 45. Malzeme-Hareketleri.csv satırı kendi içinde tutmuyor (ORTA)
+      `Data/ProjectExporter.swift:58`
+      · Miktar 2 ondalığa kırpılıyor, Tutar tam hassasiyetle yazılıyor;
+        Excel'de `=Miktar*BirimFiyat` satırdaki Tutar'ı vermiyor.
+
+- [ ] 46. Vade günü 09:00–12:00 arasında kurulan plan o günün hatırlatıcısını
+      kaybediyor (ORTA) `Data/ReminderScheduler.swift:97` — çalıştırılmadı.
+
+- [ ] 47. Demo verisinde ay iki kez ekleniyor (ORTA)
+      `Data/InMemoryProjectRepository+Seed.swift:522` — yorum "bir ay sonra"
+      diyor, gerçek vade iki ay sonra.
+
+- [ ] 48. `ProjectExporter.money` negatif kuruşta eksi işaretini yiyor (DÜŞÜK)
+      `Data/ProjectExporter.swift:51` — `Kurus.kurus(-50)` → `"0,50"`.
+
+- [ ] 49. Küçük olanlar (DÜŞÜK): `partners(for:)` sıralamasız — artan kuruş
+      çağrıdan çağrıya başka ortağa gidebiliyor (`ProjectViewModel:1014`);
+      `DateInterval.contains` iki uçtan kapsayıcı, ay sınırındaki kayıt iki
+      döneme birden sayılıyor (`ProjectViewModel:2667`); öğlen çapasının saat
+      dilimi iddiası UTC−10 ve batısında bozuluyor (`Installment.swift:16`).
+
+#### Bu turun yöntem dersi
+
+**Ekrana bakarak bulunamayacak kusurlar var.** 32 numaralı hata üretim
+verisinde bile "toplam tutuyor" diyordu ve gözle bakıldığında doğruydu.
+Yakalanmasının tek yolu mantığı uygulamadan söküp 12.960 girdiyle koşturmaktı.
+
+**Swift tarafında hâlâ HİÇ birim testi yok** — yalnızca kurallar ve Cloud
+Functions için JS testleri var. Para mantığı bugüne dek hiç otomatik
+sınanmamış. Kalıcı bir test hedefi kurmak sıradaki iş olmalı; bu turda
+kullanılan tek başına derleme yöntemi (`Kurus` + `Installment` + `Shim`)
+o hedefin çekirdeği olabilir.
+
+- [ ] 50. **Taksit planını gösteren ekran yok.** Müteahhit daireyi 12 ay
+      vadeyle satıyor ve o 12 vadeyi listeleyen hiçbir ekran yok. Plan yalnızca
+      üç yerde yüzeye çıkıyor: gecikmiş tahsilat listesi (yalnız VADESİ GEÇMİŞ
+      olanlar), vade bildirimleri, ve JSON yedeği. "Bu dairenin ödeme takvimi
+      ne?" sorusunun cevabı ancak yedek dosyası açılarak bulunabiliyor.
+      Bu turda 32'nin düzeldiğini gözle doğrulamak da bu yüzden mümkün olmadı.
+
+---
+
 # İnşaat Takip — Öncelikli Yol Haritası
 
 86 bulgu birleştirildiğinde geriye **5 kümede toplanan gerçek iş** kalıyor. Kilometre taşı olarak **Firebase / kalıcı veri** alınmış; her şey ona göre "öncesi" ve "sonrası" diye konumlandırıldı.
