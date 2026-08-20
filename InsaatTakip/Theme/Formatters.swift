@@ -49,6 +49,22 @@ enum Fmt {
         return sign + money(Kurus.kurus(v))
     }
 
+    /// TAM para: kuruş yalnızca sıfırdan farklıysa yazılır ("42.650.000 ₺",
+    /// "42.650.000,37 ₺").
+    ///
+    /// Rapor özet kartı gibi SATIRLARI BİRBİRİNDEN ÇIKARILAN yerlerde şart.
+    /// `compactMoney` her satırı ayrı ayrı milyona yuvarlıyor (iki ondalık =
+    /// 5.000 ₺'ye kadar sapma), dolayısıyla ortağın kâğıt üstünde yaptığı
+    /// "satış − malzeme − diğer" çıkarması karttaki "Dönem net" ile
+    /// tutmuyordu. Oysa `net` modelde tam Kuruş aritmetiğiyle hesaplanıyor —
+    /// bozulan hesap değil, GÖSTERİMDİ. Bu kart ortaklara PDF olarak
+    /// dağıtıldığı için tutmayan üç rakam doğrudan güven kaybı demek.
+    static func exactMoney(_ value: Kurus) -> String {
+        // İşaret `compactMoney` ile aynı karakter (U+2212), tire değil.
+        let sign = value.raw < 0 ? "−" : ""
+        return sign + moneyText(Kurus.kurus(abs(value.raw))) + " ₺"
+    }
+
     /// Milyon cinsinden tek ondalık: 315000000 kuruş → "3,1" (rapor grafiği).
     static func millionsShort(_ value: Kurus) -> String {
         let f = NumberFormatter()

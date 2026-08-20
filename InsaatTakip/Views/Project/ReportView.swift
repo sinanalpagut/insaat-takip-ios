@@ -174,16 +174,22 @@ struct ReportView: View {
                 summaryRow("Kat karşılığı (bedelsiz)", "\(summary.landOwnerCount) adet")
                 Divider().overlay(Palette.divider)
             }
-            summaryRow("Satış geliri", Fmt.compactMoney(summary.salesTotal))
+            // TAM HASSASİYET, kısaltma DEĞİL. Bu dört rakam birbirinden
+            // çıkarılıyor (`net = satış − (malzeme + diğer)`) ve `compactMoney`
+            // her satırı ayrı ayrı milyona yuvarladığı için ortağın kâğıt
+            // üstünde yaptığı çıkarma karttaki "Dönem net" ile tutmuyordu.
+            // Model tarafında hesap zaten tam Kuruş aritmetiği — bozulan
+            // gösterimdi. Kart ortaklara PDF olarak dağıtılıyor.
+            summaryRow("Satış geliri", Fmt.exactMoney(summary.salesTotal))
             Divider().overlay(Palette.divider)
-            summaryRow("Tahsil edilen", Fmt.compactMoney(summary.collectedTotal))
+            summaryRow("Tahsil edilen", Fmt.exactMoney(summary.collectedTotal))
             Divider().overlay(Palette.divider)
-            summaryRow("Malzeme gideri", Fmt.compactMoney(summary.materialCost))
+            summaryRow("Malzeme gideri", Fmt.exactMoney(summary.materialCost))
             Divider().overlay(Palette.divider)
-            summaryRow("Diğer giderler", Fmt.compactMoney(summary.otherExpenses))
+            summaryRow("Diğer giderler", Fmt.exactMoney(summary.otherExpenses))
             Divider().overlay(Palette.divider)
             // Gider defteri geldiği için "Dönem net" artık dürüst bir rakam.
-            summaryRow("Dönem net", Fmt.compactMoney(summary.net),
+            summaryRow("Dönem net", Fmt.exactMoney(summary.net),
                        valueColor: summary.net >= .zero ? Palette.success : Palette.alertInk)
 
             // m² MALİYETİ — madde 25.

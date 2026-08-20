@@ -375,7 +375,28 @@ struct ReceiptSheet: View {
         // gösterimi buydu ve yeni ayrıştırıcı onu yanlış okurdu.
         let unitPrice = Kurus.kurus(Int64((Double(total.raw) / quantity).rounded()))
         unitPriceText = Fmt.moneyText(unitPrice)
-        viewModel.flash("Birim fiyat fişten hesaplandı")
+
+        // DEFTERE GEÇECEK TUTAR, FİŞİN TOPLAMI DEĞİL. Kayıt (miktar, birim
+        // fiyat) ikilisini saklıyor ve tutarı `Kurus.cost` ile TÜRETİYOR —
+        // "türetilen rakam saklanmaz" ilkesinin gereği. Ama birim fiyat tam
+        // kuruşa yuvarlandığı için `miktar × birim fiyat` fişin toplamından
+        // sapabiliyor: 1.000 adet / 22.345,67 ₺'lik bir fişte birim fiyat
+        // 22,35 ₺ çıkıyor ve deftere 22.350,00 ₺ geçiyor — fişte OLMAYAN
+        // 4,33 ₺.
+        //
+        // Sapma kaçınılmaz (yuvarlama), ama SESSİZ olması kaçınılmaz değil.
+        // Kullanıcı fişte yazmayan bir tutarın deftere geçtiğini bilmeli:
+        // miktarı düzeltip sapmayı kapatabilir ya da bilerek kabul edebilir.
+        // Sessizce kapatmak, mali müşavirin fişle defteri karşılaştırdığı gün
+        // açıklanamayan bir fark bırakırdı.
+        let ledger = Kurus.cost(quantity: quantity, unitPrice: unitPrice)
+        if ledger == total {
+            viewModel.flash("Birim fiyat fişten hesaplandı")
+        } else {
+            let diff = Kurus.kurus(abs((ledger - total).raw))
+            let yon = ledger > total ? "fazla" : "eksik"
+            viewModel.flash("Birim fiyat hesaplandı · deftere \(Fmt.money(ledger)) ₺ geçecek, fişten \(Fmt.money(diff)) ₺ \(yon)")
+        }
     }
 
     /// Katalog dışı kalem eklemek için kesikli çip.
