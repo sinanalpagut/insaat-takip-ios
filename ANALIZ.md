@@ -902,7 +902,7 @@ edilmedi.
 
 #### DOĞRULANMIŞ — çürütme turundan geçti
 
-- [ ] 35. **Satış kaydını düzenlemek taksit planını sessizce sıfırlıyor** (YÜKSEK)
+- [x] 35. **Satış kaydını düzenlemek taksit planını sessizce sıfırlıyor** (YÜKSEK)
       `Views/Project/Sheets/SaleFormSheet.swift:288`
       · `prefill()` kayıtlı planın taksit adedini ve ilk vadesini forma
         YÜKLEMİYOR; `installmentCount` 12 ve `firstDueDate = Date()`
@@ -917,8 +917,9 @@ edilmedi.
         peşinat satırı tahsilatla kirlendiği için eski plan geri gelmiyor.
       · Plan toplamı her iki durumda da bedele birebir eşit kaldığı için hiçbir
         toplam denetimi yakalamıyor.
+      · **TAMAM (20 Ağu 2026)** — satış düzenlemede plan korunuyor: prefill kayıtlı adedi/ilk vadeyi yüklüyor, peşinat eski planın sequence 0 satırından geliyor. Bulgudaki senaryo koşturuldu — yeniden kurulan plan orijinalle BİREBİR aynı.
 
-- [ ] 36. **"İlk vade" seçilen tarihe hiçbir taksit düşmüyor** (YÜKSEK)
+- [x] 36. **"İlk vade" seçilen tarihe hiçbir taksit düşmüyor** (YÜKSEK)
       `Models/Installment.swift:155`
       · Vadeler `date(byAdding: .month, value: index + 1, to: firstDueDate)`
         ile üretiliyor — 1. taksit seçilen tarihin kendisine değil, BİR AY
@@ -929,8 +930,9 @@ edilmedi.
         yanlış tarihi vaat ediyor → "yanıltıcı rakam yasak" ilkesinin ihlali.
       · NOT: ay sonu davranışı DOĞRU — çapa sabit olduğu için 31 Ocak'tan
         başlayan planda gün kırpılsa da sonraki aylarda 31'e dönüyor.
+      · **TAMAM (20 Ağu 2026)** — planın İLK SATIRI artık firstDueDate'e düşüyor (peşinat varsa o, yoksa 1. taksit). 12.960 vaka: ilk-vade hatası 0.
 
-- [ ] 37. **`Kurus.cost` taşmada TUZAK atıyor — fiş formunda yazarken çökme** (YÜKSEK)
+- [x] 37. **`Kurus.cost` taşmada TUZAK atıyor — fiş formunda yazarken çökme** (YÜKSEK)
       `Models/Kurus.swift:59`
       · `Int64((quantity * Double(unitPrice.raw)).rounded())` — `guard
         quantity.isFinite` yalnızca NaN/sonsuzu eliyor, ÇARPIMIN Int64
@@ -945,6 +947,7 @@ edilmedi.
         Kullanıcı daha kaydetmeden, alana yazarken uygulama kapanıyor.
       · Ayrıca 2^53 kuruş üstünde çökmeyen ama sessizce yanlış rakam üreten bir
         bant var (ölçüldü: 48 kuruş eksik, hiçbir uyarı yok).
+      · **TAMAM (20 Ağu 2026)** — Kurus.cost taşmada DOYURUYOR, tuzak atmıyor. Sınır yuvarlanmış değer üzerinden denetleniyor. Doyurma seçildi çünkü parseNumber/parseMoney de kırpıyor.
 
 - [ ] 38. Ortak kartındaki "Aradaki fark" — **ÇÜRÜTÜLDÜ (mekanizma gerçek, zarar değil)**
       `ViewModels/ProjectViewModel.swift:2153`
@@ -954,7 +957,7 @@ edilmedi.
 
 #### DOĞRULANMADI — tarama teslim edilmeden düştü, "muhtemel" sayılmalı
 
-- [ ] 39. **m² maliyetinin PAYDASI eksik** (YÜKSEK) `ViewModels/ProjectViewModel.swift:931`
+- [x] 39. **m² maliyetinin PAYDASI eksik** (YÜKSEK) `ViewModels/ProjectViewModel.swift:931`
       · Pay tüm projenin gideri, payda yalnızca **alanı GİRİLMİŞ** dairelerin
         alanı. Kendi doküman yorumu (satır 915-920) tersini söylüyor.
       · Ölçülen şişme: 12/20 daire girili → 1,7 kat; 4/20 → 5 kat; 1/20 → 20 kat.
@@ -963,8 +966,9 @@ edilmedi.
       · Dashboard karşılaştırma tablosu kapsamı YAZMIYOR ve YAZAMAZ
         (`ProjectComparison` `missingCount` taşımıyor), üstelik tabloyu bu
         şişmiş rakama göre SIRALIYOR.
+      · **TAMAM (20 Ağu 2026)** — rakam düzeltilemezdi (girilmemiş dairenin alanı bilinmiyor, madde 14 uydurma varsayılanları kaldırdı) — kapsam YAZILDI: tabloda 'N/M dairenin alanı girili' satırı + dipnotta sıralama uyarısı. ProjectComparison artık measuredCount/missingCount taşıyor.
 
-- [ ] 40. **Rapor "Malzeme gideri" ile Malzeme-Hareketleri.csv iki ayrı taban** (YÜKSEK)
+- [x] 40. **Rapor "Malzeme gideri" ile Malzeme-Hareketleri.csv iki ayrı taban** (YÜKSEK)
       `Data/ProjectExporter.swift:85`
       · Ekran DEVİR + fişleri topluyor (`accruedCost = openingCost + entries`);
         CSV yalnız `materialLogs` geziyor, `openingCost` hiçbir satırda yok,
@@ -972,8 +976,9 @@ edilmedi.
       · Hiç fişi olmayan projede dosya HİÇ üretilmiyor → mali müşavir malzeme
         maliyeti diye 0 ₺ görüyor.
       · Aynı paylaşımdaki Yedek.json devri TAŞIYOR — iki dosya çelişiyor.
+      · **TAMAM (20 Ağu 2026)** — devir kendi satırı olarak CSV'ye giriyor ('Devir' türü) ve dosya üretim koşulu da devri sayıyor — devri olup fişi olmayan projede dosya hiç üretilmiyordu.
 
-- [ ] 41. **Daireler.csv "Bedel"/"Kalan" satılmamış daireleri de dolduruyor** (YÜKSEK)
+- [x] 41. **Daireler.csv "Bedel"/"Kalan" satılmamış daireleri de dolduruyor** (YÜKSEK)
       `Data/ProjectExporter.swift:119`
       · Ekran `countsAsRevenue` ile yalnız satılanı sayıyor; CSV TÜM daireleri
         koşulsuz yazıyor. Boş daire `price` alanında liste fiyatı taşıyor.
@@ -981,6 +986,7 @@ edilmedi.
         **%39,7 şişkin**. Sütun adı ekranla AYNI, kapsamı farklı, dosyada bunu
         söyleyen tek satır yok.
       · `scopeNote` yalnızca PDF'e giriyor, CSV'ye değil.
+      · **TAMAM (20 Ağu 2026)** — sütunlar ayrıştırıldı: 'Liste Fiyatı' (tüm daireler) ile 'Satış Bedeli/Tahsil Edilen/Kalan Alacak' (yalnız satılan, countsAsRevenue ile birebir) ve 'Kapora' (rezerve dairenin gerçek nakdi).
 
 - [ ] 42. Fiş tarayıcı ÜÇÜNCÜ yuvarlama noktası açıyor (ORTA)
       `Views/Project/Sheets/ReceiptSheet.swift:376`
@@ -994,9 +1000,10 @@ edilmedi.
         üstünde yaptığı çıkarma karttaki "net" ile tutmuyor. **Ortaklara
         dağıtılan PDF'te de aynı.**
 
-- [ ] 44. CSV kaçışlaması satır sonunu kaçırıyor (ORTA) `Data/ProjectExporter.swift:70`
+- [x] 44. CSV kaçışlaması satır sonunu kaçırıyor (ORTA) `Data/ProjectExporter.swift:70`
       · Swift'te `"\r\n"` TEK grapheme; `contains("\n")` **false** dönüyor.
         Excel'den kopyalanmış iki satırlık açıklama CSV'yi bozuyor.
+      · **TAMAM (20 Ağu 2026)** — arama unicodeScalars üzerine alındı; \r\n Swift'te tek grapheme olduğu için contains("\n") false dönüyordu (ölçüldü).
 
 - [ ] 45. Malzeme-Hareketleri.csv satırı kendi içinde tutmuyor (ORTA)
       `Data/ProjectExporter.swift:58`
@@ -1010,8 +1017,9 @@ edilmedi.
       `Data/InMemoryProjectRepository+Seed.swift:522` — yorum "bir ay sonra"
       diyor, gerçek vade iki ay sonra.
 
-- [ ] 48. `ProjectExporter.money` negatif kuruşta eksi işaretini yiyor (DÜŞÜK)
+- [x] 48. `ProjectExporter.money` negatif kuruşta eksi işaretini yiyor (DÜŞÜK)
       `Data/ProjectExporter.swift:51` — `Kurus.kurus(-50)` → `"0,50"`.
+      · **TAMAM (20 Ağu 2026)** — işaret ayrı tutuluyor; -1..-99 kuruş aralığında eksi kayboluyordu (ölçüldü).
 
 - [ ] 49. Küçük olanlar (DÜŞÜK): `partners(for:)` sıralamasız — artan kuruş
       çağrıdan çağrıya başka ortağa gidebiliyor (`ProjectViewModel:1014`);
