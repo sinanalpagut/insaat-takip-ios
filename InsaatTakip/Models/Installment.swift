@@ -135,6 +135,18 @@ extension Installment {
         }
 
         var result: [Installment] = []
+        // PLANIN İLK SATIRI `firstDueDate`E DÜŞER. Önceden taksitler koşulsuz
+        // `value: index + 1` ile üretiliyordu, yani peşinat YOKKEN kullanıcının
+        // DatePicker'da "İlk vade" diye seçtiği tarihe HİÇBİR taksit düşmüyordu:
+        // plan bir ay ileri kayıyor, son vade de bir ay sarkıyordu. Parametre
+        // adı, ekran etiketi ve özet metni üçü birden o tarihi vaat ederken
+        // üretilen veri başka tarih taşıyordu — "yanıltıcı rakam yasak"
+        // ilkesinin doğrudan ihlali.
+        //
+        // Peşinat VARSA ilk satır odur (sequence 0) ve taksitler bir ay sonra
+        // başlar; peşinat yoksa ilk satır 1. taksittir. Her iki durumda da
+        // satırlar `firstDueDate`ten başlayıp birer ay arayla ilerliyor.
+        let hasDownPayment = downPayment > .zero
         if downPayment > .zero {
             result.append(Installment(id: UUID(), projectId: projectId,
                                       apartmentId: apartmentId, sequence: 0,
@@ -152,7 +164,8 @@ extension Installment {
         let amounts = Kurus.split(rest, into: count)
 
         for index in 0..<count {
-            let due = Fmt.calendar.date(byAdding: .month, value: index + 1,
+            let monthOffset = hasDownPayment ? index + 1 : index
+            let due = Fmt.calendar.date(byAdding: .month, value: monthOffset,
                                         to: firstDueDate) ?? firstDueDate
             result.append(Installment(id: UUID(), projectId: projectId,
                                       apartmentId: apartmentId,

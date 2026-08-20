@@ -54,9 +54,36 @@ struct Kurus: Codable, Equatable, Hashable, Comparable, AdditiveArithmetic {
     /// Kural fiş BAŞINA uygulanır, toplamda değil. Böylece bir fiş silindiğinde
     /// etkisi tam olarak geri alınabiliyor ve alt küme toplamları (ay, çeyrek)
     /// üst küme toplamının parçası olarak kalıyor.
+    ///
+    /// TAŞMA DENETİMİ ŞART: `guard quantity.isFinite` yalnızca NaN/sonsuzu
+    /// eliyordu, ÇARPIMIN Int64'e sığıp sığmadığını kimse denetlemiyordu.
+    /// Swift'te aralık dışı `Int64(Double)` dönüşümü sarmalanmaz, TUZAK ATAR
+    /// (SIGTRAP) — yani yanlış rakam değil, ANINDA ÇÖKME.
+    ///
+    /// İki tavan ayrı ayrı "güvenli" seçilmişti ama çarpımları unutulmuştu:
+    /// `parseNumber` miktarı 1e12'ye, `parseMoney` tutarı 1e14 kuruşa kırpıyor;
+    /// 1e12 × 1e14 = 1e26, `Int64.max` ise 9,22e18. Çağrı yolu Kaydet düğmesi
+    /// DEĞİLDİ: `ReceiptSheet`in `totalAmount`ı bir computed property ve `body`
+    /// içinde okunuyor, yani kullanıcı daha kaydetmeden ALANA YAZARKEN
+    /// uygulama kapanıyordu.
+    ///
+    /// Doyurma (saturation) seçildi çünkü dosyadaki yerleşik davranış bu:
+    /// `parseNumber` ve `parseMoney` de sessizce kırpıyor. Eşiğe ancak
+    /// 92 katrilyon ₺'de varılıyor — gerçek bir inşaat rakamı değil.
+    ///
+    /// NOT: 2^53 kuruşun (~90 trilyon ₺) üstünde `Double` her tam sayıyı
+    /// temsil edemez; çökmeyen ama birkaç kuruş sapan bir bant var. Gerçekçi
+    /// aralığın çok dışında olduğu için ayrıca ele alınmıyor, ama biliniyor.
     static func cost(quantity: Double, unitPrice: Kurus) -> Kurus {
         guard quantity.isFinite else { return .zero }
-        return Kurus(raw: Int64((quantity * Double(unitPrice.raw)).rounded()))
+        let product = (quantity * Double(unitPrice.raw)).rounded()
+        // 2^63 tam olarak temsil edilebilir; sınır YUVARLANMIŞ değer üzerinden
+        // denetleniyor, çünkü yuvarlama değeri eşiğe itebilir.
+        let limit = 9_223_372_036_854_775_808.0
+        guard product.isFinite, product > -limit, product < limit else {
+            return Kurus(raw: product < 0 ? Int64.min : Int64.max)
+        }
+        return Kurus(raw: Int64(product))
     }
 
     /// Oran hesapları için — bölme bilinçli olarak burada değil, çağıran yerde
