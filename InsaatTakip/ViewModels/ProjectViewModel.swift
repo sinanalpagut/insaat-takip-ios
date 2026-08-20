@@ -698,6 +698,16 @@ final class ProjectViewModel: ObservableObject {
 
     // MARK: - Gecikmiş tahsilat (madde 21)
 
+    /// Bir dairenin kayıtlı taksit planı, sıraya göre.
+    ///
+    /// Satış formu düzenleme modunda bunu OKUMAK ZORUNDA: taksit adedi ve ilk
+    /// vade forma yüklenmezse form varsayılanlarıyla (12 ay, bugün) kaydediyor
+    /// ve kayıtlı plan sessizce onlarla değiştiriliyor.
+    func installmentPlan(for apartmentId: UUID) -> [Installment] {
+        installments.filter { $0.apartmentId == apartmentId }
+            .sorted { $0.sequence < $1.sequence }
+    }
+
     /// Bir dairenin vade durumu — plan yoksa nil.
     func installmentStatus(for apartmentId: UUID) -> Installment.Status? {
         let plan = installments.filter { $0.apartmentId == apartmentId }
@@ -2006,10 +2016,20 @@ final class ProjectViewModel: ObservableObject {
             let anchor = firstDueDate ?? after.saleDate ?? Date()
             let noon = Fmt.calendar.date(bySettingHour: 12, minute: 0, second: 0,
                                          of: anchor) ?? anchor
+            // PEŞİNAT, BİRİKEN TAHSİLAT DEĞİL. Formdaki alan "TAHSİL EDİLEN"
+            // diye etiketli ve `after.paidAmount` ödemeler biriktikçe büyüyor;
+            // bunu peşinat sanmak, düzenleme sırasında planı bambaşka bir
+            // plana çeviriyordu. İlk satışta ikisi zaten aynı; ayrıştıkları an
+            // düzenleme anıdır ve doğru kaynak ESKİ PLANIN kendi peşinat
+            // satırıdır (sequence 0). Plan yoksa (ilk satış) form değeri
+            // kullanılıyor.
+            let previousDown = previousPlan.first { $0.sequence == 0 }?.amount
             let plan = Installment.plan(apartmentId: apartmentId,
                                         projectId: apartment.projectId,
                                         price: after.price,
-                                        downPayment: after.paidAmount,
+                                        downPayment: previousPlan.isEmpty
+                                            ? after.paidAmount
+                                            : (previousDown ?? .zero),
                                         count: installmentCount,
                                         firstDueDate: noon)
             installments.append(contentsOf: plan)

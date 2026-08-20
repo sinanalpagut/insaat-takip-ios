@@ -299,6 +299,23 @@ struct SaleFormSheet: View {
         paidText = Fmt.moneyText(apartment.paidAmount)
         payment = apartment.paymentStatus ?? .tamamlandi
         saleDate = apartment.saleDate ?? Date()
+
+        // KAYITLI PLAN FORMA YÜKLENİYOR. Önceden yüklenmiyordu ve
+        // `installmentCount` 12, `firstDueDate` bugün varsayılanlarında
+        // kalıyordu; `save()` bu varsayılanları kaydediyor, `saveSale` de eski
+        // planı silip yerine onlarla yenisini kuruyordu. Yani alıcı adındaki
+        // bir yazım hatasını düzeltmek 36 aylık planı 12 aylığa çeviriyor, tüm
+        // vadeleri bugüne kaydırıyor ve GECİKMİŞ TAHSİLATI sıfırlıyordu.
+        // Plan toplamı bedele eşit kaldığı için hiçbir toplam denetimi bunu
+        // yakalamıyordu.
+        let plan = viewModel.installmentPlan(for: apartment.id)
+        let taksitler = plan.filter { $0.sequence > 0 }
+        if !taksitler.isEmpty {
+            installmentCount = taksitler.count
+            // Planın İLK satırı (peşinat varsa o, yoksa 1. taksit) —
+            // `Installment.plan`in `firstDueDate` sözleşmesiyle birebir aynı.
+            firstDueDate = plan.first?.dueDate ?? firstDueDate
+        }
     }
 
     /// Boş dairede tanımlı liste fiyatı varsa (TOKİ gerçek verisi) forma hazır getirir.
