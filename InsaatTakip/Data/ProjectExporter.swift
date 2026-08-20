@@ -48,10 +48,16 @@ struct ProjectExporter {
     // MARK: Biçimlendirme
 
     /// Para: kuruştan liraya, ondalık VİRGÜL, binlik ayracı YOK.
+    ///
+    /// İŞARET AYRI TUTULUYOR: önceden `lira = raw / 100` yazıyordu ve tam sayı
+    /// bölmesi sıfıra doğru kırptığı için −1 ile −99 kuruş arasındaki her değer
+    /// lira kısmını 0 yapıyor, `abs` da kuruşu pozitife çeviriyordu — eksi
+    /// işareti tamamen kayboluyordu (`-50` → `"0,50"`). Bir zarar rakamı
+    /// dışa aktarmada kâra dönüşüyordu.
     static func money(_ value: Kurus) -> String {
-        let lira = value.raw / 100
-        let kurus = abs(value.raw % 100)
-        return "\(lira),\(String(format: "%02d", kurus))"
+        let sign = value.raw < 0 ? "-" : ""
+        let magnitude = abs(value.raw)
+        return "\(sign)\(magnitude / 100),\(String(format: "%02d", magnitude % 100))"
     }
 
     /// Miktar (kg, m³, torba): ondalık virgül, gereksiz sıfır yok.
@@ -66,8 +72,16 @@ struct ProjectExporter {
     /// CSV alanı kaçışlama. Ayraç, tırnak ya da satır sonu içeren alan
     /// tırnaklanır; içerideki tırnak ikilenir. Bu olmadan bir açıklamadaki
     /// noktalı virgül sütunları kaydırır ve dosyanın geri kalanı bozulur.
+    ///
+    /// SATIR SONU `unicodeScalars` ÜZERİNDEN aranıyor: Swift'te `"\r\n"` TEK
+    /// grapheme kümesidir, dolayısıyla `text.contains("\n")` CRLF içeren bir
+    /// metinde **false** döner. Excel'den kopyalanmış iki satırlık bir açıklama
+    /// (Excel CRLF kullanır) tırnaklanmadan yazılıyordu: satır ikiye bölünüyor
+    /// ve o noktadan sonraki BÜTÜN sütunlar kayıyordu. Yalnız `\r` de
+    /// (klasik Mac satır sonu) aynı sebeple kaçırılıyordu.
     static func field(_ text: String) -> String {
-        guard text.contains(separator) || text.contains("\"") || text.contains("\n")
+        guard text.contains(separator) || text.contains("\"")
+                || text.unicodeScalars.contains(where: { $0 == "\n" || $0 == "\r" })
         else { return text }
         return "\"\(text.replacingOccurrences(of: "\"", with: "\"\""))\""
     }

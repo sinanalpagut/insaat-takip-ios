@@ -785,6 +785,18 @@ final class ProjectViewModel: ObservableObject {
         let difference: Kurus
         /// Satışa oranla fark — satış yoksa nil (sıfıra bölme yok).
         let margin: Double?
+        /// `perM2`nin PAYDASINA giren daire sayısı.
+        let measuredCount: Int
+        /// Alanı girilmediği için paydaya GİRMEYEN daire sayısı.
+        ///
+        /// NEDEN TAŞINIYOR: `areaCost` paydaya yalnızca alanı girilmiş
+        /// daireleri alıyor, oysa pay projenin TAMAMININ gideri. Kapsam
+        /// eksikse rakam (toplam/girili) oranı kadar şişiyor — 20 dairenin
+        /// 4'ü girili ise 5 KAT. `ReportView`in kapsam cümlesi bunu yazıyor;
+        /// bu tablo yazamıyordu çünkü sayı buraya hiç ulaşmıyordu. Aynı
+        /// rakamın bir ekranda dürüst, diğerinde yanıltıcı olması madde 1'in
+        /// dersinin ihlaliydi.
+        let missingCount: Int
     }
 
     func comparisons(for user: User?) -> [ProjectComparison] {
@@ -795,10 +807,14 @@ final class ProjectViewModel: ObservableObject {
             let margin: Double? = sales.raw != 0
                 ? Double(difference.raw) / Double(sales.raw)
                 : nil
+            let area = areaCost(for: project.id)
             return ProjectComparison(id: project.id, title: project.title,
-                                     perM2: areaCost(for: project.id)?.perM2,
+                                     perM2: area?.perM2,
                                      sales: sales, difference: difference,
-                                     margin: margin)
+                                     margin: margin,
+                                     measuredCount: area?.measuredCount ?? 0,
+                                     missingCount: area?.missingCount
+                                        ?? apartments(for: project.id).count)
         }
         .sorted { lhs, rhs in
             switch (lhs.perM2, rhs.perM2) {

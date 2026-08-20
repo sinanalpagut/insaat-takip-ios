@@ -290,10 +290,28 @@ struct DashboardView: View {
             let shown = 5
             ForEach(rows.prefix(shown)) { row in
                 HStack(spacing: 8) {
-                    Text(row.title)
-                        .font(.manrope(12, .semiBold))
-                        .foregroundColor(Palette.ink)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.title)
+                            .font(.manrope(12, .semiBold))
+                            .foregroundColor(Palette.ink)
+                            .lineLimit(1)
+                        // KAPSAM SATIRI. m² maliyetinin paydasına yalnızca
+                        // alanı GİRİLMİŞ daireler giriyor, oysa pay projenin
+                        // tamamının gideri — kapsam eksikse rakam
+                        // (toplam/girili) oranı kadar ŞİŞİYOR (20 dairenin
+                        // 4'ü girili ise 5 KAT). Rapor ekranı bunu zaten
+                        // yazıyordu, bu tablo yazmıyordu; aynı rakamın bir
+                        // ekranda dürüst diğerinde yanıltıcı olması madde 1'in
+                        // dersinin ihlaliydi. Rakamı "düzeltmek" seçenek
+                        // değil: girilmemiş dairenin alanı BİLİNMİYOR ve
+                        // madde 14'te uydurma varsayılanlar kaldırıldı.
+                        if row.missingCount > 0 && row.perM2 != nil {
+                            Text("\(row.measuredCount)/\(row.measuredCount + row.missingCount) dairenin alanı girili")
+                                .font(.manrope(10, .medium))
+                                .foregroundColor(Palette.alertInk)
+                                .lineLimit(1)
+                        }
+                    }
                     Spacer()
                     if let margin = row.margin {
                         Text(Fmt.signedPercent(margin))
@@ -318,7 +336,12 @@ struct DashboardView: View {
                     .padding(.top, 8)
             }
 
-            Text("Sıralama m² maliyetine göre. Yüzde, satışa oranla satış−gider farkı; kalan inşaat maliyeti düşülmemiştir.")
+            // Eksik kapsam SIRALAMAYI da bozuyor: şişmiş rakam projeyi
+            // listenin pahalı ucuna oturtuyor. Kırpmayı yazdığımız gibi
+            // (yukarıdaki "+n proje daha") bunu da yazıyoruz.
+            let eksikKapsam = rows.contains { $0.missingCount > 0 && $0.perM2 != nil }
+            Text("Sıralama m² maliyetine göre. Yüzde, satışa oranla satış−gider farkı; kalan inşaat maliyeti düşülmemiştir."
+                 + (eksikKapsam ? " Alanı eksik girilmiş projede m² maliyeti olduğundan yüksek çıkar ve sıralamayı yukarı taşır." : ""))
                 .font(.manrope(10.5, .medium))
                 .foregroundColor(Palette.textTertiary)
                 .lineSpacing(2)
