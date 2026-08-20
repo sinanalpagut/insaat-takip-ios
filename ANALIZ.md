@@ -988,17 +988,19 @@ edilmedi.
       · `scopeNote` yalnızca PDF'e giriyor, CSV'ye değil.
       · **TAMAM (20 Ağu 2026)** — sütunlar ayrıştırıldı: 'Liste Fiyatı' (tüm daireler) ile 'Satış Bedeli/Tahsil Edilen/Kalan Alacak' (yalnız satılan, countsAsRevenue ile birebir) ve 'Kapora' (rezerve dairenin gerçek nakdi).
 
-- [ ] 42. Fiş tarayıcı ÜÇÜNCÜ yuvarlama noktası açıyor (ORTA)
+- [x] 42. Fiş tarayıcı ÜÇÜNCÜ yuvarlama noktası açıyor (ORTA)
       `Views/Project/Sheets/ReceiptSheet.swift:376`
       · Fişten birim fiyat türetiliyor, sonra miktarla çarpılıyor: deftere geçen
         gider fişin toplamı DEĞİL. Ölçülen: 22.345,67 ₺'lik fiş → 22.350,00 ₺
         (fişte olmayan 4,33 ₺).
+      · **TAMAM (20 Ağu 2026)** — sapma kaçınılmaz (kayıt miktar+birim fiyat saklayıp tutarı türetiyor) ama SESSİZ olması değil: 'Uygula' sonrası deftere geçecek tutar ve fişten farkı yazılı söyleniyor.
 
-- [ ] 43. Rapor özet kartının dört rakamı birbirini tutmuyor (ORTA)
+- [x] 43. Rapor özet kartının dört rakamı birbirini tutmuyor (ORTA)
       `Views/Project/ReportView.swift:177,186`
       · Her satır AYRI `compactMoney` yuvarlamasından geçiyor; ortağın kâğıt
         üstünde yaptığı çıkarma karttaki "net" ile tutmuyor. **Ortaklara
         dağıtılan PDF'te de aynı.**
+      · **TAMAM (20 Ağu 2026)** — Fmt.exactMoney eklendi, kartın beş para satırı tam hassasiyete geçti. SIKLIK ÖLÇÜLDÜ: 200.000 rastgele dönem özetinde ortağın çıkarması %33,25 oranında tutmuyordu — her üç rapordan biri, tipik fark 10.000 ₺.
 
 - [x] 44. CSV kaçışlaması satır sonunu kaçırıyor (ORTA) `Data/ProjectExporter.swift:70`
       · Swift'te `"\r\n"` TEK grapheme; `contains("\n")` **false** dönüyor.
