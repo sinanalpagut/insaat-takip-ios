@@ -840,10 +840,17 @@ final class ProjectViewModel: ObservableObject {
         var urls: [URL] = []
 
         let logs = materialLogs.filter { $0.projectId == projectId }
-        if !logs.isEmpty,
+        let projectMaterials = materials(for: projectId)
+        // DEVİR DE DOSYA ÜRETTİRİR: koşul yalnızca `logs`a bakıyordu, oysa
+        // ekrandaki malzeme gideri `openingCost + fişler`. Devri olup fişi
+        // olmayan projede dosya HİÇ üretilmiyordu ve dışa aktarmada malzeme
+        // maliyeti sıfır görünüyordu — üstelik eksik dosya, eksik satırdan
+        // daha sinsi: kimse olmayan bir dosyayı sorgulamıyor.
+        let hasOpening = projectMaterials.contains { $0.openingCost != .zero || $0.openingIn != 0 }
+        if !logs.isEmpty || hasOpening,
            let url = ProjectExporter.write(
             ProjectExporter.materialLogsCSV(logs: logs,
-                                            materials: materials(for: projectId)),
+                                            materials: projectMaterials),
             name: "\(stem)-Malzeme-Hareketleri.csv") {
             urls.append(url)
         }

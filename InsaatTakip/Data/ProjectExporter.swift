@@ -96,8 +96,28 @@ struct ProjectExporter {
 
     // MARK: Tablolar
 
+    /// Malzeme hareketleri.
+    ///
+    /// DEVİR SATIRLARI ŞART: ekrandaki "Malzeme gideri" `Material.accruedCost`
+    /// üzerinden geliyor ve o `openingCost + fişler` diye tanımlı. Bu dosya
+    /// yalnızca `logs`u gezdiği için devir hiçbir satırda görünmüyordu; aynı adı
+    /// taşıyan iki rakam ayrışıyor, mali müşavir "Tutar" sütununu toplayınca
+    /// ekrandakinin çok altında bir sayı buluyordu. Hiç fişi olmayan ama devri
+    /// olan projede fark %100'e çıkıyordu.
+    ///
+    /// Devir bir TÜRETİLMİŞ toplam değil, ham açılış kaydıdır — o yüzden
+    /// dosyaya toplam olarak değil, kendi satırı olarak giriyor.
     static func materialLogsCSV(logs: [MaterialLog], materials: [Material]) -> String {
         let byId = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0) })
+        let openingRows = materials
+            .filter { $0.openingCost != .zero || $0.openingIn != 0 }
+            .sorted { $0.name < $1.name }
+            .map { material -> [String] in
+                ["", material.name, material.code, "Devir",
+                 quantity(material.openingIn), material.unit,
+                 "", money(material.openingCost),
+                 "Açılış devri (fiş öncesi)", ""]
+            }
         let rows = logs.sorted { $0.date > $1.date }.map { log -> [String] in
             let material = byId[log.materialId]
             let total = Kurus.cost(quantity: log.amount, unitPrice: log.unitPrice)
@@ -116,7 +136,7 @@ struct ProjectExporter {
         }
         return csv(header: ["Tarih", "Malzeme", "Kod", "Tür", "Miktar", "Birim",
                             "Birim Fiyat", "Tutar", "Açıklama", "Kaydeden"],
-                   rows: rows)
+                   rows: openingRows + rows)
     }
 
     static func expensesCSV(_ expenses: [Expense]) -> String {
@@ -133,6 +153,19 @@ struct ProjectExporter {
     static func apartmentsCSV(_ apartments: [Apartment], includeBuyer: Bool) -> String {
         let rows = apartments.sorted { $0.apartmentNumber < $1.apartmentNumber }
             .map { apartment -> [String] in
+                // KAPSAM: "Satış Bedeli / Tahsil Edilen / Kalan Alacak"
+                // sütunları YALNIZCA satılan daireyi dolduruyor — ekranın
+                // `countsAsRevenue` süzgeciyle birebir aynı. Önceden üç sütun
+                // da TÜM daireleri dolduruyordu: boş daire `price` alanında
+                // LİSTE fiyatı taşıdığı için "Kalan" sütununun toplamı ekrandaki
+                // "Kalan alacak"tan %40'a varan oranda şişik çıkıyordu. Sütun adı
+                // ekranla aynıydı, saydığı şey değildi.
+                //
+                // Bilgi KAYBOLMUYOR: liste fiyatı kendi sütununda duruyor,
+                // rezerve dairenin kaporası da — o gerçek nakit (`isCommitted`).
+                // Ayrıştırmak, sütunu boşaltmaktan da tek bir "Bedel" sütununda
+                // iki farklı şeyi toplamaktan da dürüst.
+                let satildi = apartment.countsAsRevenue
                 var values = [
                     String(apartment.apartmentNumber),
                     Apartment.floorLabel(for: apartment.floor),
@@ -140,15 +173,21 @@ struct ProjectExporter {
                     apartment.areaM2.map { quantity($0) } ?? "",
                     apartment.status.label,
                     money(apartment.price),
-                    money(apartment.paidAmount),
-                    money(max(.zero, apartment.price - apartment.paidAmount)),
+                    satildi ? money(apartment.price) : "",
+                    satildi ? money(apartment.paidAmount) : "",
+                    satildi ? money(max(.zero, apartment.price - apartment.paidAmount)) : "",
+                    apartment.status == .reserved ? money(apartment.paidAmount) : "",
                     apartment.saleDate.map(date) ?? "",
                 ]
                 if includeBuyer { values.append(apartment.buyerName ?? "") }
                 return values
             }
-        var header = ["Daire No", "Kat", "Tip", "Brüt m²", "Durum", "Bedel",
-                      "Tahsil Edilen", "Kalan", "Satış Tarihi"]
+        // "Liste Fiyatı" ile "Satış Bedeli" AYRI sütunlar: boş daire de liste
+        // fiyatı taşır ama o ciro değildir. Tek sütunda toplanınca ekrandaki
+        // satış rakamıyla dosyadaki toplam ayrışıyordu.
+        var header = ["Daire No", "Kat", "Tip", "Brüt m²", "Durum",
+                      "Liste Fiyatı", "Satış Bedeli", "Tahsil Edilen",
+                      "Kalan Alacak", "Kapora", "Satış Tarihi"]
         if includeBuyer { header.append("Alıcı") }
         return csv(header: header, rows: rows)
     }
