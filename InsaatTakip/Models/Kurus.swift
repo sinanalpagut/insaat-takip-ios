@@ -124,11 +124,30 @@ struct Kurus: Codable, Equatable, Hashable, Comparable, AdditiveArithmetic {
         let magnitude = abs(total.raw)
 
         // Taban pay ve kalan: her ikisi de tam sayı, kayan nokta yok.
-        var shares = percents.map { Kurus(raw: sign * (magnitude * Int64($0) / 100)) }
-        let remainders = percents.map { (magnitude * Int64($0)) % 100 }
+        //
+        // TAŞMA KORUMASI: `magnitude * Int64(yüzde)` düz çarpımla yapılırsa
+        // büyük tutarlarda Int64'ü aşıp TUZAK ATIYOR (SIGTRAP). Eşik sanıldığı
+        // kadar uzak değil: yüzdeler toplamı 100 olduğu için `magnitude`
+        // 9,2e16 kuruşu (≈922 trilyon ₺) geçtiğinde son satır taşıyor. Üstelik
+        // `Kurus.cost` taşmada Int64.max'a DOYURDUĞU için o değer buraya
+        // doğrudan akabiliyor — yani bir yerdeki çökme başka yerde çökmeye
+        // dönüşüyordu.
+        //
+        // `multipliedFullWidth` çarpımı 128 bitte tutuyor, `dividingFullWidth`
+        // de 100'e bölüp hem bölümü hem kalanı veriyor. Bölüm her zaman
+        // Int64'e sığar (yüzde ≤ 100 iken magnitude*p/100 ≤ magnitude), yani
+        // bu yol tuzak atmıyor ve sonuç TAM — kayan noktaya hiç uğranmıyor.
+        func scaled(_ p: Int) -> (share: Int64, remainder: Int64) {
+            let full = magnitude.multipliedFullWidth(by: Int64(p))
+            let (q, r) = Int64(100).dividingFullWidth(full)
+            return (q, r)
+        }
+        let parts = percents.map(scaled)
+        var shares = parts.map { Kurus(raw: sign * $0.share) }
+        let remainders = parts.map(\.remainder)
 
         let distributed = shares.reduce(Int64(0)) { $0 + abs($1.raw) }
-        var leftover = (magnitude * Int64(percents.reduce(0, +)) / 100) - distributed
+        var leftover = scaled(percents.reduce(0, +)).share - distributed
 
         // Kalanı büyükten küçüğe dağıt; eşitlikte sıradaki ilk pay kazanır ki
         // sonuç ÇAĞRIDAN ÇAĞRIYA AYNI olsun (rastgelelik yok).

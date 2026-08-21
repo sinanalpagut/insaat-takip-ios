@@ -61,10 +61,19 @@ struct ProjectExporter {
     }
 
     /// Miktar (kg, m³, torba): ondalık virgül, gereksiz sıfır yok.
+    ///
+    /// TAM YAZILIR, 2 ondalığa KIRPILMAZ. Kırpıldığında satır kendi içinde
+    /// tutmuyordu: "Tutar" sütunu `Kurus.cost` ile TAM miktardan hesaplanıyor,
+    /// dolayısıyla Excel'de `=Miktar*BirimFiyat` yazan müşavir satırdaki
+    /// Tutar'ı bulamıyordu (12,345 m³ → "12,35" yazılıp 30.245,25 ₺ ile yan
+    /// yana duruyordu). Dışa aktarma bir VERİ dosyası; gösterim kısaltması
+    /// ekranın işi, dosyanın değil.
     static func quantity(_ value: Double) -> String {
-        let rounded = (value * 100).rounded() / 100
-        if rounded == rounded.rounded() { return String(Int(rounded)) }
-        return String(format: "%.2f", rounded).replacingOccurrences(of: ".", with: ",")
+        guard value.isFinite else { return "" }
+        if value == value.rounded() && abs(value) < 1e15 { return String(Int64(value)) }
+        // %g gereksiz sıfır bırakmaz; 15 anlamlı hane Double'ın taşıyabildiği
+        // her miktarı geri okunabilir biçimde yazar.
+        return String(format: "%.15g", value).replacingOccurrences(of: ".", with: ",")
     }
 
     static func date(_ value: Date) -> String { dateFormatter.string(from: value) }
@@ -109,14 +118,33 @@ struct ProjectExporter {
     /// dosyaya toplam olarak değil, kendi satırı olarak giriyor.
     static func materialLogsCSV(logs: [MaterialLog], materials: [Material]) -> String {
         let byId = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0) })
+        // AÇILIŞ İKİ SATIR OLABİLİR. `Material.recalculate` açılışı iki ayrı
+        // büyüklükte tutuyor: `totalIn = openingIn + girişler`,
+        // `totalOut = openingOut + çıkışlar`. Yalnız `openingIn` yazıldığında
+        // dosyadan "Devir + Giriş − Çıkış" diye kalan stok hesaplayan okuyucu
+        // tüketilmiş açılış stoğunu hiç görmüyor ve rakam şişiyordu — üstelik
+        // "Devir" satırının varlığı "açılış tam olarak burada" izlenimi verdiği
+        // için eksiklik artık sorgulanmıyordu.
         let openingRows = materials
-            .filter { $0.openingCost != .zero || $0.openingIn != 0 }
+            .filter { $0.openingCost != .zero || $0.openingIn != 0 || $0.openingOut != 0 }
             .sorted { $0.name < $1.name }
-            .map { material -> [String] in
-                ["", material.name, material.code, "Devir",
-                 quantity(material.openingIn), material.unit,
-                 "", money(material.openingCost),
-                 "Açılış devri (fiş öncesi)", ""]
+            .flatMap { material -> [[String]] in
+                var out: [[String]] = []
+                if material.openingCost != .zero || material.openingIn != 0 {
+                    out.append(["", material.name, material.code, "Devir",
+                                quantity(material.openingIn), material.unit,
+                                "", money(material.openingCost),
+                                "Açılış devri (fiş öncesi)", ""])
+                }
+                if material.openingOut != 0 {
+                    // Tür "Çıkış": stok hesabında açılış tüketimi de çıkıştır.
+                    // Tutar BOŞ — maliyet yalnızca `openingCost`ta sayılıyor,
+                    // burada da yazılsa çift sayılırdı.
+                    out.append(["", material.name, material.code, "Çıkış",
+                                quantity(material.openingOut), material.unit,
+                                "", "", "Açılış devri (çıkış)", ""])
+                }
+                return out
             }
         let rows = logs.sorted { $0.date > $1.date }.map { log -> [String] in
             let material = byId[log.materialId]
@@ -129,7 +157,13 @@ struct ProjectExporter {
                 quantity(log.amount),
                 material?.unit ?? "",
                 money(log.unitPrice),
-                money(total),
+                // TUTAR YALNIZCA MALİYET SATIRLARINDA. Ekrandaki "Malzeme
+                // gideri" `accruedCost` = `openingCost + GİRİŞ fişleri`;
+                // çıkış fişlerine de tutar yazıldığında sütun toplamı ekranla
+                // ayrışıyordu ve devir satırları eklenince mutlak hata
+                // büyümüştü. Çıkışın parasal değeri kaybolmuyor: satırda
+                // Miktar ve Birim Fiyat duruyor, çarpımı okuyucunun elinde.
+                log.type == .entry ? money(total) : "",
                 log.note,
                 log.user,
             ]
@@ -172,7 +206,13 @@ struct ProjectExporter {
                     apartment.type,
                     apartment.areaM2.map { quantity($0) } ?? "",
                     apartment.status.label,
-                    money(apartment.price),
+                    // LİSTE FİYATI SATILAN DAİREDE BOŞ. `saveSale` satılan
+                    // dairede `price` alanının ÜSTÜNE satış bedelini yazıyor,
+                    // yani orada `price` artık liste fiyatı değil. İki sütuna
+                    // da yazıldığında satılan her satır aynı parayı iki farklı
+                    // başlık altında tekrar ediyordu ve "Liste Fiyatı" sütun
+                    // toplamı ekranda karşılığı olmayan bir karışıma dönüşüyordu.
+                    satildi ? "" : money(apartment.price),
                     satildi ? money(apartment.price) : "",
                     satildi ? money(apartment.paidAmount) : "",
                     satildi ? money(max(.zero, apartment.price - apartment.paidAmount)) : "",

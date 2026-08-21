@@ -373,7 +373,17 @@ struct ReceiptSheet: View {
         // Birim fiyat tam kuruşa yuvarlanır; alt kuruş hassasiyeti tutulmuyor.
         // Elle "%.2f" biçimleme kaldırıldı — projedeki tek Fmt dışı para
         // gösterimi buydu ve yeni ayrıştırıcı onu yanlış okurdu.
-        let unitPrice = Kurus.kurus(Int64((Double(total.raw) / quantity).rounded()))
+        // Bölüm de Int64'e sığmak zorunda: miktar alanına çok küçük bir sayı
+        // ("0,000000001") yazmak bölümü 1e23'e çıkarıyor ve korumasız
+        // `Int64(Double)` TUZAK ATIYOR — madde 37'de `Kurus.cost` için
+        // kapatılan çökmenin aynısı, aynı fonksiyonun iki satır yukarısında.
+        let ham = (Double(total.raw) / quantity).rounded()
+        let limit = 9_223_372_036_854_775_808.0
+        guard ham.isFinite, ham > -limit, ham < limit else {
+            viewModel.flash("Miktar bu fiş için fazla küçük — birim fiyat hesaplanamıyor")
+            return
+        }
+        let unitPrice = Kurus.kurus(Int64(ham))
         unitPriceText = Fmt.moneyText(unitPrice)
 
         // DEFTERE GEÇECEK TUTAR, FİŞİN TOPLAMI DEĞİL. Kayıt (miktar, birim
@@ -395,7 +405,14 @@ struct ReceiptSheet: View {
         } else {
             let diff = Kurus.kurus(abs((ledger - total).raw))
             let yon = ledger > total ? "fazla" : "eksik"
-            viewModel.flash("Birim fiyat hesaplandı · deftere \(Fmt.money(ledger)) ₺ geçecek, fişten \(Fmt.money(diff)) ₺ \(yon)")
+            // `Fmt.exactMoney`, `Fmt.money` DEĞİL. İkisi de sonuna " ₺"
+            // ekliyor (bir kez daha eklemek "0 ₺ ₺" üretiyordu), ama asıl
+            // fark şu: `money` tam liraya yuvarlıyor ve bu mesajın anlattığı
+            // sapma yapısı gereği KURUŞ ölçeğinde. 0,33 ₺'lik bir sapmada
+            // mesaj "fişten 0 ₺ fazla" diyordu — yani sessiz sapmayı
+            // engellemek için yazılan cümle, sapmayı kendi içinde sessizce
+            // yutuyordu.
+            viewModel.flash("Birim fiyat hesaplandı · deftere \(Fmt.exactMoney(ledger)) geçecek, fişten \(Fmt.exactMoney(diff)) \(yon)")
         }
     }
 
