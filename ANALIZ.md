@@ -1238,12 +1238,16 @@ Aşağıda madde 68 olarak açıldı.
 Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üstüne yeni
 özellik koymak borcu büyütüyor.
 
-- [ ] 54. **Veri hiç tazelenmiyor.** `addSnapshotListener` kod tabanında SIFIR
+- [x] 54. **Veri hiç tazelenmiyor.** `addSnapshotListener` kod tabanında SIFIR
       kez geçiyor, `refreshable` sıfır, `scenePhase` sıfır. `refresh()` yalnızca
       `RootView.swift:57`deki `.task(id:)` içinden, yani pratikte soğuk açılışta
       çağrılıyor. Ortak, yöneticinin girdiği satışı görmek için uygulamayı
       tamamen kapatıp açmak zorunda ve bunu ona söyleyen hiçbir şey yok.
       **Ürünün ortağa verdiği şeffaflık vaadi tam burada kırılıyor.**
+      · **TAMAM (21 Ağu 2026)** — üç parça: `lastLoadedAt` (son BAŞARILI yükleme), `scenePhase` ile ön plana geçişte yenileme, ve `.refreshable` (ProjectDetailView'da tek yerde; ortam üzerinden indiği için beş sekme de yakalıyor).
+      · **EKRAN TAZELİK KONUSUNDA YALAN SÖYLÜYORDU:** alt başlık `Fmt.clock()`u varsayılanıyla çağırıyordu, yani o anki saati yazıyordu. Veri ne kadar eski olursa olsun 'Bugün 14:32 güncellendi' diyordu. Artık 'az önce' / '09:15'de' / 'dün' / 'sunucudan henüz yüklenmedi'.
+      · **CANLI DİNLEYİCİ BİLEREK EKLENMEDİ:** `load()` her görünür proje için 13 koleksiyonun tamamını çekiyor; dinleyici bunu sürekli açık tutmak olurdu. Gerçek zamanlı senkron madde 58 (limit/sayfalama) ile BİRLİKTE ele alınmalı.
+      · KAPSAM: iki kişi aynı anda bakarken hâlâ birbirinin değişikliğini kendiliğinden görmüyor. Kapanan şey 'veri yalnızca soğuk açılışta geliyor' ve 'ekran tazelik konusunda yalan söylüyor'.
 
 - [ ] 55. **Çakışma denetimi yok — son yazan kazanır.**
       `FirestoreProjectRepository.stage()` her tür için `batch.setData(...)`
