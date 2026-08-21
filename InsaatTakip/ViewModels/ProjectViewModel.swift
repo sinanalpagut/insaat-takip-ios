@@ -2685,6 +2685,19 @@ final class ProjectViewModel: ObservableObject {
         }
     }
 
+    /// Dönem denetimi YARI AÇIK: `[başlangıç, bitiş)`.
+    ///
+    /// `DateInterval.contains` iki uçtan da kapsayıcı, oysa
+    /// `Calendar.dateInterval(of:for:)`in `end`i bir SONRAKİ dönemin
+    /// BAŞLANGICI — yani dışarıda kalması gereken an. Tam sınıra düşen bir
+    /// kayıt (1 Eylül 00:00:00) hem Ağustos hem Eylül özetine giriyordu:
+    /// iki dönem raporunun toplamı proje geneliyle tutmuyor, aynı para iki kez
+    /// sayılıyordu. Sınır anı nadir ama üretilebilir — tarih seçicisinden gelen
+    /// değerlerin saati her zaman "şimdi" değil.
+    private func inPeriod(_ date: Date, _ range: DateInterval) -> Bool {
+        date >= range.start && date < range.end
+    }
+
     /// Seçilen dönemin özet tablosu.
     func reportSummary(for projectId: UUID, period: ReportPeriod) -> ReportSummary {
         let (range, title) = dateRange(for: period)
@@ -2692,7 +2705,7 @@ final class ProjectViewModel: ObservableObject {
         let sold = apartments(for: projectId).filter { apartment in
             guard apartment.countsAsRevenue, let saleDate = apartment.saleDate else { return false }
             guard let range else { return true }   // "Tümü"
-            return range.contains(saleDate)
+            return inPeriod(saleDate, range)
         }
         let sales = sold.reduce(Kurus.zero) { $0 + $1.price }
         let projectApartments = apartments(for: projectId)
@@ -2707,7 +2720,7 @@ final class ProjectViewModel: ObservableObject {
         let collected: Kurus
         if let range {
             collected = payments
-                .filter { revenueApartmentIds.contains($0.apartmentId) && range.contains($0.date) }
+                .filter { revenueApartmentIds.contains($0.apartmentId) && inPeriod($0.date, range) }
                 .reduce(Kurus.zero) { $0 + $1.amount }
         } else {
             collected = projectApartments.filter(\.countsAsRevenue).reduce(Kurus.zero) { $0 + $1.paidAmount }
@@ -2728,7 +2741,7 @@ final class ProjectViewModel: ObservableObject {
         if let range {
             cost = materialLogs.reduce(Kurus.zero) { sum, log in
                 guard log.type == .entry, materialIds.contains(log.materialId),
-                      range.contains(log.date) else { return sum }
+                      inPeriod(log.date, range) else { return sum }
                 return sum + Kurus.cost(quantity: log.amount, unitPrice: log.unitPrice)
             }
         } else {
@@ -2739,7 +2752,7 @@ final class ProjectViewModel: ObservableObject {
         let projectExpenses = expenses.filter { $0.projectId == projectId }
         let otherCost = projectExpenses.reduce(Kurus.zero) { sum, expense in
             guard let range else { return sum + expense.amount }
-            return range.contains(expense.date) ? sum + expense.amount : sum
+            return inPeriod(expense.date, range) ? sum + expense.amount : sum
         }
 
         return ReportSummary(title: title, soldCount: sold.count,

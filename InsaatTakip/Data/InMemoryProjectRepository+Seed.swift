@@ -519,11 +519,24 @@ extension InMemoryProjectRepository {
         // planla tahsilatın farkından doğuyor.
         for apartment in apartments where apartment.paymentStatus == .taksitli {
             guard let saleDate = apartment.saleDate, apartment.price > .zero else { continue }
-            let firstDue = Fmt.calendar.date(byAdding: .month, value: 1, to: saleDate) ?? saleDate
             // Peşinat: satıştaki ilk ödeme (bedelin ~%10-20'si).
             let down = payments
                 .filter { $0.apartmentId == apartment.id && $0.method == .pesinat }
                 .reduce(Kurus.zero) { $0 + $1.amount }
+            // `Installment.plan`in sözleşmesi (madde 36): planın İLK SATIRI
+            // `firstDueDate`e düşer. Peşinat varsa ilk satır odur ve satış
+            // GÜNÜNDEDİR (sözleşmede ödenir), taksitler bir ay sonra başlar;
+            // peşinat yoksa ilk taksit doğrudan bir ay sonraya konur.
+            //
+            // Önceden koşulsuz `saleDate + 1 ay` veriliyordu: peşinat satırı
+            // satıştan bir ay sonraya düşüyor, `plan` bir ay daha eklediği için
+            // taksitler İKİ ay sonra başlıyordu — üstteki yorumun ("ilk vade
+            // satış tarihinden bir ay sonra") tam tersi. Demo verisi gecikme
+            // listesini besleyen tek kaynak olduğu için bu kayma, ekranda
+            // görünen gecikme günlerini de sistematik olarak kaydırıyordu.
+            let firstDue = down > .zero
+                ? saleDate
+                : (Fmt.calendar.date(byAdding: .month, value: 1, to: saleDate) ?? saleDate)
             installments += Installment.plan(apartmentId: apartment.id,
                                              projectId: apartment.projectId,
                                              price: apartment.price,

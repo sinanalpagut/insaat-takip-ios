@@ -332,9 +332,29 @@ struct SaleFormSheet: View {
     ///
     /// Rakamı kullanıcı kaydettikten sonra keşfetmemeli: 3.850.000 ₺'lik bir
     /// daireyi 12 taksite bölerken aylık tutarın ne olacağı kararı etkiliyor.
+    /// Planın peşinatı — KAYDEDİLENLE AYNI KAYNAK.
+    ///
+    /// `saveSale` düzenleme modunda peşinatı eski planın `sequence 0` satırından
+    /// alıyor (madde 35), çünkü form alanı "TAHSİL EDİLEN" diye etiketli ve o
+    /// tutar ödemeler biriktikçe büyüyor. Önizleme `paidText`ten okumaya devam
+    /// edince ekranla kayıt zorunlu olarak ayrıştı: 600.000 ₺ peşinatlı 36
+    /// taksitlik bir planda 14 taksit ödendikten sonra ekran "aylık 50.926 ₺"
+    /// diyor, veritabanına 83.333 ₺ giriyordu — kullanıcı gördüğü rakama
+    /// güvenerek kaydediyor. Bu, madde 33'ün kapattığı kusurun (önizlemenin
+    /// planı ayrı hesaplaması) 35 düzeltilirken geri açılmış hali.
+    private var effectiveDownPayment: Kurus {
+        if let apartment = selectedApartment {
+            let plan = viewModel.installmentPlan(for: apartment.id)
+            if plan.contains(where: { $0.sequence > 0 }) {
+                return plan.first(where: { $0.sequence == 0 })?.amount ?? .zero
+            }
+        }
+        return ProjectViewModel.parseMoney(paidText)
+    }
+
     private var planSummary: String {
         let price = ProjectViewModel.parseMoney(priceText)
-        let down = ProjectViewModel.parseMoney(paidText)
+        let down = effectiveDownPayment
         guard price > down, installmentCount > 0 else {
             return "Bedel ve peşinat girilince aylık tutar burada görünür."
         }

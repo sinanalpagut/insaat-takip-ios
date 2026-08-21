@@ -9,11 +9,22 @@ import Foundation
 // yazılı değildi. Bu kayıt o boşluğu dolduruyor.
 //
 // VADE ÖĞLEN 12:00'DE. Gün sınırına 12 saat uzak durmak bilinçli — projede
-// `Fmt.makeDate` zaten bu deseni kullanıyor. Gece yarısına sabitlenseydi üç
-// ayrı yerden ısırırdı: (1) yaz saati geçişinde tarih bir gün kayar,
-// (2) `DateInterval.contains` iki uçtan kapsayıcı olduğu için ay sınırındaki
-// vade iki aya birden sayılır ve "bu ay vadesi gelen" toplamı sessizce şişer,
-// (3) cihaz saat dilimi farklıysa aynı vade iki kullanıcıda farklı güne düşer.
+// `Fmt.makeDate` zaten bu deseni kullanıyor. Gece yarısına sabitlenseydi:
+//   (1) yaz saati geçişinde tarih bir gün kayardı (aya ay eklerken gece yarısı
+//       23:00'a düşer ve gün geri gider);
+//   (2) cihaz saat dilimi farklıysa aynı vade iki kullanıcıda farklı güne
+//       düşerdi.
+//
+// (2)'NİN KAPSAMI SINIRLI, ölçüldü: Türkiye'de (+03) 12:00'ye çapalanan vade
+// 09:00 UTC'dir, dolayısıyla koruma UTC+14'ten UTC−07'ye kadar tutuyor;
+// UTC−10 ve batısında (Honolulu, Midway) gün yine bir geri kayıyor. Türk
+// müteahhit uygulaması için pratikte erişilmez, ama çapa "her saat diliminde
+// güvenli" DEĞİL — öyle yazmak yanlış bir güven verirdi.
+//
+// ÜÇÜNCÜ BİR GEREKÇE DAHA YAZILIYDI: `DateInterval.contains`in iki uçtan
+// kapsayıcı olması yüzünden ay sınırındaki vadenin iki döneme birden
+// sayılması. O kusur artık kendi katmanında çözülü (`ProjectViewModel.inPeriod`
+// yarı açık denetim yapıyor); çapayla telafi edilmesi zaten yanlış katmandı.
 
 struct Installment: Codable, Identifiable, Equatable {
 

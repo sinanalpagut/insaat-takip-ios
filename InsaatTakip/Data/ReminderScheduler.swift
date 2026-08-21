@@ -105,13 +105,43 @@ final class ReminderScheduler {
             Fmt.calendar.startOfDay(for: $0.due)
         }
 
+        // ELEME `prefix`TEN ÖNCE. Tetikleme anı GEÇMİŞSE o gün için kurulacak
+        // bir şey yok; listede bırakılırsa 30'luk kotadan yer yiyor ve
+        // gerçekten kurulabilecek bir gün kırpılıyordu.
+        //
+        // KAPI VADEYE DEĞİL TETİKLEME ANINA BAKIYOR. Vade öğlene çapalı,
+        // hatırlatıcı ise 09:00'a kuruluyor — yani 09:00 ile 12:00 arasında
+        // vade "gelecekte" görünüyor ama tetikleyici çoktan geçmiş oluyordu.
+        // `UNCalendarNotificationTrigger` bileşenlerinde yıl/ay/gün AÇIKÇA
+        // verildiği için tek bir mutlak ana çivili: geçmişte kalınca ertesi
+        // güne KAYMIYOR, hiç ateşlemiyor. Üstüne `try?` olası hatayı da
+        // yutuyordu, yani kayıp iki katmanlı sessizdi.
+        //
+        // Bu vaka madde 36'dan sonra İSTİSNA DEĞİL: peşinatsız satışta ilk
+        // taksit artık `firstDueDate`e düşüyor ve o alanın varsayılanı BUGÜN.
+        // Sabah 10:30'da girilen taksitli bir satışın ilk hatırlatıcısı
+        // sessizce yok oluyordu.
+        let now = Date()
+        func fireDate(_ day: Date) -> Date {
+            Fmt.calendar.date(bySettingHour: Self.hour, minute: 0, second: 0, of: day) ?? day
+        }
+        // Bugünün tetikleme anı geçmişse ama vade hâlâ önümüzdeyse bildirim
+        // TELAFİ EDİLİYOR (kısa gecikmeli), çünkü tahsilat bugün. Zaten
+        // teslim edilmiş olanı tekrarlamamak için teslim listesi sorgulanıyor.
+        let deliveredIds = Set(await center.deliveredNotifications().map(\.request.identifier))
+        let usable = grouped.keys.sorted().filter { day in
+            fireDate(day) > now || (grouped[day]?.contains { $0.due > now } ?? false)
+        }
+
         #if DEBUG
-        let days = grouped.keys.count
-        print("[reminder] \(pending.count) açık vade → \(days) gün, " +
-              "kurulacak: \(min(days, Self.maxDays)) (sistem sınırı 64)")
+        let dropped = grouped.keys.count - usable.count
+        print("[reminder] \(pending.count) açık vade → \(grouped.keys.count) gün, " +
+              "kurulacak: \(min(usable.count, Self.maxDays))" +
+              (dropped > 0 ? " (\(dropped) gün tetikleme anı geçtiği için elendi)" : "") +
+              " (sistem sınırı 64)")
         #endif
 
-        for day in grouped.keys.sorted().prefix(Self.maxDays) {
+        for day in usable.prefix(Self.maxDays) {
             guard let items = grouped[day] else { continue }
             let total = items.reduce(Kurus.zero) { $0 + $1.amount }
             let content = UNMutableNotificationContent()
@@ -121,10 +151,24 @@ final class ReminderScheduler {
                 : "\(items.count) daire · toplam \(Fmt.money(total))"
             content.sound = .default
 
-            var components = Fmt.calendar.dateComponents([.year, .month, .day], from: day)
-            components.hour = Self.hour
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-            let request = UNNotificationRequest(identifier: "vade-\(day.timeIntervalSince1970)",
+            let identifier = "vade-\(day.timeIntervalSince1970)"
+            let trigger: UNNotificationTrigger
+            if fireDate(day) > now {
+                var components = Fmt.calendar.dateComponents([.year, .month, .day], from: day)
+                components.hour = Self.hour
+                // Dakika ve saniye AÇIKÇA sıfırlanıyor: joker bırakıldığında
+                // eşleşme o saatin herhangi bir dakikasına düşebiliyor.
+                components.minute = 0
+                components.second = 0
+                trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            } else if deliveredIds.contains(identifier) {
+                // Bugünün bildirimi zaten gitmiş; tekrarlamıyoruz.
+                continue
+            } else {
+                // Tetikleme anı geçti ama vade bugün — kısa gecikmeyle telafi.
+                trigger = UNTimeIntervalNotificationTrigger(timeInterval: 60, repeats: false)
+            }
+            let request = UNNotificationRequest(identifier: identifier,
                                                 content: content, trigger: trigger)
             try? await center.add(request)
         }
