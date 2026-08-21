@@ -329,8 +329,37 @@ final class FirestoreProjectRepository: ProjectRepository {
 
     // MARK: - Kodlama / kod çözme
 
+    /// Her yazılan belgeye SUNUCU zaman damgası ve yazan kişi/oturum eklenir.
+    ///
+    /// NEDEN (madde 55): yazma yolu tam belge `setData` — son yazan kazanır,
+    /// merge yok, önkoşul yok. Aynı kişinin iki cihazı aynı kaydı düzenlerse
+    /// biri diğerini SESSİZCE eziyor. En gerçekçi hali kuyruk: şantiyede
+    /// çevrimdışı kalan telefon saatlerce yazma biriktiriyor, bağlanınca
+    /// iPad'de yapılmış daha yeni değişikliğin üstüne yazıyor.
+    ///
+    /// BU ALANLAR KAYBI ÖNLEMİYOR, GÖRÜNÜR KILIYOR. Önleme (transaction +
+    /// sürüm önkoşulu) toplu yazmanın atomikliğini bozar ve tek maddeden büyük
+    /// bir iştir — satış + taksitler + denetim kaydı bugün TEK partide gidiyor
+    /// ve bu güvence korunmalı. Bugün eksik olan şey teşhis: bir belgeye en son
+    /// NE ZAMAN ve HANGİ OTURUMDAN yazıldığı hiçbir yerde yazılı değil,
+    /// dolayısıyla "değişikliğim nereye gitti" sorusu cevaplanamıyor.
+    ///
+    /// `serverTimestamp` bilinçli: cihaz saatine güvenilmiyor (bkz. madde 77 —
+    /// denetim izinin zaman damgası da bugün istemciden geliyor).
+    /// `writerSession` uygulama açılışına özgü: aynı uid iki cihazda da aynı
+    /// olduğu için tek başına uid, "hangi cihaz" sorusunu ayırt etmiyor.
+    private static let writerSession = UUID().uuidString
+
+    private func stamped(_ fields: [String: Any]) -> [String: Any] {
+        var out = fields
+        out["updatedAt"] = FieldValue.serverTimestamp()
+        out["updatedBy"] = Auth.auth().currentUser?.uid ?? ""
+        out["updatedFrom"] = Self.writerSession
+        return out
+    }
+
     private func encode<T: Encodable>(_ value: T) throws -> [String: Any] {
-        try Firestore.Encoder().encode(value)
+        stamped(try Firestore.Encoder().encode(value))
     }
 
     /// Kod çözme hatası SESSİZCE GEÇİLMEZ. Bozuk bir `materialLog`u atlamak,
@@ -394,7 +423,7 @@ final class FirestoreProjectRepository: ProjectRepository {
         // Yol ancak yükleme bitince yazılır; nil iken alan hiç konmaz ki
         // "yol var ama boş" gibi üçüncü bir durum doğmasın.
         if let path = photo.storagePath { fields["storagePath"] = path }
-        return fields
+        return stamped(fields)
     }
 
     private func fields(of photo: ApartmentPhoto) -> [String: Any] {
@@ -403,7 +432,7 @@ final class FirestoreProjectRepository: ProjectRepository {
                                      "apartmentId": photo.apartmentId.uuidString,
                                      "label": photo.label]
         if let path = photo.storagePath { fields["storagePath"] = path }
-        return fields
+        return stamped(fields)
     }
 
     private func fetchSitePhotos(_ pid: UUID) async throws -> [SitePhoto] {
