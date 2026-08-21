@@ -1138,7 +1138,13 @@ o hedefin çekirdeği olabilir.
       · Tutarlar `Fmt.exactMoney` ile — `compactMoney` olsaydı 316.666,67 ₺ '317 B ₺' görünürdü ve ekranın varlık sebebi tam olarak gerçek takvimi göstermek.
       · Kırpma sessiz değil: 6'dan fazla vadede kaç vadenin gizlendiği yazılı ve DOKUNULDUĞUNDA açılıyor.
       · **SİMÜLATÖRDE DOĞRULANDI** (Daire No 5): ekrandaki '3 vade gecikti · 577.500 ₺' Daireler sekmesindeki gecikme rakamıyla birebir aynı; FIFO doğru (peşinat+1. taksit ödendi, 2. kısmi, 3. açık); madde 47'nin düzeltmesi de görünür (peşinat satış gününde).
-      · KALAN: '+n vade daha' açıcısı ekranın altında kaldığı ve simülatör aracı kaydırmadığı için GÖZLE doğrulanmadı.
+      · **GERÇEK CİHAZDA ÜRETİM VERİSİYLE DOĞRULANDI** (21 Ağu 2026):
+        Daire 1'in 12 taksitlik planı listelendi. 1. taksit 'Kısmi · kalan
+        66.666,67 ₺' gösteriyor — 450.000 ₺ tahsilatın 200.000'i peşinatı
+        kapatmış, kalan 250.000'i 1. taksidin 316.666,67 ₺'sine gitmiş.
+        Madde 32'nin ayrımı ilk kez EKRANDA görünür: 1-8. taksit ...,67 ve
+        9-12. taksit ...,66. '+7 vade daha' açıcısı da çalışıyor ve 'İlk 6
+        vadeyi göster' ile geri dönüyor.
 
 ---
 
