@@ -1058,6 +1058,21 @@ Dosyalar cihazdan `devicectl device copy from` ile doğrudan çekildi (uygulaman
 - **Dekont GEÇTİ.** Tahsilatın `receiptPath`i dolu — `paymentReceipts` kovası
   çalışıyor.
 
+- **F (belge yükleme) GEÇTİ.** PDF yüklendi: 0,206 MB, `application/pdf`,
+  `partnerVisible: false`, `storagePath` DOLU (bulut yolunun varlığı =
+  yüklemenin tamamlandığının tek otoritesi). EN KRİTİK AYRINTI: Storage nesne
+  adı Firestore belge kimliğiyle BİREBİR aynı ve UZANTISIZ —
+  `projects/{pid}/documents/{docId}`. Çapraz servis kuralı
+  `firestore.get(.../documents/$(docId))` ile kardeş belgeyi çözdüğü için bu
+  şart; daha önce tam bu noktada elle yazılmış küçük harfli kimlikler yüzünden
+  "Service call error" alınmıştı.
+- **G (davet kodu) GEÇTİ.** Sunucu kodu üretti, `invites/{KOD}` otorite kaydı
+  `expiresAt` (createdAt + 48 saat), `usedAt: null`, `projectId` ve `ownerUid`
+  ile yazıldı; `redeemInvite` ikisini de İŞLEM İÇİNDE denetliyor
+  (`code-used` / `code-expired`). Proje belgesindeki ayna yalnızca
+  `{code, createdAt}` taşıyor — kod okuma üyelere kapalı kalsın diye bilerek.
+  KALAN: gerçek bir KULLANIM denenmedi, ikinci bir telefon numarası gerekiyor.
+
 **YÖNTEM NOTU — denetim izi bir doğrulama aracıdır.** İlk turda plan
 değişmemişti ve bu düzeltmenin kanıtı sanılabilirdi; oysa `denetimIzi`de
 "düzenlendi" kaydı YOKTU, yani işlem hiç yapılmamıştı. Değişmeyen veri,
