@@ -1007,27 +1007,31 @@ edilmedi.
         Excel'den kopyalanmış iki satırlık açıklama CSV'yi bozuyor.
       · **TAMAM (20 Ağu 2026)** — arama unicodeScalars üzerine alındı; \r\n Swift'te tek grapheme olduğu için contains("\n") false dönüyordu (ölçüldü).
 
-- [ ] 45. Malzeme-Hareketleri.csv satırı kendi içinde tutmuyor (ORTA)
+- [x] 45. Malzeme-Hareketleri.csv satırı kendi içinde tutmuyor (ORTA)
       `Data/ProjectExporter.swift:58`
       · Miktar 2 ondalığa kırpılıyor, Tutar tam hassasiyetle yazılıyor;
         Excel'de `=Miktar*BirimFiyat` satırdaki Tutar'ı vermiyor.
+      · **TAMAM (21 Ağu 2026)** — `quantity()` miktarı 2 ondalığa kırpıyordu, Tutar ise TAM miktardan hesaplanıyordu; Excel'de =Miktar*BirimFiyat satırdaki Tutar'ı vermiyordu. Dışa aktarma bir VERİ dosyası, kısaltma ekranın işi. Gerçek veride 18/18 satır artık kendi içinde tutuyor.
 
-- [ ] 46. Vade günü 09:00–12:00 arasında kurulan plan o günün hatırlatıcısını
+- [x] 46. Vade günü 09:00–12:00 arasında kurulan plan o günün hatırlatıcısını
       kaybediyor (ORTA) `Data/ReminderScheduler.swift:97` — çalıştırılmadı.
+      · **TAMAM (21 Ağu 2026)** — kapı vadeye değil TETİKLEME ANINA taşındı; eleme prefix(maxDays)'ten önce yapılıyor (ölü gün kotadan yer yiyordu); vade bugünse ve 09:00 geçtiyse kısa gecikmeli telafi kuruluyor, teslim edilmişse tekrarlanmıyor. Madde 36'dan sonra bu vaka istisna değil VARSAYILAN olmuştu.
 
-- [ ] 47. Demo verisinde ay iki kez ekleniyor (ORTA)
+- [x] 47. Demo verisinde ay iki kez ekleniyor (ORTA)
       `Data/InMemoryProjectRepository+Seed.swift:522` — yorum "bir ay sonra"
       diyor, gerçek vade iki ay sonra.
+      · **TAMAM (21 Ağu 2026)** — peşinat varsa firstDue artık satış günü. Önceden koşulsuz saleDate+1ay veriliyor, plan bir ay daha eklediği için taksitler İKİ ay sonra başlıyordu.
 
 - [x] 48. `ProjectExporter.money` negatif kuruşta eksi işaretini yiyor (DÜŞÜK)
       `Data/ProjectExporter.swift:51` — `Kurus.kurus(-50)` → `"0,50"`.
       · **TAMAM (20 Ağu 2026)** — işaret ayrı tutuluyor; -1..-99 kuruş aralığında eksi kayboluyordu (ölçüldü).
 
-- [ ] 49. Küçük olanlar (DÜŞÜK): `partners(for:)` sıralamasız — artan kuruş
+- [x] 49. Küçük olanlar (DÜŞÜK): `partners(for:)` sıralamasız — artan kuruş
       çağrıdan çağrıya başka ortağa gidebiliyor (`ProjectViewModel:1014`);
       `DateInterval.contains` iki uçtan kapsayıcı, ay sınırındaki kayıt iki
       döneme birden sayılıyor (`ProjectViewModel:2667`); öğlen çapasının saat
       dilimi iddiası UTC−10 ve batısında bozuluyor (`Installment.swift:16`).
+      · **TAMAM (21 Ağu 2026)** — 49a ÇÜRÜTÜLDÜ (sıra keyfî ama SABİT). 49b düzeltildi: `inPeriod()` yarı açık denetim, dört çağrı yeri — 1 Eylül 00:00 tarihli kayıt hem Ağustos hem Eylül özetine giriyordu. 49c: çapanın gerekçesi ölçülüp daraltıldı (koruma UTC+14…UTC−07, UTC−10'da kırılıyor) ve DateInterval gerekçesi kaldırıldı — o kusur artık kendi katmanında çözülü.
 
 #### GERÇEK CİHAZDA DOĞRULANDI (21 Ağu 2026, iPhone 13 Pro, üretim Firestore)
 
@@ -1077,6 +1081,39 @@ Dosyalar cihazdan `devicectl device copy from` ile doğrudan çekildi (uygulaman
 değişmemişti ve bu düzeltmenin kanıtı sanılabilirdi; oysa `denetimIzi`de
 "düzenlendi" kaydı YOKTU, yani işlem hiç yapılmamıştı. Değişmeyen veri,
 düzeltmenin başarısı kadar adımın atlanmış olmasının da işaretidir.
+
+#### REGRESYON DENETİMİ — düzeltmeler beş kusur üretmişti (21 Ağu 2026)
+
+Bu oturumun 13 düzeltmesi dört mercekli bir denetimden geçirildi. Sonuç edepli
+değil: **düzeltmelerin kendisi beş kusur üretmiş.** Hepsi derleyip
+çalıştırılarak doğrulandı ve kapatıldı.
+
+1. **`Kurus.split(byPercents:)` taşmada ÇÖKÜYORDU (SIGTRAP).** 37 düzeltilirken
+   `Kurus.cost` `Int64.max`a doyurmaya başladı; o değer ortak paylarına
+   aktığında `magnitude * Int64(yüzde)` taşıyor. Yani çökme ortadan kalkmamış,
+   İKİNCİ KEZ yer değiştirmişti (ilkinde `abs(Int64.min)`e taşımıştım).
+   `multipliedFullWidth`/`dividingFullWidth` ile 128 bitte yapılıyor.
+2. **Devir satırı `openingOut` taşımıyordu** — dosyadan okunan kalan stok
+   şişiyordu; üstelik "Devir" satırının varlığı eksikliği sorgulanamaz
+   kılıyordu.
+3. **"Tutar" sütunu çıkış fişlerini de sayıyordu** — ekrandaki malzeme gideri
+   `openingCost + GİRİŞ`; sütun toplamı ayrışıyordu.
+4. **"Liste Fiyatı" satılan dairede satış bedelini tekrar ediyordu** —
+   `saveSale` satılan dairede `price`ın üstüne satış bedelini yazıyor.
+5. **Fiş sapma mesajı (42) sapmayı yutuyordu** — `Fmt.money` tam liraya
+   yuvarladığı için 0,33 ₺ sapmada "fişten 0 ₺ fazla" diyordu; sessiz sapmayı
+   engellemek için yazılan cümle sapmayı kendi içinde sessizce yutuyordu.
+   Ayrıca çift " ₺". `Fmt.exactMoney`e geçildi.
+
+Ayrıca **35'in yan etkisi**: `saveSale` peşinatı kayıtlı plandan almaya
+başlarken ekranın önizlemesi güncellenmedi; ekran "aylık 50.926 ₺" derken
+veritabanına 83.333 ₺ giriyordu — madde 33'ün kapattığı kusurun geri açılmış
+hali.
+
+**DERS: bir çökmeyi doyurmayla kapatmak, üretilen sınır değerin aktığı HER
+YOLU denetlemeyi gerektiriyor.** `Int64.max` ve `Int64.min` sıradan sayılar
+değil; `abs`, çarpma ve toplama onları tuzağa çeviriyor. İki kez aynı hataya
+düştüm: önce `abs(Int64.min)`, sonra `magnitude * yüzde`.
 
 #### Bu turun yöntem dersi
 
