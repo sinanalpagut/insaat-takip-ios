@@ -1261,18 +1261,24 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · **AÇIK KALAN:** önleme (transaction + sürüm önkoşulu) ve çakışmanın kullanıcıya GÖSTERİLMESİ. Önleme toplu yazmanın atomikliğini bozar — satış + taksitler + denetim kaydı bugün TEK partide gidiyor ve o güvence korunmalı. Ayrı bir iş olarak ele alınmalı.
       · Riskli kısım sınandı: modellerin tanımadığı alanlar çözümlemeyi düşürseydi tek belge tüm uygulamayı boşaltırdı (madde 56). Birim testi var; gerçek yazma yolu emülatörde AYRICA doğrulanmadı.
 
-- [ ] 56. **Tek bozuk belge tüm veriyi görünmez yapıyor; şema sürümü yok.**
+- [~] 56. **Tek bozuk belge tüm veriyi görünmez yapıyor; şema sürümü yok.**
       `fetch` (FirestoreProjectRepository.swift:353) tek çözülemeyen belgede
       fırlatıyor, `apply` hiç çalışmıyor, ekranda hiçbir proje kalmıyor.
       `schemaVersion`/`migration` kavramı yok — bir alan tipi değişirse eski
       kurulumlar boş ekran görür. (Madde 12'de `areaM2` göçü elle yazılmıştı;
       ikinci bir göç için altyapı yok.)
+      · **YARIÇAP DARALTILDI (21 Ağu 2026), ŞEMA SÜRÜMÜ AÇIK.**
+      · Yalıtım belge düzeyinde DEĞİL proje düzeyinde: bozuk belgeyi atlamak toplamları sessizce yanlış gösterirdi (gerekçe `decode`in başında yazılı). Etkilenen proje bütünüyle dışarıda kalıyor ve `failedProjects`e yazılıyor.
+      · Listeden SESSİZCE EKSİLMİYOR: dashboard'da kalıcı şerit kaç projenin düştüğünü, hangileri olduğunu ve 'rakamları toplamlara DAHİL DEĞİL' uyarısını yazıyor.
+      · AÇIK: `schemaVersion` ve göç altyapısı yok. Bir alan tipi değişirse eski kurulumlar etkilenen projeyi kaybeder — artık tümünü değil.
 
-- [ ] 57. **Yükleme hatası ile "hiç projen yok" ekranı BİREBİR aynı.**
+- [x] 57. **Yükleme hatası ile "hiç projen yok" ekranı BİREBİR aynı.**
       `refresh()` hatayı sönümlü bir toast'la söylüyor, `latest` boş kaldığı
       için kullanıcı "Henüz projen yok" karşılama kartını görüyor. Kural reddi,
       eksik indeks ya da bozuk belge durumunda üründeki en korkutucu cümle
       gösteriliyor: VERİN YOK. "Tekrar dene" yolu da yok.
+      · **TAMAM (21 Ağu 2026)** — `loadError` ayrı bir durum. Hata ekranı SEBEBİ yazıyor, 'verilerin duruyor' diye güvenceliyor ve 'Tekrar dene' veriyor; geri dönüş yolu hiç yoktu.
+      · Simülatörde `-backend firestore` ile (sahte kimlik + gerçek Firestore) hata yolu tetiklenip ekran GÖRÜLDÜ.
 
 - [~] 58. **Limit, sayfalama ve tembel liste yok.** `load()` görünür her proje
       için 13 koleksiyonun TAMAMINI çekiyor; `.limit(` kod tabanında sıfır.
