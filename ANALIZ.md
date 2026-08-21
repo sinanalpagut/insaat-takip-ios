@@ -1082,6 +1082,36 @@ değişmemişti ve bu düzeltmenin kanıtı sanılabilirdi; oysa `denetimIzi`de
 "düzenlendi" kaydı YOKTU, yani işlem hiç yapılmamıştı. Değişmeyen veri,
 düzeltmenin başarısı kadar adımın atlanmış olmasının da işaretidir.
 
+#### DAVET AKIŞI — yetki modeli ilk kez ikinci bir kimlikle sınandı (21 Ağu 2026)
+
+Davet kodunun gerçekten KULLANILMASI bugüne dek hiç denenmemişti. Emülatörde
+iki gerçek telefon kimliği üretilip `redeemInvite` uçtan uca koşturuldu
+(23 denetim). Doğrulananlar: ortak katılmadan projeyi okuyamıyor; davet kaydı
+istemciye tamamen kapalı; yabancı başkasının projesine kod üretemiyor;
+katıldıktan sonra `memberUids` güncelleniyor; **alıcı kimliği ortağa kapalı**
+(madde 18'in asıl sınavı); ortak başkası adına proje kuramıyor; kod tek
+kullanımlık; süresi dolan reddediliyor; ortak kaydı hisse 0 ile yazılıyor.
+
+- [x] 51. **`redeemInvite` idempotan değildi** — **TAMAM (21 Ağu 2026, yayında)**
+      · Üyelik denetimi (`zaten üyeyse başarıyı tekrar döndür`) `usedAt`
+        kapısının ARKASINDAYDI. Kullanıcı kodu kullanıp üye olduğu an kod
+        harcanıyor, aynı bağlantıya ikinci dokunuşta "bu kod kullanılmış"
+        hatası alıyordu — az önce kendisi katılmışken.
+      · Ağ yeniden denemesinde de aynısı: çağrı sunucuda başarılı olup yanıt
+        kaybolursa kullanıcıya katılamadığı söyleniyordu. O dal işlevin
+        İDEMPOTANS çıkışıydı ve kapının arkasında işe yaramıyordu — üstelik
+        kendi yorumu tam bu durumu gerekçe gösteriyordu.
+      · Denetim kapının ÖNÜNE alındı. Güvenlik zayıflamıyor: üye OLMAYAN biri
+        harcanmış kodu hâlâ kullanamıyor.
+      · **NEDEN TESTLERDEN KAÇTI:** "ikinci dokunuş HATA DEĞİL" adlı mevcut
+        test İKİ FARKLI kod kullanıyordu (TWICE1 → TWICE2), yani "zaten üye
+        olan kişi YENİ bir kod kullanıyor" senaryosunu sınıyordu. Yorumu "aynı
+        bağlantıya iki kez dokunmak" dediği hâlde o vaka hiç sınanmamıştı.
+        **Testin adı kapsamından fazlasını vaat ediyordu.** İki test eklendi;
+        164 test geçiyor.
+      · KALAN: ortağın EKRANDA ne gördüğü hâlâ görülmedi — ikinci fiziksel
+        cihaz + Firebase test numarası gerekiyor.
+
 #### REGRESYON DENETİMİ — düzeltmeler beş kusur üretmişti (21 Ağu 2026)
 
 Bu oturumun 13 düzeltmesi dört mercekli bir denetimden geçirildi. Sonuç edepli
