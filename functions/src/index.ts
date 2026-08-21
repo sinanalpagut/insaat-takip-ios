@@ -103,14 +103,6 @@ export const redeemInvite = onCall<{ code?: string }, Promise<RedeemResult>>(
       if (!invite.exists) {
         throw new HttpsError("not-found", "code-not-found");
       }
-      if (invite.get("usedAt") != null) {
-        throw new HttpsError("already-exists", "code-used");
-      }
-
-      const expiresAt = invite.get("expiresAt") as Timestamp | undefined;
-      if (!expiresAt || expiresAt.toMillis() <= Date.now()) {
-        throw new HttpsError("deadline-exceeded", "code-expired");
-      }
 
       const projectId = invite.get("projectId");
       if (typeof projectId !== "string" || projectId.length === 0) {
@@ -128,11 +120,33 @@ export const redeemInvite = onCall<{ code?: string }, Promise<RedeemResult>>(
       const title = `${project.get("blockNumber")} Ada / ${project.get("parcelNumber")} Parsel`;
       const members: string[] = project.get("memberUids") ?? [];
 
-      // Zaten üye (ya da projenin sahibi) — kod HARCANMAZ. Harcansaydı,
-      // yanlışlıkla iki kez dokunan kişi kodu yakar ve yönetici yeni kod
-      // üretmek zorunda kalırdı.
+      // ÜYELİK DENETİMİ `usedAt` KAPISINDAN ÖNCE — sıra kritik.
+      //
+      // Zaten üye (ya da projenin sahibi) olan kişi için yapacak bir şey yok:
+      // başarıyı tekrar döndürmek doğru cevap. Bu dal ÖNCEDEN `usedAt`
+      // kapısının ARKASINDAYDI ve dolayısıyla kendi gerekçesinin tarif ettiği
+      // duruma hiç ulaşamıyordu: kullanıcı kodu kullanıp üye olduğu anda kod
+      // harcanmış oluyor, ikinci dokunuşunda "bu kod kullanılmış" hatası
+      // alıyordu — oysa az önce kendisi katılmıştı.
+      //
+      // Aynı şey ağ yeniden denemesinde de oluyordu: çağrı sunucuda başarılı
+      // olup yanıt kaybolursa, yeniden deneme hata döndürüyor ve kullanıcıya
+      // katılamadığı söyleniyordu. Bu dal işlevin İDEMPOTANS çıkışı; kapının
+      // arkasında durduğu sürece işe yaramıyordu.
+      //
+      // Güvenlik zayıflamıyor: üye OLMAYAN biri harcanmış kodu hâlâ
+      // kullanamıyor, aşağıdaki kapı yerinde duruyor.
       if (members.includes(uid) || project.get("ownerUid") === uid) {
         return { projectId, projectTitle: title, alreadyMember: true };
+      }
+
+      if (invite.get("usedAt") != null) {
+        throw new HttpsError("already-exists", "code-used");
+      }
+
+      const expiresAt = invite.get("expiresAt") as Timestamp | undefined;
+      if (!expiresAt || expiresAt.toMillis() <= Date.now()) {
+        throw new HttpsError("deadline-exceeded", "code-expired");
       }
 
       // Dört yazma, TEK transaction: üyelik + ortak kaydı + hareket + kodun

@@ -251,6 +251,51 @@ describe('redeemInvite — zaten üye olan', () => {
     assert.equal(f.usedAt, undefined, 'zaten üye olan kişi kodu harcadı');
   });
 
+  it('AYNI KODA ikinci kez dokunmak hata döndürmez — idempotans', async () => {
+    // Yukarıdaki test İKİ FARKLI kod kullanıyor, yani "zaten üye olan kişi YENİ
+    // bir kod kullanıyor" senaryosunu sınıyor. Oysa kendi yorumu "aynı
+    // bağlantıya iki kez dokunmak" diyor ve GERÇEK vaka bu: kullanıcı kodu
+    // kullanıp üye oluyor, sonra aynı bağlantıya tekrar dokunuyor.
+    //
+    // O vaka bir dönem HATA döndürüyordu: üyelik denetimi `usedAt` kapısının
+    // ARKASINDAYDI, dolayısıyla kişi kendi başarılı çağrısıyla kodu harcadığı
+    // an ikinci dokunuşunda "bu kod kullanılmış" alıyordu. Ağ yeniden
+    // denemesinde de aynısı oluyordu: çağrı sunucuda başarılı olup yanıt
+    // kaybolursa kullanıcıya katılamadığı söyleniyordu.
+    const CODE = 'SAMEC1';
+    await seedInvite(CODE);
+    const u = await newUser();
+
+    const first = await redeem(u.idToken, CODE);
+    assert.equal(first.status, 200);
+    assert.equal(first.result.alreadyMember, false);
+
+    // AYNI kod, AYNI kullanıcı, ikinci kez.
+    const second = await redeem(u.idToken, CODE);
+    assert.equal(second.status, 200, 'ikinci dokunuş hata döndürdü');
+    assert.equal(second.result.alreadyMember, true);
+    assert.equal(second.result.projectId, first.result.projectId);
+
+    // Üyelik tekrar yazılmamalı: aynı uid iki kez listede olmamalı.
+    const proje = await getFields(`projects/${first.result.projectId}`);
+    const uyeler = proje.memberUids.arrayValue.values.map((v) => v.stringValue);
+    assert.equal(uyeler.filter((x) => x === u.uid).length, 1, 'uid listeye iki kez girdi');
+  });
+
+  it('üye OLMAYAN biri harcanmış kodu hâlâ kullanamaz', async () => {
+    // İdempotans dalı `usedAt` kapısının önüne alındı; kapının kendisi
+    // yerinde durmalı, yoksa harcanmış kod herkese açılırdı.
+    const CODE = 'SPENT1';
+    await seedInvite(CODE);
+    const ilk = await newUser();
+    assert.equal((await redeem(ilk.idToken, CODE)).status, 200);
+
+    const yabanci = await newUser();
+    const r = await redeem(yabanci.idToken, CODE);
+    assert.equal(r.status, 409);
+    assert.equal(r.error.status, 'ALREADY_EXISTS');
+  });
+
   it('projenin SAHİBİ kendi davetiyle ortak olmaz', async () => {
     // Sahibin jetonunu almak için ONA proje kurduruyoruz. Auth emülatörünün
     // `signUp`'ı belirli bir uid kabul etmiyor (localId yok sayılıyor ve jeton
