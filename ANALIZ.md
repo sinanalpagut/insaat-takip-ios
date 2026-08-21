@@ -1249,12 +1249,17 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · **CANLI DİNLEYİCİ BİLEREK EKLENMEDİ:** `load()` her görünür proje için 13 koleksiyonun tamamını çekiyor; dinleyici bunu sürekli açık tutmak olurdu. Gerçek zamanlı senkron madde 58 (limit/sayfalama) ile BİRLİKTE ele alınmalı.
       · KAPSAM: iki kişi aynı anda bakarken hâlâ birbirinin değişikliğini kendiliğinden görmüyor. Kapanan şey 'veri yalnızca soğuk açılışta geliyor' ve 'ekran tazelik konusunda yalan söylüyor'.
 
-- [ ] 55. **Çakışma denetimi yok — son yazan kazanır.**
+- [~] 55. **Çakışma denetimi yok — son yazan kazanır.**
       `FirestoreProjectRepository.stage()` her tür için `batch.setData(...)`
       çağırıyor: merge yok, `updatedAt` önkoşulu yok, transaction yok. Madde 19
       yalnızca TÜRETİLEN malzeme alanlarını kodlamayarak çakışmayı çözmüştü;
       daire, tahsilat, taksit, gider, ortak, belge ve denetim kaydı hâlâ açık.
       İki cihaz aynı projeyi düzenlerse biri diğerini SESSİZCE siliyor.
+      · **TEMEL ATILDI (21 Ağu 2026), ÖNLEME AÇIK.**
+      · RİSK YENİDEN ÇERÇEVELENDİ: ortaklar SALT OKUNUR (14 kural sahip yazması istiyor, üye yazması sıfır), yani çakışma iki farklı kişi değil AYNI KİŞİNİN İKİ CİHAZI demek. En gerçekçi hali kuyruk: çevrimdışı telefon saatlerce yazma biriktirip bağlanınca iPad'deki daha yeni değişikliği eziyor.
+      · Her yazma artık `updatedAt` (SUNUCU zamanı), `updatedBy` (uid) ve `updatedFrom` (oturum) taşıyor. Tek kaldıraç noktası `encode()`; fotoğraf belgeleri ayrıca damgalandı. Bugüne kadar bir belgeye en son ne zaman ve hangi oturumdan yazıldığı HİÇBİR YERDE yazılı değildi.
+      · **AÇIK KALAN:** önleme (transaction + sürüm önkoşulu) ve çakışmanın kullanıcıya GÖSTERİLMESİ. Önleme toplu yazmanın atomikliğini bozar — satış + taksitler + denetim kaydı bugün TEK partide gidiyor ve o güvence korunmalı. Ayrı bir iş olarak ele alınmalı.
+      · Riskli kısım sınandı: modellerin tanımadığı alanlar çözümlemeyi düşürseydi tek belge tüm uygulamayı boşaltırdı (madde 56). Birim testi var; gerçek yazma yolu emülatörde AYRICA doğrulanmadı.
 
 - [ ] 56. **Tek bozuk belge tüm veriyi görünmez yapıyor; şema sürümü yok.**
       `fetch` (FirestoreProjectRepository.swift:353) tek çözülemeyen belgede
