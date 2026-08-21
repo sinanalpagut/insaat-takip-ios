@@ -91,52 +91,28 @@ final class FirestoreProjectRepository: ProjectRepository {
         print("[load] uid=\(uid) proje=\(result.projects.count) önbellekten=\(projectDocs.metadata.isFromCache)")
         #endif
 
-        for project in result.projects {
-            let pid = project.id
-            // Belgeler ROLE GÖRE farklı sorgulanıyor. Ortak için süzgeç şart:
-            // `partnerVisible == false` kayıtları kural reddediyor ve süzgeç
-            // olmadan sorgunun tamamı düşer. Sahip kısıtsız sorgular.
-            let isOwner = project.ownerUid == uid
-
-            // Tek projenin 11 koleksiyonu paralel; projeler arası sıralı.
-            async let materials = fetch(Material.self, .materials, pid)
-            async let materialLogs = fetch(MaterialLog.self, .materialLogs, pid)
-            async let apartments = fetch(Apartment.self, .apartments, pid)
-            async let partners = fetch(Partner.self, .partners, pid)
-            async let documents = fetchDocuments(pid, ownerView: isOwner)
-            async let activities = fetch(ActivityItem.self, .activities, pid)
-            async let expenses = fetch(Expense.self, .expenses, pid)
-            async let payments = fetch(Payment.self, .payments, pid)
-            async let installments = fetch(Installment.self, .installments, pid)
-            async let audits = fetch(AuditEntry.self, .auditEntries, pid)
-            async let sitePhotos = fetchSitePhotos(pid)
-            async let apartmentPhotos = fetchApartmentPhotos(pid)
-
-            result.materials += try await materials
-            result.materialLogs += try await materialLogs
-            result.apartments += try await apartments
-            result.partners += try await partners
-            result.documents += try await documents
-            result.activities += try await activities
-            result.expenses += try await expenses
-            result.payments += try await payments
-            result.installments += try await installments
-            result.auditEntries += try await audits
-            result.sitePhotos += try await sitePhotos
-            result.apartmentPhotos += try await apartmentPhotos
-
-            // Alıcı kimlikleri YALNIZCA sahibin projesinde çekilir. Ortak için
-            // sorguyu ATMAMAK şart: kural okumayı reddeder, `getDocuments`
-            // fırlatır ve TÜM yükleme düşerdi — belgelerdeki role göre sorgu
-            // dersinin aynısı. Ortakta `buyerName` nil kalır; arayüz zaten nil
-            // adla başa çıkıyor.
-            if isOwner {
-                let buyers = try await fetch(ApartmentBuyer.self, .buyers, pid)
-                let names = Dictionary(uniqueKeysWithValues: buyers.map { ($0.apartmentId, $0.name) })
-                for index in result.apartments.indices
-                where result.apartments[index].projectId == pid {
-                    result.apartments[index].buyerName = names[result.apartments[index].id]
-                }
+        // PROJE BAŞINA YALITIM (madde 56). Önceden tek bir çözülemeyen belge
+        // `load()`u fırlatıyordu: `apply` hiç çalışmıyor, ekranda HİÇBİR proje
+        // kalmıyordu. Bir projedeki bozuk kayıt yüzünden diğer dört projeyi
+        // kaybetmek orantısız.
+        //
+        // BOZUK BELGEYİ ATLAMAK ise hâlâ YAPILMIYOR; gerekçesi `decode`in
+        // başında yazılı: bir `materialLog`u atlamak toplamları SESSİZCE yanlış
+        // gösterir. Yalıtım o yüzden belge düzeyinde değil PROJE düzeyinde —
+        // etkilenen proje bütünüyle dışarıda kalıyor (rakamı yarım
+        // gösterilmiyor) ve `failedProjects`e yazılıyor ki ekranda söylensin.
+        let found = result.projects
+        result.projects = []
+        for project in found {
+            do {
+                result.merge(try await loadProject(project, uid: uid))
+            } catch {
+                result.failedProjects.append(
+                    ProjectLoadFailure(id: project.id, title: project.title,
+                                       reason: String(describing: error)))
+                #if DEBUG
+                print("[load] proje yüklenemedi \(project.title): \(error)")
+                #endif
             }
         }
 
@@ -150,6 +126,59 @@ final class FirestoreProjectRepository: ProjectRepository {
         }
 
         latest = result
+        return result
+    }
+
+    /// TEK projenin verisi. Hata fırlatırsa YALNIZCA o proje düşer.
+    private func loadProject(_ project: Project, uid: String) async throws -> DataSnapshot {
+        var result = DataSnapshot()
+        result.projects = [project]
+        let pid = project.id
+        // Belgeler ROLE GÖRE farklı sorgulanıyor. Ortak için süzgeç şart:
+        // `partnerVisible == false` kayıtları kural reddediyor ve süzgeç
+        // olmadan sorgunun tamamı düşer. Sahip kısıtsız sorgular.
+        let isOwner = project.ownerUid == uid
+
+        // Tek projenin 11 koleksiyonu paralel; projeler arası sıralı.
+        async let materials = fetch(Material.self, .materials, pid)
+        async let materialLogs = fetch(MaterialLog.self, .materialLogs, pid)
+        async let apartments = fetch(Apartment.self, .apartments, pid)
+        async let partners = fetch(Partner.self, .partners, pid)
+        async let documents = fetchDocuments(pid, ownerView: isOwner)
+        async let activities = fetch(ActivityItem.self, .activities, pid)
+        async let expenses = fetch(Expense.self, .expenses, pid)
+        async let payments = fetch(Payment.self, .payments, pid)
+        async let installments = fetch(Installment.self, .installments, pid)
+        async let audits = fetch(AuditEntry.self, .auditEntries, pid)
+        async let sitePhotos = fetchSitePhotos(pid)
+        async let apartmentPhotos = fetchApartmentPhotos(pid)
+
+        result.materials += try await materials
+        result.materialLogs += try await materialLogs
+        result.apartments += try await apartments
+        result.partners += try await partners
+        result.documents += try await documents
+        result.activities += try await activities
+        result.expenses += try await expenses
+        result.payments += try await payments
+        result.installments += try await installments
+        result.auditEntries += try await audits
+        result.sitePhotos += try await sitePhotos
+        result.apartmentPhotos += try await apartmentPhotos
+
+        // Alıcı kimlikleri YALNIZCA sahibin projesinde çekilir. Ortak için
+        // sorguyu ATMAMAK şart: kural okumayı reddeder, `getDocuments`
+        // fırlatır ve TÜM yükleme düşerdi — belgelerdeki role göre sorgu
+        // dersinin aynısı. Ortakta `buyerName` nil kalır; arayüz zaten nil
+        // adla başa çıkıyor.
+        if isOwner {
+            let buyers = try await fetch(ApartmentBuyer.self, .buyers, pid)
+            let names = Dictionary(uniqueKeysWithValues: buyers.map { ($0.apartmentId, $0.name) })
+            for index in result.apartments.indices
+            where result.apartments[index].projectId == pid {
+                result.apartments[index].buyerName = names[result.apartments[index].id]
+            }
+        }
         return result
     }
 

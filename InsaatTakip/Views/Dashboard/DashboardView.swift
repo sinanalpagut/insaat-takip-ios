@@ -48,7 +48,17 @@ struct DashboardView: View {
                     }
                     .padding(.top, 18)
 
-                    if visibleProjects.isEmpty {
+                    // Yüklenemeyen projeler ŞERİDİ — listeden sessizce
+                    // eksilmesinler ve toplamlara dahil olmadıkları YAZILI olsun.
+                    failedProjectsStrip
+
+                    // HATA İLE BOŞLUK AYRI ŞEYLER (madde 57). Aynı ekranı
+                    // göstermek, veri gelmediğinde kullanıcıya "verin yok"
+                    // demek oluyordu — kural reddi, eksik indeks ya da ağ
+                    // hatasında üründeki en korkutucu cümle.
+                    if let hata = viewModel.loadError, visibleProjects.isEmpty {
+                        loadErrorState(hata)
+                    } else if visibleProjects.isEmpty {
                         emptyState
                     }
 
@@ -208,6 +218,83 @@ struct DashboardView: View {
     /// YENİ HESABIN gördüğü ilk ekran bu. Boş bırakılırsa kullanıcı, davet
     /// koduyla mı katılacağını yoksa proje mi kuracağını anlamadan bomboş bir
     /// sayfayla karşılaşıyordu.
+    /// Yükleme hatası — boş durumdan AYRI ve geri dönüşü var.
+    private func loadErrorState(_ mesaj: String) -> some View {
+        VStack(spacing: 0) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .iconFont(22, weight: .semibold)
+                .foregroundColor(Palette.alertInk)
+                .frame(width: 54, height: 54)
+                .background(Palette.alertTint)
+                .cornerRadius(17)
+
+            Text("Veriler yüklenemedi")
+                .font(.sora(17, .bold))
+                .foregroundColor(Palette.ink)
+                .padding(.top, 4)
+
+            // SEBEBİ YAZILI: "bir hata oluştu" kullanıcıya hiçbir şey
+            // söylemiyor ve destek kanalı da olmadığı için (madde 72) sorunun
+            // izi tamamen kayboluyordu.
+            Text(mesaj)
+                .font(.manrope(12.5, .medium))
+                .foregroundColor(Palette.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .padding(.top, 6)
+                .padding(.horizontal, 8)
+
+            Text("Verilerin duruyor — bu bir bağlantı ya da izin sorunu.")
+                .font(.manrope(11.5, .medium))
+                .foregroundColor(Palette.textTertiary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 8)
+
+            Button {
+                Task { await viewModel.refresh() }
+            } label: {
+                Text(viewModel.isRefreshing ? "Deneniyor…" : "Tekrar dene")
+                    .font(.manrope(13.5, .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 46)
+                    .background(Palette.accent)
+                    .cornerRadius(13)
+            }
+            .disabled(viewModel.isRefreshing)
+            .padding(.top, 16)
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity)
+        .background(Palette.surface)
+        .cornerRadius(18)
+        .padding(.top, 18)
+    }
+
+    /// İçeriği okunamayan projeler — listeden SESSİZCE eksilmesinler (madde 56).
+    @ViewBuilder
+    private var failedProjectsStrip: some View {
+        if !viewModel.failedProjects.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(viewModel.failedProjects.count) proje yüklenemedi")
+                    .font(.manrope(12.5, .bold))
+                    .foregroundColor(Palette.alertInk)
+                Text(viewModel.failedProjects.map(\.title).joined(separator: ", "))
+                    .font(.manrope(11.5, .medium))
+                    .foregroundColor(Palette.textSecondary)
+                    .lineLimit(2)
+                Text("Bu projelerin rakamları aşağıdaki toplamlara DAHİL DEĞİL.")
+                    .font(.manrope(11, .medium))
+                    .foregroundColor(Palette.textTertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Palette.alertTint)
+            .cornerRadius(14)
+            .padding(.top, 14)
+        }
+    }
+
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "building.2")

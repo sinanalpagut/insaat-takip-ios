@@ -124,6 +124,19 @@ final class ProjectViewModel: ObservableObject {
     /// Yenileme sürüyor mu — üst üste binen çağrıları eler.
     @Published private(set) var isRefreshing = false
 
+    /// Yükleme başarısız olduysa kullanıcıya gösterilecek metin.
+    ///
+    /// NEDEN AYRI DURUM (madde 57): hata önceden yalnızca sönümlü bir toast'la
+    /// söyleniyordu ve `projects` boş kaldığı için ekranda "Henüz projen yok"
+    /// karşılama kartı çiziliyordu. Yani kural reddi, eksik indeks ya da bozuk
+    /// belge durumunda kullanıcı üründeki EN KORKUTUCU cümleyi görüyordu:
+    /// verin yok. Toast da üç saniyede söndüğü için geriye hiçbir iz kalmıyordu.
+    @Published private(set) var loadError: String?
+
+    /// Yüklenebilen ama İÇERİĞİ okunamayan projeler (madde 56).
+    /// Listeden sessizce eksilmemeleri için taşınıyor.
+    @Published private(set) var failedProjects: [ProjectLoadFailure] = []
+
     func refresh() async {
         // ÜST ÜSTE BİNME YOK: ön plana geçiş ile çekerek yenileme aynı anda
         // gelebiliyor ve iki tam yükleme hem pahalı hem gereksiz.
@@ -131,9 +144,18 @@ final class ProjectViewModel: ObservableObject {
         isRefreshing = true
         defer { isRefreshing = false }
         do {
-            apply(try await repository.load())
+            let snapshot = try await repository.load()
+            apply(snapshot)
+            failedProjects = snapshot.failedProjects
+            loadError = nil
             lastLoadedAt = Date()
+            // Bir proje düştüyse SESSİZ GEÇİLMEZ: ekrandaki şerit kalıcı,
+            // toast ise sadece ilk anda dikkat çekiyor.
+            if !snapshot.failedProjects.isEmpty {
+                flash("\(snapshot.failedProjects.count) proje yüklenemedi")
+            }
         } catch {
+            loadError = Self.loadFailureMessage(for: error)
             #if DEBUG
             // Ham hata görünmezse "yüklenemedi" mesajının NEDENİ hiçbir yerde
             // okunamaz. Kural reddi mi, indeks mi, ağ mı — ayırt etmek şart.

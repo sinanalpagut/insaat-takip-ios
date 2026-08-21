@@ -29,6 +29,43 @@ struct DataSnapshot {
     var installments: [Installment] = []
     var apartmentPhotos: [ApartmentPhoto] = []
     var auditEntries: [AuditEntry] = []
+
+    /// Yüklenemeyen projeler — SESSİZCE DÜŞÜRÜLMEZ.
+    ///
+    /// Bir projenin koleksiyonlarından biri çözülemezse o proje sonuçtan
+    /// çıkarılıyor ama BURAYA yazılıyor ki ekranda söylenebilsin. Listeden
+    /// sessizce eksilen bir proje, kullanıcının "hepsi bu" sanacağı bir yalan
+    /// olurdu — aynı ders portföy listesinde `prefix(4)` ile bir kez öğrenildi.
+    var failedProjects: [ProjectLoadFailure] = []
+}
+
+/// Tek bir projenin yüklenememe kaydı.
+struct ProjectLoadFailure: Identifiable {
+    let id: UUID
+    /// Proje belgesi okunabildiği için başlık BİLİNİYOR; kullanıcıya hangi
+    /// projenin düştüğünü söyleyebilmek için taşınıyor.
+    let title: String
+    let reason: String
+}
+
+extension DataSnapshot {
+    /// Tek projenin parça sonucunu bütüne katar.
+    mutating func merge(_ other: DataSnapshot) {
+        projects += other.projects
+        materials += other.materials
+        materialLogs += other.materialLogs
+        apartments += other.apartments
+        partners += other.partners
+        documents += other.documents
+        activities += other.activities
+        sitePhotos += other.sitePhotos
+        expenses += other.expenses
+        payments += other.payments
+        installments += other.installments
+        apartmentPhotos += other.apartmentPhotos
+        auditEntries += other.auditEntries
+        failedProjects += other.failedProjects
+    }
 }
 
 /// Tek bir kayıt yazması. Firestore'daki bir doküman işlemine birebir karşılık gelir.
