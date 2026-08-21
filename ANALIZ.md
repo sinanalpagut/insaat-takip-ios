@@ -1029,6 +1029,40 @@ edilmedi.
       döneme birden sayılıyor (`ProjectViewModel:2667`); öğlen çapasının saat
       dilimi iddiası UTC−10 ve batısında bozuluyor (`Installment.swift:16`).
 
+#### GERÇEK CİHAZDA DOĞRULANDI (21 Ağu 2026, iPhone 13 Pro, üretim Firestore)
+
+Dosyalar cihazdan `devicectl device copy from` ile doğrudan çekildi (uygulamanın
+`tmp` kabından) — maile hiç gerek kalmadı.
+
+- **35 GEÇTİ.** Daire 1'in satış kaydında yalnızca alıcı adı değiştirilip
+  kaydedildi. Denetim izi düzenlemeyi doğruluyor ("düzenlendi · Alıcı kaydı:
+  kayıtlı → güncellendi"). Plan 13 satır kaldı, tutar/vade/sıra BİREBİR aynı.
+  KRİTİK AYRINTI: taksit KİMLİKLERİ değişti, yani kod yıkıcı yolu gerçekten
+  izledi (planı silip yeniden kurdu) ve buna rağmen aynı planı üretti — düzeltme
+  "yeniden kurma"yı engellemiyor, GİRDİLERİNİ düzeltiyor.
+  Eski kod aynı işlemde şunu üretecekti: peşinat satırı 450.000 ₺ (200.000
+  yerine — biriken tahsilat peşinat sanılıyordu), aylık 295.833,34 ₺
+  (316.666,67 yerine), vadeler 19'undan 21'ine kayacaktı.
+- **36 GEÇTİ.** Peşinatsız yeni satışta (Daire 2) ilk taksit kullanıcının
+  seçtiği 01.09.2026'ya düştü. Eski kodla 01.10.2026 olacaktı.
+- **32 GEÇTİ.** İki planda da taksitler arası fark 1 kuruş, toplamlar bedele
+  birebir eşit.
+- **41 GEÇTİ.** Daireler.csv'nin üç sütunu ekranla birebir (Satış Bedeli
+  7.857.500,00 · Tahsil Edilen 450.000,00 · Kalan Alacak 7.407.500,00).
+  Ayrıca 145/2 demo verisinde eski davranış ölçüldü: "Kalan" %20,6 şişikti.
+- **40 GEÇTİ.** Devri olmayan projede dosya üretilmemesi doğru. 145/2 verisinde
+  yeni mantık ölçüldü: Devir 8.934.990 + Giriş 857.510 = 9.792.500 = ekran;
+  eski davranışta kayıp %91,2 idi.
+- **43 GEÇTİ** (hesaplanarak). Kullanıcının verisinde eski gösterim 5.000 ₺
+  sapma üretiyordu (kart 7,77 M, ortağın çıkarması 7,775 M).
+- **Dekont GEÇTİ.** Tahsilatın `receiptPath`i dolu — `paymentReceipts` kovası
+  çalışıyor.
+
+**YÖNTEM NOTU — denetim izi bir doğrulama aracıdır.** İlk turda plan
+değişmemişti ve bu düzeltmenin kanıtı sanılabilirdi; oysa `denetimIzi`de
+"düzenlendi" kaydı YOKTU, yani işlem hiç yapılmamıştı. Değişmeyen veri,
+düzeltmenin başarısı kadar adımın atlanmış olmasının da işaretidir.
+
 #### Bu turun yöntem dersi
 
 **Ekrana bakarak bulunamayacak kusurlar var.** 32 numaralı hata üretim
