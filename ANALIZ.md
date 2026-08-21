@@ -1127,12 +1127,18 @@ sınanmamış. Kalıcı bir test hedefi kurmak sıradaki iş olmalı; bu turda
 kullanılan tek başına derleme yöntemi (`Kurus` + `Installment` + `Shim`)
 o hedefin çekirdeği olabilir.
 
-- [ ] 50. **Taksit planını gösteren ekran yok.** Müteahhit daireyi 12 ay
+- [x] 50. **Taksit planını gösteren ekran yok.** Müteahhit daireyi 12 ay
       vadeyle satıyor ve o 12 vadeyi listeleyen hiçbir ekran yok. Plan yalnızca
       üç yerde yüzeye çıkıyor: gecikmiş tahsilat listesi (yalnız VADESİ GEÇMİŞ
       olanlar), vade bildirimleri, ve JSON yedeği. "Bu dairenin ödeme takvimi
       ne?" sorusunun cevabı ancak yedek dosyası açılarak bulunabiliyor.
       Bu turda 32'nin düzeldiğini gözle doğrulamak da bu yüzden mümkün olmadı.
+      · **TAMAM (21 Ağu 2026)** — daire detayında, tahsilat defterinin ÜSTÜNDE: plan BEKLENENİ, defter GERÇEKLEŞENİ gösteriyor.
+      · **MAHSUP TEK KAYNAĞA ALINDI:** aynı FIFO döngüsü `Installment.status` ve `ReminderScheduler` içinde iki kez yazılıydı, ekran üçüncüsünü gerektirecekti. `Installment.settle(_:collected:)` eklendi, her iki mevcut çağıran ona bağlandı.
+      · Tutarlar `Fmt.exactMoney` ile — `compactMoney` olsaydı 316.666,67 ₺ '317 B ₺' görünürdü ve ekranın varlık sebebi tam olarak gerçek takvimi göstermek.
+      · Kırpma sessiz değil: 6'dan fazla vadede kaç vadenin gizlendiği yazılı ve DOKUNULDUĞUNDA açılıyor.
+      · **SİMÜLATÖRDE DOĞRULANDI** (Daire No 5): ekrandaki '3 vade gecikti · 577.500 ₺' Daireler sekmesindeki gecikme rakamıyla birebir aynı; FIFO doğru (peşinat+1. taksit ödendi, 2. kısmi, 3. açık); madde 47'nin düzeltmesi de görünür (peşinat satış gününde).
+      · KALAN: '+n vade daha' açıcısı ekranın altında kaldığı ve simülatör aracı kaydırmadığı için GÖZLE doğrulanmadı.
 
 ---
 
