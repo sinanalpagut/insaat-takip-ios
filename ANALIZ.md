@@ -1269,11 +1269,15 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       eksik indeks ya da bozuk belge durumunda üründeki en korkutucu cümle
       gösteriliyor: VERİN YOK. "Tekrar dene" yolu da yok.
 
-- [ ] 58. **Limit, sayfalama ve tembel liste yok.** `load()` görünür her proje
+- [~] 58. **Limit, sayfalama ve tembel liste yok.** `load()` görünür her proje
       için 13 koleksiyonun TAMAMINI çekiyor; `.limit(` kod tabanında sıfır.
       Listeler `ScrollView { VStack { ForEach } }` — tek bir `LazyVStack`/`List`
       yok (desen biliniyor: `SitePhotosView` `LazyVGrid` kullanıyor). Bugün 12
       daireyle görünmüyor, üç yıllık projede görünür.
+      · **KISMEN TAMAM (21 Ağu 2026)** — iki parça kapandı, biri açık.
+      · **Hareket akışı** sunucuda `order(by: timestamp, desc).limit(200)` ile sınırlandı. Bonus kusur: başlık 'son 7 gün' diyordu ama `activities(filter:for:)` HİÇBİR tarih süzgeci uygulamıyordu — tüm geçmiş 'son 7 gün' başlığı altında listeleniyordu. Başlık artık gösterileni sayıyor ve sınıra dayanınca '(en yeniler)' yazıyor.
+      · **Altı liste LazyVStack'e geçti:** malzeme, daire, gider, hareket geçmişi, ortak, belge. Simülatörde düzen bozulmadığı doğrulandı.
+      · **AÇIK KALAN — toplamları besleyen koleksiyonlar sınırlanamadı.** malzemeHareketleri, giderler, tahsilatlar, taksitler ve daireler para toplamlarının ham kaynağı; limit koymak rakamları SESSİZCE yanlış yapardı. `auditEntries` de sınırlanamaz (yedeğe `denetimIzi` olarak giriyor). Gerçek çözüm sunucu tarafı toplama (Firestore aggregation); saklanan toplam ilkeye aykırı. **Canlı dinleyici tartışması bu iş bitmeden açılmamalı** — sınırsız koleksiyona dinleyici, sınırsız okuma demek (bkz. madde 54 notu).
 
 #### B — GÜNLÜK KULLANIMI ENGELLEYENLER
 
