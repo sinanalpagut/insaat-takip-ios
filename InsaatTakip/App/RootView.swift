@@ -14,6 +14,7 @@ enum Route: Hashable {
 
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var viewModel: ProjectViewModel
 
     @State private var path = NavigationPath()
@@ -54,6 +55,22 @@ struct RootView: View {
                 // gerçek veriyi getiriyor. Oturum açıldıktan SONRA çalışması
                 // şart: Firestore sorgusu `request.auth.uid` istiyor, o yüzden
                 // burada (giriş yapılmış dalda) duruyor.
+                // ÖN PLANA GEÇİŞTE YENİLE. Veri önceden YALNIZCA soğuk
+                // açılışta geliyordu (`.task(id:)` oturum kimliğine bağlı,
+                // pratikte uygulama sıfırdan açıldığında bir kez). Uygulamayı
+                // arka planda tutan bir ortak, yöneticinin girdiği satışı
+                // görmek için uygulamayı tamamen kapatıp açmak zorundaydı — ve
+                // bunu ona söyleyen hiçbir şey yoktu.
+                //
+                // Canlı dinleyici (`addSnapshotListener`) DEĞİL: `load()` her
+                // görünür proje için 13 koleksiyonun tamamını çekiyor ve
+                // dinleyici bunu sürekli açık tutmak demek olurdu (madde 58
+                // sayfalama/limit ile birlikte ele alınmalı). Ön plana geçiş +
+                // çekerek yenileme, maliyeti kullanıcının eylemine bağlıyor.
+                .onChange(of: scenePhase) { yeni in
+                    guard yeni == .active, appState.currentUser != nil else { return }
+                    Task { await viewModel.refresh() }
+                }
                 .task(id: appState.currentUser?.id) {
                     // Kayıtlardaki "kim" alanının kaynağı. Yenilemeden ÖNCE
                     // atanıyor: refresh sırasında oluşan bir yazma da doğru

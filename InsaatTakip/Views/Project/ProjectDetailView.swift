@@ -111,6 +111,11 @@ struct ProjectDetailView: View {
             }
         }
         .background(Palette.page.ignoresSafeArea())
+        // ÇEKEREK YENİLEME — tek yerde. `.refreshable` ortam üzerinden aşağı
+        // iniyor, dolayısıyla beş sekmenin beşi de kendi ScrollView'ıyla bunu
+        // yakalıyor; sekme başına eklemek gerekirse biri unutulur ve tam o
+        // sekmede veri sessizce eskir.
+        .refreshable { await viewModel.refresh() }
         .navigationBarHidden(true)
         .floatingActionButton(fabTitle ?? "", visible: isAdmin && fabTitle != nil) {
             switch tab {

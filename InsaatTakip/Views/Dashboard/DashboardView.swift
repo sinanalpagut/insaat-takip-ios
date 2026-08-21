@@ -73,6 +73,8 @@ struct DashboardView: View {
                 .padding(.horizontal, 16)
             }
         }
+        // Çekerek yenileme — gerekçe ProjectDetailView'da.
+        .refreshable { await viewModel.refresh() }
         .background(Palette.page.ignoresSafeArea())
         .navigationBarHidden(true)
         .floatingActionButton("Yeni Proje", visible: isAdmin) {

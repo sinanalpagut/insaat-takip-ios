@@ -112,9 +112,27 @@ final class ProjectViewModel: ObservableObject {
     /// veriyor); Firestore'da ilk açılışta önbellek BOŞ olduğu için ekranı asıl
     /// dolduran çağrı budur. Hata sessiz geçilmez: kullanıcı boş bir dashboard'a
     /// bakıp verisini kaybettiğini sanmasın.
+    /// Son BAŞARILI yüklemenin anı. `nil` ise yetkili kaynaktan hiç veri
+    /// gelmedi (yalnızca önbellek gösteriliyor olabilir).
+    ///
+    /// Ekranda gösterilmesi şart: alt başlık önceden `Fmt.clock()`u
+    /// varsayılanıyla çağırıyordu, yani O ANKİ SAATİ yazıyordu. Veri saatlerce
+    /// eski olsa bile satır "az önce güncellendi" diyordu — kullanıcı yalnızca
+    /// eski veri görmüyor, ona verinin TAZE OLDUĞU söyleniyordu.
+    @Published private(set) var lastLoadedAt: Date?
+
+    /// Yenileme sürüyor mu — üst üste binen çağrıları eler.
+    @Published private(set) var isRefreshing = false
+
     func refresh() async {
+        // ÜST ÜSTE BİNME YOK: ön plana geçiş ile çekerek yenileme aynı anda
+        // gelebiliyor ve iki tam yükleme hem pahalı hem gereksiz.
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
         do {
             apply(try await repository.load())
+            lastLoadedAt = Date()
         } catch {
             #if DEBUG
             // Ham hata görünmezse "yüklenemedi" mesajının NEDENİ hiçbir yerde
@@ -1190,10 +1208,34 @@ final class ProjectViewModel: ObservableObject {
     }
 
     /// Dashboard alt başlığı — yalnızca kullanıcının eriştiği projeleri sayar.
+    ///
+    /// TAZELİK BİLGİSİ GERÇEK. Önceki hali `Fmt.clock()`u varsayılanıyla
+    /// çağırıyordu (`Date()`), yani her çizimde o anki saati yazıyordu:
+    /// veri ne kadar eski olursa olsun satır "Bugün 14:32 güncellendi" diyordu.
+    /// Uygulama veriyi yalnızca soğuk açılışta çekiyor olduğu için bu, en çok
+    /// yanıltıcı olabileceği anda yanıltıyordu — ortak, yöneticinin az önce
+    /// girdiği satışı göremezken ekran ona verinin taze olduğunu söylüyordu.
     func dashboardSubtitle(for user: User?) -> String {
         let visible = visibleProjects(for: user)
         let apartmentTotal = visible.reduce(0) { $0 + $1.totalApartments }
-        return "\(visible.count) proje · \(apartmentTotal) daire · Bugün \(Fmt.clock()) güncellendi"
+        return "\(visible.count) proje · \(apartmentTotal) daire · \(freshnessText)"
+    }
+
+    /// "az önce güncellendi" / "14:32'de güncellendi" / "dün 09:15'te güncellendi"
+    /// / "sunucudan henüz yüklenmedi".
+    /// `now` PARAMETRE: eşik davranışı ("az önce" ne kadar sürüyor, gün sınırı
+    /// nerede) sınanabilir olmalı — projedeki `status(for:collected:today:)`
+    /// ile aynı desen.
+    var freshnessText: String { Self.freshnessText(lastLoadedAt) }
+
+    static func freshnessText(_ lastLoadedAt: Date?, now: Date = Date()) -> String {
+        guard let at = lastLoadedAt else { return "sunucudan henüz yüklenmedi" }
+        let gecen = now.timeIntervalSince(at)
+        if gecen < 90 { return "az önce güncellendi" }
+        if Fmt.calendar.isDate(at, inSameDayAs: now) { return "\(Fmt.clock(at))'de güncellendi" }
+        if let dun = Fmt.calendar.date(byAdding: .day, value: -1, to: now),
+           Fmt.calendar.isDate(at, inSameDayAs: dun) { return "dün \(Fmt.clock(at))'de güncellendi" }
+        return "\(Fmt.shortDate(at)) tarihinde güncellendi"
     }
 
     // MARK: - Yönetici işlemleri (yetki kontrolü çağıran ekranda + burada)
