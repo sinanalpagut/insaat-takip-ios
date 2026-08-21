@@ -19,7 +19,10 @@ struct MaterialsTabView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 11) {
+            // TEMBEL LİSTE: hücreler göründükçe çiziliyor. Düz `VStack` bütün
+            // listeyi baştan kuruyor — malzeme kartları her yeni kayıtla uzuyor ve ilk
+            // çizimin maliyeti listeyle birlikte büyüyor.
+            LazyVStack(spacing: 11) {
                 HStack {
                     Text("Stok Durumu")
                         .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)

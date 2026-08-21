@@ -350,8 +350,30 @@ final class FirestoreProjectRepository: ProjectRepository {
         }
     }
 
+    /// Hareket akışının sunucu tarafı sınırı.
+    ///
+    /// NEDEN YALNIZCA `activities`: bu koleksiyon hiçbir PARA TOPLAMINI
+    /// beslemiyor ve JSON yedeğine de girmiyor — salt bir akış ekranı. Diğer
+    /// koleksiyonlar (malzemeHareketleri, giderler, tahsilatlar, taksitler,
+    /// daireler) toplamların HAM KAYNAĞI: projenin "türetilen rakam saklanmaz,
+    /// ham kayıtlardan hesaplanır" ilkesi gereği hepsi okunuyor. Onlara limit
+    /// koymak rakamları SESSİZCE yanlış yapardı — bu uygulamanın reddettiği
+    /// hatanın en ağır biçimi. `auditEntries` de sınırlanamaz: yedeğe
+    /// `denetimIzi` olarak giriyor ve eksik bir yedek, kullanıcının veri
+    /// kaybını fark etmeyeceği bir yalan olur.
+    ///
+    /// Toplamları besleyen koleksiyonların sınırlanabilmesi için ya sunucu
+    /// tarafı toplama (Firestore aggregation) ya da saklanan toplam gerekiyor;
+    /// ikincisi ilkeye aykırı, ilki ayrı bir iş (bkz. ANALIZ madde 58 notu).
+    private static let activityLimit = 200
+
     private func fetch<T: Decodable>(_ type: T.Type, _ coll: Coll, _ pid: UUID) async throws -> [T] {
-        let snap = try await collection(coll, pid).getDocuments()
+        var query: Query = collection(coll, pid)
+        if coll == .activities {
+            query = query.order(by: "timestamp", descending: true)
+                         .limit(to: Self.activityLimit)
+        }
+        let snap = try await query.getDocuments()
         return try snap.documents.map { try decode(type, from: $0, in: coll.rawValue) }
     }
 

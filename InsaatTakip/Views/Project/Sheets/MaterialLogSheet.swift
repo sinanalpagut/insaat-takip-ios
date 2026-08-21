@@ -93,7 +93,10 @@ struct MaterialLogSheet: View {
 
                 // Giriş / çıkış kayıtları
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 0) {
+                    // TEMBEL LİSTE: hücreler göründükçe çiziliyor. Düz `VStack` bütün
+                    // listeyi baştan kuruyor — hareket geçmişi her yeni kayıtla uzuyor ve ilk
+                    // çizimin maliyeti listeyle birlikte büyüyor.
+                    LazyVStack(spacing: 0) {
                         let entries = viewModel.logs(for: materialId)
                         ForEach(Array(entries.enumerated()), id: \.element.id) { index, log in
                             logRow(log, unit: material.unit)

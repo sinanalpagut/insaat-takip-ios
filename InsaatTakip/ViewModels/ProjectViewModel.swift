@@ -2838,6 +2838,10 @@ final class ProjectViewModel: ObservableObject {
     /// Üyelik burada uygulanmazsa dashboard'daki gizlilik sınırı bildirim
     /// zilinden delinir: ortak, görmediği projelerin alıcı adını ve tutarını
     /// bu ekranda okuyabilir.
+    /// Hareket akışının proje başına sunucu sınırı — görünümün kapsam satırı
+    /// bunu okuyor ki etiket ile sorgu ayrışmasın.
+    static let activityFeedLimit = 200
+
     func activities(filter: ActivityFilter, for user: User?) -> [ActivityItem] {
         let allowed = Set(visibleProjects(for: user).map(\.id))
         // projectId'si olmayan (proje bağımsız) kayıt bugün yok; olursa gizlenir.

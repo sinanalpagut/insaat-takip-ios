@@ -24,7 +24,10 @@ struct PartnersTabView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 10) {
+            // TEMBEL LİSTE: hücreler göründükçe çiziliyor. Düz `VStack` bütün
+            // listeyi baştan kuruyor — ortak kartları her yeni kayıtla uzuyor ve ilk
+            // çizimin maliyeti listeyle birlikte büyüyor.
+            LazyVStack(spacing: 10) {
                 let partners = viewModel.partners(for: projectId)
                 let shareTotal = partners.reduce(0) { $0 + $1.sharePercent }
 

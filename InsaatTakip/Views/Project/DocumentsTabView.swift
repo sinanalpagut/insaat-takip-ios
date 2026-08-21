@@ -55,7 +55,10 @@ struct DocumentsTabView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
+            // TEMBEL LİSTE: hücreler göründükçe çiziliyor. Düz `VStack` bütün
+            // listeyi baştan kuruyor — belge satırları her yeni kayıtla uzuyor ve ilk
+            // çizimin maliyeti listeyle birlikte büyüyor.
+            LazyVStack(alignment: .leading, spacing: 0) {
                 // Tümü / Mimari / Statik / Ruhsat filtresi
                 HStack(spacing: 8) {
                     ForEach(Filter.allCases, id: \.self) { option in

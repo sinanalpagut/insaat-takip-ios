@@ -22,7 +22,10 @@ struct ExpensesTabView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 11) {
+            // TEMBEL LİSTE: hücreler göründükçe çiziliyor. Düz `VStack` bütün
+            // listeyi baştan kuruyor — gider satırları her yeni kayıtla uzuyor ve ilk
+            // çizimin maliyeti listeyle birlikte büyüyor.
+            LazyVStack(spacing: 11) {
                 if expenses.isEmpty {
                     emptyState.padding(.top, 16)
                 } else {

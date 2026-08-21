@@ -16,7 +16,10 @@ struct ActivityFeedView: View {
             header
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
+                // TEMBEL: hücreler göründükçe çiziliyor. Düz `VStack` bütün
+                // listeyi baştan kuruyordu — 200 hareketle bile ilk çizim
+                // gereksiz yere pahalı.
+                LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(ActivityItem.Section.allCases, id: \.self) { section in
                         let items = viewModel.activities(filter: filter, for: appState.currentUser)
                             .filter { $0.section == section }
@@ -43,11 +46,24 @@ struct ActivityFeedView: View {
         .onAppear { viewModel.markActivityRead() }
     }
 
-    /// Başlıktaki kapsam satırı — gördüğü proje sayısını dürüstçe söyler.
+    /// Başlıktaki kapsam satırı — gördüğü proje sayısını VE gerçekten
+    /// gösterilen hareket sayısını söyler.
+    ///
+    /// "son 7 gün" YAZIYORDU AMA HİÇBİR TARİH SÜZGECİ YOKTU:
+    /// `activities(filter:for:)` yalnızca projeye ve türe göre süzüyor, tüm
+    /// geçmişi döndürüyordu. Etiket kapsamdan dar bir söz veriyor, ekran
+    /// geniş bir liste gösteriyordu — kullanıcı iki aylık bir kaydı "son 7
+    /// gün" başlığı altında görüyordu.
+    ///
+    /// Artık sorgu sunucuda en yeni 200 harekete sınırlı (bkz.
+    /// `FirestoreProjectRepository.activityLimit`) ve satır GÖSTERİLENİ
+    /// sayıyor. Kırpma sessiz değil: sınıra dayanıldığında yazılı söyleniyor.
     private var scopeText: String {
-        let count = viewModel.visibleProjects(for: appState.currentUser).count
-        let scope = appState.isAdmin ? "Tüm projeler" : "\(count) proje"
-        return "\(scope) · son 7 gün"
+        let projeler = viewModel.visibleProjects(for: appState.currentUser).count
+        let scope = appState.isAdmin ? "Tüm projeler" : "\(projeler) proje"
+        let adet = viewModel.activities(filter: .tumu, for: appState.currentUser).count
+        let sinirda = adet >= ProjectViewModel.activityFeedLimit * max(projeler, 1)
+        return "\(scope) · \(adet) hareket" + (sinirda ? " (en yeniler)" : "")
     }
 
     private var header: some View {

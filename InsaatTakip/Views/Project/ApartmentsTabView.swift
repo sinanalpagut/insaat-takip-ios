@@ -66,7 +66,10 @@ struct ApartmentsTabView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 14) {
+            // TEMBEL LİSTE: hücreler göründükçe çiziliyor. Düz `VStack` bütün
+            // listeyi baştan kuruyor — daire ızgarası her yeni kayıtla uzuyor ve ilk
+            // çizimin maliyeti listeyle birlikte büyüyor.
+            LazyVStack(spacing: 14) {
                 summaryCard
                     .padding(.top, 16)
 
