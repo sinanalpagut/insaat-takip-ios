@@ -255,7 +255,7 @@ struct ReceiptSheet: View {
                 // Düzenleme kipinde form kayıtlı değerlerle açılır.
                 selectedMaterialId = log.materialId
                 direction = log.type
-                quantityText = Fmt.qty(log.amount)
+                quantityText = Fmt.qtyText(log.amount)   // qty DEĞİL: o yuvarlıyor
                 unitPriceText = Fmt.moneyText(log.unitPrice)
                 referenceText = log.note
                 date = log.date

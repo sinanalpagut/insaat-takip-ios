@@ -146,6 +146,23 @@ enum Fmt {
         "\(qty(value)) \(unit)"
     }
 
+    /// Miktarı FORMA geri yazmak için — ondalık KORUNUR.
+    ///
+    /// `qty` kullanılamaz, çünkü o `rounded()` uygulayıp ondalığı atıyor:
+    /// 12,5 m³'lük bir fiş düzenlemeye açıldığında kutuda "13" beliriyor ve
+    /// "Değişikliği Kaydet" gerçekten 13 m³ yazıyordu. Denetim izi de aynı
+    /// yuvarlanmış metni kullandığı için satır "13 m³ → 13 m³" görünüyor,
+    /// yani kaybın izi bile kalmıyordu.
+    ///
+    /// Bu, `moneyText`in para için çözdüğü sorunun miktar karşılığı — ve
+    /// `ReceiptSheet` düzenleme formunda ikisi YAN YANA duruyordu: birim fiyat
+    /// `moneyText` ile (doğru), miktar `qty` ile (yuvarlanmış).
+    static func qtyText(_ value: Double) -> String {
+        guard value.isFinite else { return "" }
+        if value == value.rounded() && abs(value) < 1e15 { return String(Int64(value)) }
+        return String(format: "%.15g", value).replacingOccurrences(of: ".", with: ",")
+    }
+
     /// Uygulamanın her yerinde kullanılan takvim (tr-TR, pazartesi haftanın ilk günü).
     static let calendar: Calendar = {
         var c = Calendar(identifier: .gregorian)

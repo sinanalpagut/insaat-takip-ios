@@ -203,7 +203,7 @@ struct ApartmentEditSheet: View {
         // Yeni projede tip/alan "—" gelir; forma boş taşınsın ki kullanıcı
         // tire silmek zorunda kalmasın.
         type = apartment.type == "—" ? "" : apartment.type
-        area = apartment.areaM2.map { Fmt.qty($0) } ?? ""
+        area = apartment.areaM2.map { Fmt.qtyText($0) } ?? ""   // qty DEĞİL: 111,55 m² → 112 oluyordu
         floor = apartment.floor
         status = apartment.status
         listPriceText = apartment.price > .zero ? Fmt.moneyText(apartment.price) : ""

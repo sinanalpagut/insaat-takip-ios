@@ -2840,7 +2840,57 @@ final class ProjectViewModel: ObservableObject {
     }
 
     /// Miktar girdisi (kg, m³, torba…). Para İÇİN KULLANILMAZ — bkz. parseMoney.
-    static func parseQuantity(_ text: String) -> Double { parseNumber(text) }
+    ///
+    /// ONDALIK KORUNUYOR. Önceden doğrudan `parseNumber`a bağlıydı ve o TÜM
+    /// noktaları koşulsuz siliyor: cihaz dili Türkçe değilse ondalık tuşundan
+    /// gelen "12.5" 125 oluyordu — `parseMoney`in yorumunda "sessiz 100 kat
+    /// hata" diye anlatılan kusurun aynısı, yalnızca para yerine miktarda.
+    /// Para tarafı düzeltilmiş, miktar tarafı atlanmıştı.
+    ///
+    /// KURAL PARADAN FARKLI ve olmak zorunda: parada ondalık en fazla 2 hane,
+    /// o yüzden `parseMoney` "ayraçtan sonra ≤2 hane ⇒ ondalık" diyebiliyor.
+    /// Miktarda 12,345 m³ geçerli bir değer, dolayısıyla hane sayısı ayırt
+    /// edici değil. Bunun yerine:
+    ///   · İki ayraç türü de varsa SONUNCUSU ondalıktır ("1.234,5").
+    ///   · Tek tür varsa ve BİRDEN ÇOK geçiyorsa binliktir ("1.234.567").
+    ///   · Tek kez geçen virgül ondalıktır (Türkçe klavyenin ondalık tuşu).
+    ///   · Tek kez geçen nokta belirsizdir: tam 3 hane izliyor ve önü boş
+    ///     değilse binlik ("12.500"), aksi halde ondalık ("12.5", "12.3456").
+    ///
+    /// Rakam süzgeci ASCII'ye bağlı: Swift'te `Character("²").isNumber` TRUE
+    /// döndürüyor ve alan m² yazımına açık olduğu için üst simge rakam
+    /// sessizce sayıya karışabilirdi.
+    static func parseQuantity(_ text: String) -> Double {
+        let isDigit: (Character) -> Bool = { $0.isASCII && $0.isNumber }
+        let cleaned = text.filter { isDigit($0) || $0 == "," || $0 == "." }
+        guard !cleaned.isEmpty else { return 0 }
+
+        let virgul = cleaned.filter { $0 == "," }.count
+        let nokta = cleaned.filter { $0 == "." }.count
+
+        var ondalikYeri: String.Index?
+        if virgul > 0 && nokta > 0 {
+            ondalikYeri = cleaned.lastIndex(where: { $0 == "," || $0 == "." })
+        } else if virgul == 1 {
+            ondalikYeri = cleaned.lastIndex(of: ",")
+        } else if nokta == 1, let i = cleaned.lastIndex(of: ".") {
+            let kuyruk = cleaned[cleaned.index(after: i)...]
+            let onu = cleaned[cleaned.startIndex..<i]
+            let binlikGorunumu = kuyruk.count == 3 && !onu.isEmpty
+            ondalikYeri = binlikGorunumu ? nil : i
+        }
+
+        var tamKisim = cleaned
+        var ondalik = ""
+        if let i = ondalikYeri {
+            tamKisim = String(cleaned[cleaned.startIndex..<i])
+            ondalik = String(cleaned[cleaned.index(after: i)...]).filter(isDigit)
+        }
+        let tam = tamKisim.filter(isDigit)
+        let metin = (tam.isEmpty ? "0" : tam) + (ondalik.isEmpty ? "" : "." + ondalik)
+        guard let value = Double(metin), value.isFinite, value >= 0 else { return 0 }
+        return min(value, maxAmount)
+    }
 
     /// Para girdisini KURUŞA çevirir. Double'a hiç uğramaz: "8,17" gibi bir tutar
     /// `Int64(Double * 100)` yolundan 816 kuruş çıkardı (0,0817'nin ikilik
