@@ -47,3 +47,28 @@ InsaatTakip/
 ├── Theme/        # Palet, tipografi, tr-TR formatlayıcılar, ortak bileşenler
 └── Resources/    # Sora + Manrope fontları
 ```
+
+## Testler
+
+**Swift birim testleri** (para mantığı, taksit planı, FIFO mahsup, dışa aktarma):
+
+```sh
+sh scripts/test.sh              # tümü
+sh scripts/test.sh KurusTests   # tek sınıf
+```
+
+Her test HANGİ KUSURU koruduğunu yazıyor. Bunlar varsayımsal değil: hepsi Faz 5
+denetiminde gerçekten bulunmuş, çoğu aylarca üretimde durmuş hatalar. Ortak
+özellikleri toplam denetimlerinden geçmeleriydi — bozdukları şey detaydı. O
+yüzden testler yalnızca toplamı değil, EŞİTLİĞİ, İŞARETİ, VADE GÜNÜNÜ ve tuzak
+atmamayı da ayrı ayrı sınıyor.
+
+`testPlanInvariantsAcrossEntireInputSpace` satış formunun izin verdiği 1...240
+taksit aralığının tamamını geziyor (12.960 vaka, ~1,5 sn): eski kod yalnızca
+100'ün tam bölenlerinde doğru sonuç veriyordu.
+
+**Kurallar ve Cloud Functions testleri** (emülatör gerektirir):
+
+```sh
+npm test
+```

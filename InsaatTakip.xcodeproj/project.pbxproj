@@ -16,12 +16,18 @@
 
 /* Begin PBXFileReference section */
 		AA00000000000000000000A4 /* InsaatTakip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = InsaatTakip.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA00000000000000000000A5 /* InsaatTakipTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InsaatTakipTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA00000000000000000000A1 /* InsaatTakip */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = InsaatTakip;
+			sourceTree = "<group>";
+		};
+		AA00000000000000000000A6 /* InsaatTakipTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = InsaatTakipTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -39,6 +45,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA00000000000000000000B5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -53,6 +66,7 @@
 			isa = PBXGroup;
 			children = (
 				AA00000000000000000000A1 /* InsaatTakip */,
+				AA00000000000000000000A6 /* InsaatTakipTests */,
 				5436F0DF302DDF66001A6F27 /* Frameworks */,
 				AA00000000000000000000A3 /* Products */,
 			);
@@ -62,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				AA00000000000000000000A4 /* InsaatTakip.app */,
+				AA00000000000000000000A5 /* InsaatTakipTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -96,7 +111,40 @@
 			productReference = AA00000000000000000000A4 /* InsaatTakip.app */;
 			productType = "com.apple.product-type.application";
 		};
+		AA00000000000000000000C2 /* InsaatTakipTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA00000000000000000000D3 /* Build configuration list for PBXNativeTarget "InsaatTakipTests" */;
+			buildPhases = (
+				AA00000000000000000000B4 /* Sources */,
+				AA00000000000000000000B5 /* Frameworks */,
+				AA00000000000000000000B6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA00000000000000000000C3 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA00000000000000000000A6 /* InsaatTakipTests */,
+			);
+			name = InsaatTakipTests;
+			packageProductDependencies = (
+			);
+			productName = InsaatTakipTests;
+			productReference = AA00000000000000000000A5 /* InsaatTakipTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+		AA00000000000000000000C4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA00000000000000000000E1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA00000000000000000000C1;
+			remoteInfo = InsaatTakip;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXProject section */
 		AA00000000000000000000E1 /* Project object */ = {
@@ -108,6 +156,10 @@
 				TargetAttributes = {
 					AA00000000000000000000C1 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					AA00000000000000000000C2 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = AA00000000000000000000C1;
 					};
 				};
 			};
@@ -130,12 +182,28 @@
 			projectRoot = "";
 			targets = (
 				AA00000000000000000000C1 /* InsaatTakip */,
+				AA00000000000000000000C2 /* InsaatTakipTests */,
 			);
 		};
 /* End PBXProject section */
 
+/* Begin PBXTargetDependency section */
+		AA00000000000000000000C3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA00000000000000000000C1 /* InsaatTakip */;
+			targetProxy = AA00000000000000000000C4 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin PBXResourcesBuildPhase section */
 		AA00000000000000000000B3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA00000000000000000000B6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -146,6 +214,13 @@
 
 /* Begin PBXSourcesBuildPhase section */
 		AA00000000000000000000B2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA00000000000000000000B4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -333,6 +408,44 @@
 			};
 			name = Release;
 		};
+		AA00000000000000000000F5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 36HVD2S94X;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sinanalpagut.insaattakipTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/InsaatTakip.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/InsaatTakip";
+			};
+			name = Debug;
+		};
+		AA00000000000000000000F6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 36HVD2S94X;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sinanalpagut.insaattakipTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/InsaatTakip.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/InsaatTakip";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -350,6 +463,15 @@
 			buildConfigurations = (
 				AA00000000000000000000F1 /* Debug */,
 				AA00000000000000000000F2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA00000000000000000000D3 /* Build configuration list for PBXNativeTarget "InsaatTakipTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA00000000000000000000F5 /* Debug */,
+				AA00000000000000000000F6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
