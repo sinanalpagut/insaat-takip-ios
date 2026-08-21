@@ -1178,6 +1178,212 @@ o hedefin çekirdeği olabilir.
 
 ---
 
+### Faz 6 — Uçtan uca durum analizi (21 Ağu 2026)
+
+Faz 5 bittiğinde "kodla çözülecek iş kalmadı" noktasına gelinmişti. Bunun
+doğru olup olmadığını sınamak için altı mercek modül modül kodu, orijinal 86
+bulguyu ve testleri okuyup **214 ayrı yetenek** çıkardı; ardından bir tamlık
+eleştirmeni "hiçbir merceğin sormadığı ne var" diye baktı.
+
+**ÖLÇÜM — iki farklı yüzde, ikisi de doğru:**
+
+| | oran | neyin ölçüsü |
+|---|---|---|
+| Yol haritası (Faz 0–5) | %94 | yapmaya KARAR VERDİĞİMİZ iş |
+| Yetenek envanteri | %65 | ürünün VAAT ETTİĞİ iş |
+
+Aradaki 29 puan, yol haritasının kapsam dışı bıraktığı alanlar. Modül dağılımı:
+daire/satış %80, malzeme/gider %71, ortak/yetki %70, rapor/dışa aktarma %64,
+giriş/hesap/belge %59, altyapı/yayın/erişilebilirlik %47.
+
+**ASIL BULGU DOĞRULAMA TARAFINDA: 214 yeteneğin 126'sı (%59) hiçbir düzeyde
+doğrulanmamış** — ne birim testi, ne emülatör, ne cihaz. Faz 5'te bulunan 19
+kusurun tamamı tam olarak o bölgeden çıkmıştı. Kod hacmi sorun değil (17.297
+satır, 11 gün); KANIT hacmi sorun.
+
+**KAYIT DÜZELTMESİ — madde 28:** "Hesap silme akışı TAMAM" diye işaretlenmişti
+ama doğrulama notu yalnızca emülatör testlerinden söz ediyor. Simülatör
+`FakeAccountDeletionService` kullanıyor (AppState.swift:114), yani gerçek
+`reauthenticate` + gerçek silme yolu BİR KEZ BİLE koşmadı. Sunucu tarafı
+test edilmiş, istemci yolu edilmemiş — ve bu App Store 5.1.1(v) zorunluluğu.
+Aşağıda madde 68 olarak açıldı.
+
+#### Bu turda kapatılanlar
+
+- [x] 52. **Fiş düzenlemek miktarı yuvarlıyordu** — **TAMAM (21 Ağu 2026)**
+      · Form `Fmt.qty` ile dolduruluyordu ve o `rounded()` uyguluyor. 12,5 m³
+        betonun fişi açılınca kutuda "13" beliriyor, kaydedince gerçekten 13 m³
+        oluyordu. Denetim izi de aynı yuvarlanmış metni kullandığı için satır
+        "13 m³ → 13 m³" görünüyor, kaybın izi bile kalmıyordu. Aynısı daire
+        alanında da vardı: 111,55 m² → 112.
+      · İRONİ: `ReceiptSheet`in 259. satırı birim fiyatı `Fmt.moneyText` ile
+        dolduruyor ve o fonksiyon TAM BU HATAYI önlemek için yazılmış — yorumu
+        "`qty` kullanılamaz, o `rounded()` uygulayıp ondalığı atıyor" diyor.
+        Ders paraya uygulanmış, YAN SATIRDAKİ miktara uygulanmamış.
+      · `Fmt.qtyText` eklendi; `Fmt.qty` gösterimde yuvarlamaya devam ediyor.
+
+- [x] 53. **Miktar ayrıştırıcısı ondalık noktayı yutuyordu** — **TAMAM (21 Ağu 2026)**
+      · `parseQuantity` doğrudan `parseNumber`a bağlıydı ve o TÜM noktaları
+        koşulsuz siliyor: cihaz dili Türkçe değilse "12.5" → 125, sessiz 10 kat
+        hata. `parseMoney` bu kusur için düzeltilmiş ve yorumu "sessiz 100 kat
+        hata" diye anlatıyor; miktar tarafı atlanmıştı.
+      · Kural paradan FARKLI olmak zorunda: parada ondalık en fazla 2 hane,
+        miktarda 12,345 m³ geçerli. Yeni kural ayraç sayısına ve konumuna
+        bakıyor. Rakam süzgeci ASCII'ye bağlandı (`Character("²").isNumber`
+        Swift'te TRUE ve alan m² yazımına açık).
+      · 7 test eklendi, gidiş-dönüş testi dahil. 26 Swift testi geçiyor.
+
+#### A — MİMARİ (her şeyden önce gelir)
+
+Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üstüne yeni
+özellik koymak borcu büyütüyor.
+
+- [ ] 54. **Veri hiç tazelenmiyor.** `addSnapshotListener` kod tabanında SIFIR
+      kez geçiyor, `refreshable` sıfır, `scenePhase` sıfır. `refresh()` yalnızca
+      `RootView.swift:57`deki `.task(id:)` içinden, yani pratikte soğuk açılışta
+      çağrılıyor. Ortak, yöneticinin girdiği satışı görmek için uygulamayı
+      tamamen kapatıp açmak zorunda ve bunu ona söyleyen hiçbir şey yok.
+      **Ürünün ortağa verdiği şeffaflık vaadi tam burada kırılıyor.**
+
+- [ ] 55. **Çakışma denetimi yok — son yazan kazanır.**
+      `FirestoreProjectRepository.stage()` her tür için `batch.setData(...)`
+      çağırıyor: merge yok, `updatedAt` önkoşulu yok, transaction yok. Madde 19
+      yalnızca TÜRETİLEN malzeme alanlarını kodlamayarak çakışmayı çözmüştü;
+      daire, tahsilat, taksit, gider, ortak, belge ve denetim kaydı hâlâ açık.
+      İki cihaz aynı projeyi düzenlerse biri diğerini SESSİZCE siliyor.
+
+- [ ] 56. **Tek bozuk belge tüm veriyi görünmez yapıyor; şema sürümü yok.**
+      `fetch` (FirestoreProjectRepository.swift:353) tek çözülemeyen belgede
+      fırlatıyor, `apply` hiç çalışmıyor, ekranda hiçbir proje kalmıyor.
+      `schemaVersion`/`migration` kavramı yok — bir alan tipi değişirse eski
+      kurulumlar boş ekran görür. (Madde 12'de `areaM2` göçü elle yazılmıştı;
+      ikinci bir göç için altyapı yok.)
+
+- [ ] 57. **Yükleme hatası ile "hiç projen yok" ekranı BİREBİR aynı.**
+      `refresh()` hatayı sönümlü bir toast'la söylüyor, `latest` boş kaldığı
+      için kullanıcı "Henüz projen yok" karşılama kartını görüyor. Kural reddi,
+      eksik indeks ya da bozuk belge durumunda üründeki en korkutucu cümle
+      gösteriliyor: VERİN YOK. "Tekrar dene" yolu da yok.
+
+- [ ] 58. **Limit, sayfalama ve tembel liste yok.** `load()` görünür her proje
+      için 13 koleksiyonun TAMAMINI çekiyor; `.limit(` kod tabanında sıfır.
+      Listeler `ScrollView { VStack { ForEach } }` — tek bir `LazyVStack`/`List`
+      yok (desen biliniyor: `SitePhotosView` `LazyVGrid` kullanıyor). Bugün 12
+      daireyle görünmüyor, üç yıllık projede görünür.
+
+#### B — GÜNLÜK KULLANIMI ENGELLEYENLER
+
+- [ ] 59. **Devir stoğu girilemiyor.** `openingIn/Out/Cost` yalnızca demo
+      tohumunda atanıyor; `addProject` her kalemi sıfırla açıyor. Yarısı bitmiş
+      şantiyede eldeki malzeme ancak sahte geçmiş tarihli fişle yazılabiliyor.
+- [ ] 60. **Proje silinemiyor, arşivlenemiyor, kapatılamıyor.** İlk kurulan
+      "deneme" projesi sonsuza dek dashboard'da, portföy toplamlarında ve
+      karşılaştırma tablosunda.
+- [ ] 61. **Daire eklenemiyor/silinemiyor, toplu düzenleme yok.** 12 yerine 14
+      girildiyse dönüş yolu yok (proje de silinemediği için baştan başlanamıyor).
+      20 daireli blokta aynı tip ve m² 20 kez elle giriliyor; düzenleme ekranına
+      yalnızca karta BASILI TUTARAK ulaşılıyor.
+- [ ] 62. **Çok kalemli irsaliye girilemiyor.** `addReceipt` tek `materialId`
+      alıyor; çimento+kum+demir taşıyan tek fiş üç ayrı kayıt ve üç ayrı kamera
+      çekimi demek. Haftada 20-30 fiş giren müteahhit için en büyük sürtünme.
+- [ ] 63. **Fiş ve dekont yalnızca KAMERADAN.** Havale dekontu bankanın ekran
+      görüntüsü olarak galeride, fatura PDF olarak e-postada duruyor; ikisi de
+      eklenemiyor. Tek yol ekrandaki dekontun fotoğrafını çekmek.
+- [ ] 64. **Gider ve tahsilat düzenlenemiyor; tahsilat silme ONAYSIZ.** Yanlış
+      tutar sil-yeniden gir demek ve belge/dekont o anda kalıcı gidiyor. Malzeme
+      fişinde onay diyaloğu var, tahsilatta yok — aynı ürün içinde tutarsız.
+- [ ] 65. **Altıncıdan sonraki ödemeler hiçbir yerden görülemiyor.**
+      "+ N ödeme daha" düz metin, dokunulmuyor. 36 aylık taksitli satışta
+      ödemelerin çoğu erişilemez. (Madde 50'de plan tarafı açılır yapıldı,
+      tahsilat defteri aynı düzeltmeyi almadı.)
+- [ ] 66. **Ortak yönetimi eksik:** ayrılan ortağın erişimi KESİLEMİYOR
+      (ne ekran ne fonksiyon var), üretilen kod geri alınamıyor ve "Yeni Kod"
+      eskisini öldürmüyor, yönetici kodun kullanılıp kullanılmadığını göremiyor
+      (`usedAt` okunması herkese kapalı `invites` koleksiyonunda kalıyor).
+- [ ] 67. **Rezerve dairede alıcı adayının adı yazılamıyor** — `buyerName`i
+      yalnızca `saveSale` yazıyor ve o daireyi koşulsuz satıldıya çeviriyor.
+
+#### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
+
+- [ ] 68. **Hesap silmenin GERÇEK yolu hiç koşmadı** — madde 28'in düzeltmesi.
+      Simülatör sahte servisi kullanıyor; gerçek `reauthenticate` + gerçek silme
+      denenmedi. App Store 5.1.1(v) zorunluluğu ve gözden geçiren bunu dener.
+- [ ] 69. **App Review giriş YAPAMAZ.** Uygulamaya girmenin tek yolu Türkiye
+      numarasına gelen SMS. Review notlarına Firebase test telefon numarası +
+      sabit kod konmazsa ilk ekran geçilemez → 2.1 reddi.
+- [ ] 70. **Release yapılandırması bir kez bile derlenip çalıştırılmadı.**
+      Firestore'un varsayılan olduğu, launch argümanlarının kapalı olduğu,
+      `aps-environment`ın production olduğu yol hiç sınanmadı.
+- [ ] 71. **App Check ve oran sınırı yok.** Telefon girişi herkese açık, her SMS
+      ücretli, callable'larda deneme sayacı yok. Bütçe uyarısı harcamayı
+      KESMİYOR — mağazada görünür olmak kötüye kullanıma açık demek.
+- [ ] 72. **Uygulama içinde destek/geri bildirim/sürüm/politika satırı yok.**
+      `AccountSheet`te yok, `CFBundleShortVersionString` okuyan kod yok.
+      Crashlytics bilinçli ertelendi; ikisi birleşince sahadaki hata İKİ
+      KANALDAN DA görünmez.
+- [ ] 73. **Yerelleştirme paketi yok** (`.lproj` yok): kamera, galeri, paylaşım
+      ve dosya seçici ekranlarının Türkçe geldiği hiç ölçülmedi.
+- [ ] 74. **Build numarası otomasyonu derleme dışında** — arşivden önce ELLE
+      çalıştırılması gerekiyor, unutulursa "redundant binary" reddi.
+
+#### D — VERİ GÜVENLİĞİ VE İZLENEBİLİRLİK
+
+- [ ] 75. **Yedekten geri dönüş yok.** `Yedek.json` üretiliyor ama okuyan tek
+      satır kod yok; "kapsam dışı" notu da yok, yani ERTELENMİŞ DEĞİL ATLANMIŞ.
+      Telefon kaybolursa veri kaybolur. Hesap silmede de "önce verini dışa
+      aktar" adımı sunulmuyor.
+- [ ] 76. **Denetim izi ortağın göreceği hiçbir ekranda yok.** `audit(forProject:)`
+      tanımlı ama View katmanında ÇAĞIRAN YOK; izi gösteren beş yerin beşi de
+      yalnızca yöneticinin açabildiği düzenleme sheet'leri. Kural ortağa okuma
+      izni veriyor — yani şeffaflık kuralda var, ekranda yok.
+- [ ] 77. **Zaman damgası ve "kim yaptı" tamamen istemciden.** `firestore.rules`
+      içinde tek bir `request.time` ya da alan doğrulaması yok. Cihaz saati
+      yanlışsa ya da kasten değiştirilirse iz yanlış tarih taşıyor.
+- [ ] 78. **Uygulama kilidi / gizlilik ekranı yok.** `LAContext` sıfır, uygulama
+      değiştiricide örtü yok. Oysa uygulama alıcı kimliği, IBAN taşıyan
+      dekontlar ve tüm proje finansallarını taşıyor.
+- [ ] 79. **Arama ve süzgeç yalnızca dairelerde.** Giderler, malzeme hareketleri,
+      tahsilatlar ve hareket akışında arama/tarih aralığı/sıralama yok.
+
+#### E — PLANLANMAMIŞ ÜRÜN ALANLARI
+
+Bunlar "ertelendi" değil: yol haritasında maddeleri hiç açılmadı. Kapsam kararı
+verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam dışı".
+
+- [ ] 80. **KDV / vergi ayrımı** (İş Mantığı#9). "BİRİM FİYAT (₺)" ve gider
+      "TUTAR (₺)" alanlarının KDV dahil mi hariç mi olduğu hiçbir ekranda
+      yazmıyor; rapor bu belirsizliğin üzerine kuruluyor.
+- [ ] 81. **Tedarikçi / cari hesap, ödendi–vadeli ayrımı** (İş Mantığı#5).
+      Uygulama kapsam dışı olduğunu ortağa YAZIYOR ama maddesi yok.
+- [ ] 82. **Ortak cari hesabı** — sermaye, avans, dağıtım (Farklılaştırıcı#2,
+      🔴 Kritik). `PartnersTabView:174` kullanıcıya "henüz tutulmuyor" diyor.
+- [ ] 83. **Blok / etap kavramı** (Gözden Kaçanlar#6). Kanıtı demo verisinin
+      içinde: "SF-1 Blok 1" ve "GB Blok 1" iki AYRI proje olarak, uydurma
+      ada/parsel numaralarıyla modellenmiş.
+- [ ] 84. **Ortak ↔ yönetici iletişimi** (Gözden Kaçanlar#7). Ortağın yüzeyi
+      salt okunur bir vitrin: gideri sorgulayamıyor, raporu "gördüm" diye
+      işaretleyemiyor. Bildirim de gitmediği için ilişki tek yönlü.
+- [ ] 85. **Yasal takvim** — ruhsat, iskân, yapı denetim, sözleşme süreleri.
+      Tek hatırlatıcı yüzeyi taksit vadesi.
+- [ ] 86. **Kalan stoğun değeri ve projeyi bitirmenin maliyeti** hiçbir ekranda
+      yok; "satılan ciro + kalan stok değeri = beklenen hasılat" gösterilmiyor.
+- [ ] 87. **Gelir modeli kararı yazılı değil.** StoreKit/abonelik/sınır sıfır;
+      her kullanıcı ücretli SMS ve Avrupa Storage maliyeti üretiyor. "Önce
+      ücretsiz" gibi bilinçli bir karar da kayıtlı değil.
+
+#### Bu turun yöntem dersi
+
+**"Kodla çözülecek iş kalmadı" doğru bir cümle değildi; doğru cümle "yol
+haritasında iş kalmadı"ydı.** İkisi arasındaki fark 33 maddeymiş.
+
+Aradaki farkı gören şey, envanteri çıkaran altı mercek DEĞİL, onların ne
+sormadığını soran tamlık eleştirmeni oldu. Mimari bulguların beşi de
+merceklerin kör noktasındaydı: her mercek kendi modülünün özelliklerine
+bakarken, "veri nasıl tazeleniyor" ya da "iki cihaz aynı anda yazarsa ne olur"
+sorusu hiçbir modülün içinde değil, hepsinin altındaydı.
+
+---
+
 # İnşaat Takip — Öncelikli Yol Haritası
 
 86 bulgu birleştirildiğinde geriye **5 kümede toplanan gerçek iş** kalıyor. Kilometre taşı olarak **Firebase / kalıcı veri** alınmış; her şey ona göre "öncesi" ve "sonrası" diye konumlandırıldı.
