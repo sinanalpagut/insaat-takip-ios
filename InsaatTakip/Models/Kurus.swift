@@ -81,7 +81,13 @@ struct Kurus: Codable, Equatable, Hashable, Comparable, AdditiveArithmetic {
         // denetleniyor, çünkü yuvarlama değeri eşiğe itebilir.
         let limit = 9_223_372_036_854_775_808.0
         guard product.isFinite, product > -limit, product < limit else {
-            return Kurus(raw: product < 0 ? Int64.min : Int64.max)
+            // NEGATİF UÇTA `Int64.min` DEĞİL, `-Int64.max`. Fark bir kuruş ve
+            // bu büyüklükte anlamsız, ama `abs(Int64.min)` Swift'te TUZAK ATAR
+            // (|Int64.min| > Int64.max) — `ProjectExporter.money`,
+            // `Fmt.compactMoney` ve `Fmt.exactMoney` üçü de `abs(value.raw)`
+            // çağırıyor. `Int64.min` üretmek, düzeltilen çökmeyi ortadan
+            // kaldırmak yerine YERİNİ DEĞİŞTİRMEK olurdu.
+            return Kurus(raw: product < 0 ? -Int64.max : Int64.max)
         }
         return Kurus(raw: Int64(product))
     }
