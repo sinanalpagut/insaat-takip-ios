@@ -160,7 +160,13 @@ struct ProjectDetailView: View {
             case "receipt": activeSheet = .receipt
             case "invite":  activeSheet = .invite
             case "apt":
-                if let id = viewModel.apartments(for: projectId).first(where: \.countsAsRevenue)?.id {
+                // PLANI OLAN daire tercih ediliyor. Önceden ilk satılmış daire
+                // seçiliyordu ve demo veride o daire peşin ödenmiş olduğu için
+                // ekran akışı en az bilgi veren hali açıyordu: ne taksit planı
+                // ne gecikme görünüyordu.
+                let roster = viewModel.apartments(for: projectId).filter(\.countsAsRevenue)
+                let planli = roster.first { !viewModel.installmentPlan(for: $0.id).isEmpty }
+                if let id = (planli ?? roster.first)?.id {
                     activeSheet = .apartmentDetail(apartmentId: id)
                 }
             case "sale":    activeSheet = .saleForm(apartmentId: nil)

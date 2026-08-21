@@ -79,6 +79,45 @@ extension Installment {
         let daysToNext: Int?
     }
 
+    /// Bir vadenin mahsup sonrası durumu.
+    struct Settlement: Identifiable {
+        let installment: Installment
+        /// Bu vadeye düşen tahsilat (0 … `installment.amount`).
+        let paid: Kurus
+
+        var id: UUID { installment.id }
+        var unpaid: Kurus { installment.amount - paid }
+        var isSettled: Bool { unpaid == .zero }
+        var isPartial: Bool { paid > .zero && unpaid > .zero }
+
+        /// Vadesi geçmiş VE kapanmamış mı — gün düzeyinde.
+        func isOverdue(today: Date = Date()) -> Bool {
+            guard !isSettled else { return false }
+            return Fmt.calendar.startOfDay(for: installment.dueDate)
+                < Fmt.calendar.startOfDay(for: today)
+        }
+    }
+
+    /// FIFO mahsup: toplam tahsilatı vadelere sırayla dağıtır.
+    ///
+    /// TEK KAYNAK. Aynı döngü önce `status(for:collected:today:)` içinde, sonra
+    /// `ReminderScheduler.reschedule` içinde ikinci kez yazılmıştı; ödeme planı
+    /// ekranı üçüncüsünü gerektirecekti. Üç kopya, birinin değişip diğerlerinin
+    /// kalması demek — ve bu mantık "hangi taksit kapandı" sorusunun TEK
+    /// cevabı olduğu için ayrışması sessiz bir tutarsızlık üretirdi.
+    ///
+    /// `collected` dairenin TOPLAM tahsilatı (`Apartment.paidAmount`); ödeme
+    /// kayıtlarında hangi taksidi kapattığı yazılı olmadığı için (bkz. yukarıdaki
+    /// FIFO notu) dağıtım sıradan türetiliyor.
+    static func settle(_ installments: [Installment], collected: Kurus) -> [Settlement] {
+        var remaining = collected
+        return installments.sorted { $0.sequence < $1.sequence }.map { item in
+            let paid = remaining >= item.amount ? item.amount : remaining
+            remaining = remaining - paid
+            return Settlement(installment: item, paid: paid)
+        }
+    }
+
     /// Bir dairenin vadelerini toplam tahsilatla karşılaştırır.
     ///
     /// `collected` dairenin TOPLAM tahsilatı (`Apartment.paidAmount`).
@@ -96,24 +135,16 @@ extension Installment {
         }
 
         let startOfToday = Fmt.calendar.startOfDay(for: today)
-        var remaining = collected
         var overdue = Kurus.zero
         var oldestOverdue: Date?
         var next: Installment?
 
-        for item in plan {
-            if remaining >= item.amount {
-                remaining = remaining - item.amount
-                continue
-            }
-            // Bu vade kısmen ya da hiç kapanmamış.
-            let unpaid = item.amount - remaining
-            remaining = .zero
-            if next == nil { next = item }
-
-            let dueDay = Fmt.calendar.startOfDay(for: item.dueDate)
+        // Mahsup `settle`den geliyor — döngü burada TEKRAR YAZILMIYOR.
+        for row in settle(plan, collected: collected) where !row.isSettled {
+            if next == nil { next = row.installment }
+            let dueDay = Fmt.calendar.startOfDay(for: row.installment.dueDate)
             if dueDay < startOfToday {
-                overdue = overdue + unpaid
+                overdue = overdue + row.unpaid
                 if oldestOverdue == nil { oldestOverdue = dueDay }
             }
         }

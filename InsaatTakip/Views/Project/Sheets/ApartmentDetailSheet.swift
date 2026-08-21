@@ -21,6 +21,8 @@ struct ApartmentDetailSheet: View {
     @State private var showCamera = false
     @State private var showCancelConfirm = false
     @State private var showPayment = false
+    /// Plan uzunsa ilk altı vade gösteriliyor; kalanı bu bayrakla açılıyor.
+    @State private var showAllInstallments = false
 
     /// Tam ekranda açılan dekont.
     @State private var previewedReceipt: SharePayloadImage?
@@ -71,8 +73,17 @@ struct ApartmentDetailSheet: View {
                         imageStrip(apartment)
                             .padding(.top, 10)
 
-                        // Tahsilat defteri — yalnızca para hareketi olabilen dairelerde.
+                        // ÖDEME PLANI önce, TAHSİLAT sonra — madde 50.
+                        // Sıra bilinçli: plan BEKLENENİ, defter GERÇEKLEŞENİ
+                        // gösteriyor ve ikisi arasındaki fark bu ekranın asıl
+                        // sorusu. Plan bugüne kadar hiçbir ekranda listelenmiyordu:
+                        // yalnızca gecikmiş vadeler, bildirimler ve JSON yedeği
+                        // üzerinden görülebiliyordu, yani "bu dairenin ödeme
+                        // takvimi ne?" sorusunun cevabı uygulamada YOKTU.
                         if apartment.isCommitted {
+                            installmentSection(apartment)
+                                .padding(.top, 20)
+
                             paymentSection(apartment)
                                 .padding(.top, 20)
                         }
@@ -380,6 +391,139 @@ struct ApartmentDetailSheet: View {
     }
 
     /// Tahsilat defteri: kalan alacak + ödeme geçmişi + yöneticiye ekleme.
+    // MARK: Ödeme planı (madde 50)
+
+    @ViewBuilder
+    private func installmentSection(_ apartment: Apartment) -> some View {
+        let plan = viewModel.installmentPlan(for: apartment.id)
+        let rows = Installment.settle(plan, collected: apartment.paidAmount)
+        let taksitSayisi = plan.filter { $0.sequence > 0 }.count
+        let acik = rows.filter { !$0.isSettled }
+        let gecikmis = rows.filter { $0.isOverdue() }
+
+        if rows.isEmpty {
+            // Peşin satışta plan yok; "0 taksit" yazmak plan varmış izlenimi verirdi.
+            EmptyView()
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("Ödeme planı")
+                        .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                    Spacer()
+                    Text(taksitSayisi > 0 ? "\(taksitSayisi) taksit" : "peşinat")
+                        .font(.manrope(12, .semiBold))
+                        .foregroundColor(Palette.textSecondary)
+                }
+
+                // ÖZET: kapanan / kalan vade sayısı ve gecikme.
+                HStack {
+                    Text("\(rows.count - acik.count)/\(rows.count) vade kapandı")
+                    Spacer()
+                    if gecikmis.isEmpty {
+                        Text(acik.isEmpty ? "Plan tamamlandı" : "Gecikme yok")
+                            .foregroundColor(acik.isEmpty ? Palette.success : Palette.textMuted)
+                    } else {
+                        let tutar = gecikmis.reduce(Kurus.zero) { $0 + $1.unpaid }
+                        Text("\(gecikmis.count) vade gecikti · \(Fmt.exactMoney(tutar))")
+                            .foregroundColor(Palette.alertInk)
+                    }
+                }
+                .font(.manrope(11.5, .semiBold))
+                .foregroundColor(Palette.textMuted)
+                .padding(.top, 10)
+
+                let gorunen = showAllInstallments ? rows : Array(rows.prefix(6))
+                VStack(spacing: 0) {
+                    ForEach(Array(gorunen.enumerated()), id: \.element.id) { index, row in
+                        installmentRow(row)
+                        if index < gorunen.count - 1 {
+                            Divider().overlay(Palette.divider)
+                        }
+                    }
+                }
+                .padding(.top, 6)
+
+                // KIRPMA SESSİZ OLAMAZ: kaç vadenin gizlendiği YAZILI ve
+                // dokunulduğunda açılıyor — bir daha kapanmayan bir "+n daha"
+                // etiketi, planı görmek isteyen kullanıcıyı yine yedek dosyasına
+                // gönderirdi.
+                if rows.count > 6 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { showAllInstallments.toggle() }
+                    } label: {
+                        Text(showAllInstallments
+                             ? "İlk 6 vadeyi göster"
+                             : "+ \(rows.count - 6) vade daha")
+                            .font(.manrope(11.5, .semiBold))
+                            .foregroundColor(Palette.accent)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                }
+            }
+        }
+    }
+
+    private func installmentRow(_ row: Installment.Settlement) -> some View {
+        let item = row.installment
+        let gecikti = row.isOverdue()
+        let baslik = item.sequence == 0 ? "Peşinat" : "\(item.sequence). taksit"
+
+        // Durum metni ve rengi TEK YERDE türetiliyor; ikon, alt satır ve
+        // VoiceOver etiketi aynı kaynaktan besleniyor ki üçü ayrışmasın.
+        let durum: (metin: String, renk: Color, ikon: String)
+        if row.isSettled {
+            durum = ("Ödendi", Palette.success, "checkmark.circle.fill")
+        } else if gecikti {
+            let gun = Fmt.calendar.dateComponents(
+                [.day], from: Fmt.calendar.startOfDay(for: item.dueDate),
+                to: Fmt.calendar.startOfDay(for: Date())).day ?? 0
+            durum = (row.isPartial
+                     ? "Gecikti · \(gun) gün · kalan \(Fmt.exactMoney(row.unpaid))"
+                     : "Gecikti · \(gun) gün", Palette.alertInk, "exclamationmark.circle.fill")
+        } else if row.isPartial {
+            durum = ("Kısmi · kalan \(Fmt.exactMoney(row.unpaid))", Palette.textMuted, "circle.lefthalf.filled")
+        } else {
+            durum = ("Bekliyor", Palette.textMuted, "circle")
+        }
+
+        return HStack(spacing: 11) {
+            Image(systemName: durum.ikon)
+                .iconFont(11, weight: .medium)
+                .foregroundColor(durum.renk)
+                .frame(width: 28, height: 28)
+                .background(row.isSettled ? Palette.successTint
+                            : (gecikti ? Palette.alertTint : Palette.fillMuted))
+                .cornerRadius(9)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(baslik) · \(Fmt.shortDate(item.dueDate))")
+                    .font(.manrope(12.5, .bold))
+                    .foregroundColor(Palette.ink)
+                    .lineLimit(1)
+                Text(durum.metin)
+                    .font(.manrope(11, .medium))
+                    .foregroundColor(durum.renk)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            Text(Fmt.exactMoney(item.amount))
+                .font(.sora(13, .bold))
+                .foregroundColor(row.isSettled ? Palette.textMuted : Palette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .padding(.vertical, 11)
+        // TEK CÜMLE olarak okunuyor (madde 31): parça parça okunduğunda
+        // hangi tutarın hangi vadeye ait olduğu kayboluyordu. Durum ayrıca
+        // RENKLE de taşındığı için etikette geçmesi şart.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(baslik), vade \(Fmt.shortDate(item.dueDate)), "
+                            + "\(Fmt.exactMoney(item.amount)), \(durum.metin)")
+    }
+
     private func paymentSection(_ apartment: Apartment) -> some View {
         let payments = viewModel.payments(forApartment: apartment.id)
         let remaining = max(.zero, apartment.price - apartment.paidAmount)

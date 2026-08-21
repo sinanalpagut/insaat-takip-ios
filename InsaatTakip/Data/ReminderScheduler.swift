@@ -83,14 +83,14 @@ final class ReminderScheduler {
 
         for (apartmentId, plan) in byApartment {
             guard let apartment = apartments.first(where: { $0.id == apartmentId }) else { continue }
-            var remaining = collectedByApartment[apartmentId] ?? .zero
-            for item in plan.sorted(by: { $0.sequence < $1.sequence }) {
-                if remaining >= item.amount {
-                    remaining = remaining - item.amount
-                    continue
-                }
-                let unpaid = item.amount - remaining
-                remaining = .zero
+            // Mahsup `Installment.settle` ile — döngü burada TEKRAR YAZILMIYOR.
+            // Aynı FIFO mantığı üç yerde ayrı yazılmış olsaydı biri değişip
+            // diğerleri kalırdı ve "hangi taksit kapandı" sorusunun cevabı
+            // ekranla bildirim arasında sessizce ayrışırdı.
+            for row in Installment.settle(plan, collected: collectedByApartment[apartmentId] ?? .zero)
+            where !row.isSettled {
+                let item = row.installment
+                let unpaid = row.unpaid
                 // GEÇMİŞ vadeye hatırlatma kurulmaz: iOS geçmiş tarihli
                 // tetikleyiciyi zaten atıyor, üstelik gecikmiş tutar ekrandaki
                 // listede duruyor.
