@@ -1372,10 +1372,10 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 
 #### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
 
-- [~] 68. **Hesap silmenin GERÇEK yolu hiç koşmadı** — madde 28'in düzeltmesi.
+- [x] 68. **Hesap silmenin GERÇEK yolu hiç koşmadı** — madde 28'in düzeltmesi.
       Simülatör sahte servisi kullanıyor; gerçek `reauthenticate` + gerçek silme
       denenmedi. App Store 5.1.1(v) zorunluluğu ve gözden geçiren bunu dener.
-- [~] 69. **App Review giriş YAPAMAZ.** Uygulamaya girmenin tek yolu Türkiye
+- [x] 69. **App Review giriş YAPAMAZ.** Uygulamaya girmenin tek yolu Türkiye
       numarasına gelen SMS. Review notlarına Firebase test telefon numarası +
       sabit kod konmazsa ilk ekran geçilemez → 2.1 reddi.
 - [ ] 70. **Release yapılandırması bir kez bile derlenip çalıştırılmadı.**
@@ -1407,6 +1407,11 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · DEPO HERKESE AÇIK (doğrulandı). Test numarası ve sabit kod repoya YAZILMADI: şablon `APP_REVIEW.md`de, gerçek değerler `.gitignore`daki `*.local.md` arkasında ve App Store Connect'te.
       · GÖZDEN GEÇİRENİN GÖRECEĞİ EKRAN ÖLÇÜLDÜ: boş hesapla giren yalnızca "Henüz projen yok" görüyor — 2.1 reddinin ikinci biçimi. Test hesabı önceden kurulmuş bir demo projeyle teslim edilecek ve o projede GERÇEK ALICI ADI olmayacak.
       · **AÇIK KALAN:** demo projenin kurulması ve App Store Connect Review Notes alanının doldurulması.
+      · **KAPANDI (24 Ağu 2026).** IAM düzeltildikten sonra gerçek silme baştan sona koştu: 1 proje / 12 daire / 9 malzeme silindi, ekran sunucudan gelen sayıyı gösterdi ("1 proje ve tüm kayıtları silindi"), işlev günlüğü temiz. KESİN KANIT: aynı numarayla tekrar giriş "Adın ne?" ekranına düştü — Auth kaydı silinmiş, yeni kimlik açılmış, profil yok, eski proje görünmüyor.
+      · KURULUM KUSURU (kodda değil): çalıştırma hizmet hesabında yalnızca *Cloud Build Service Account* rolü vardı. Üç rol eklendi — Cloud Datastore User, Firebase Authentication Admin, Storage Object Admin. Bu eksik `redeemInvite`'i de vuruyordu; iki callable de üretim Firestore'una bugüne kadar hiç dokunamamış.
+      · ON DÖRDÜNCÜ KUSUR BENİM DÜZELTMEMDEYDİ: yerel temizlik `terminate()` çağırıyordu ve uygulama ömrü boyunca yaşayan deponun yakaladığı Firestore örneğini öldürüyordu — sil → tekrar gir dizisi `FIRIllegalStateException` ile ÇÖKÜYORDU. Firestore önbelleği artık bayrakla sonraki açılışa devrediliyor (Firebase'in belgelediği yol). Dört test eklendi, cihazda doğrulandı.
+      · **KAPANDI (24 Ağu 2026).** Test numarası tanımlandı, giriş uçtan uca koştu ve demo hesap kuruldu: *145 Ada / 2 Parsel · Gebze, Kocaeli · 4 Kat / 12 Daire · 9 malzeme kalemi · 1 taksitli satış* (850.000 ₺ peşinat + 12 × 250.000 ₺). ALICI ADI UYDURMA — gözden geçirene gösterilen veride gerçek kişi yok.
+      · **AÇIK KALAN (kullanıcının işi):** App Store Connect → App Review Information → Notes alanına `APP_REVIEW.md` bölüm 2'deki metnin yapıştırılması.
 
 #### D — VERİ GÜVENLİĞİ VE İZLENEBİLİRLİK
 
