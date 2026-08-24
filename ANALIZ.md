@@ -1298,7 +1298,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 - [~] 60. **Proje silinemiyor, arşivlenemiyor, kapatılamıyor.** İlk kurulan
       "deneme" projesi sonsuza dek dashboard'da, portföy toplamlarında ve
       karşılaştırma tablosunda.
-- [ ] 61. **Daire eklenemiyor/silinemiyor, toplu düzenleme yok.** 12 yerine 14
+- [x] 61. **Daire eklenemiyor/silinemiyor, toplu düzenleme yok.** 12 yerine 14
       girildiyse dönüş yolu yok (proje de silinemediği için baştan başlanamıyor).
       20 daireli blokta aynı tip ve m² 20 kez elle giriliyor; düzenleme ekranına
       yalnızca karta BASILI TUTARAK ulaşılıyor.
@@ -1362,6 +1362,13 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · Eklenenler sayı değil LİSTE olarak gösteriliyor.
       · MÜKERRER KALEM UYARISI — kendi düzeltmemin ürettiği riski kapatıyor: `selectedMaterial` nil olunca `materials.first`e düşüyor, yani kalem eklendikten sonra çip fiilen seçili kalıyor ve aynı malzeme ikinci kez girilebiliyor. Seçimi zorla temizlemek yerine durum SÖYLENİYOR.
       · Simülatörde doğrulandı. KAPSAM: kayıtlar modelde ayrı kalıyor.
+      · **TAMAM (21 Ağu 2026)** — üç iş de kapandı: ekleme, silme, toplu düzenleme.
+      · `totalApartments` LİSTEYLE SENKRON tutuluyor. Saklanan bir sayı ve ayrışabilirdi; '5 Kat / 20 Daire' yazan projede 21 daire olması 'türetilen rakam saklanmaz' ilkesinin ihlali olurdu.
+      · SİLME yalnızca TAAHHÜTSÜZ dairede: satılmış dairenin tahsilatı, taksit planı ve alıcı kaydı var, `cancelSale` onları temizliyor. Menüde seçenek hiç gösterilmiyor. Dairenin GÖRSELLERİ de düşüyor.
+      · `AuditEntry.Action`a `create` eklendi — daire eklemeyi 'düzenlendi' diye kaydetmek yanlış olurdu.
+      · TOPLU UYGULAMA yalnızca TİP ve ALAN kopyalıyor; bedel, durum ve teslim notu daireye özgü ve toplu yazılsaydı satılmış dairenin bedeli sessizce değişirdi. Bir test tam bunu koruyor.
+      · Önce kaydet sonra uygula (yoksa kaynağın kendisi eski kalırdı); değişmeyene yazma üretilmiyor; tek denetim kaydı yazılıyor.
+      · On test eklendi. 52 Swift testi geçiyor.
 
 #### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
 
