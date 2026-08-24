@@ -1292,7 +1292,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 
 #### B — GÜNLÜK KULLANIMI ENGELLEYENLER
 
-- [ ] 59. **Devir stoğu girilemiyor.** `openingIn/Out/Cost` yalnızca demo
+- [x] 59. **Devir stoğu girilemiyor.** `openingIn/Out/Cost` yalnızca demo
       tohumunda atanıyor; `addProject` her kalemi sıfırla açıyor. Yarısı bitmiş
       şantiyede eldeki malzeme ancak sahte geçmiş tarihli fişle yazılabiliyor.
 - [~] 60. **Proje silinemiyor, arşivlenemiyor, kapatılamıyor.** İlk kurulan
@@ -1351,6 +1351,12 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · **DENETİM İZİNE AD YAZILMIYOR.** `auditEntries` kuralı ORTAĞA okuma veriyor; adı oraya koymak madde 18'i arka kapıdan açardı. 'Alıcı adayı: yok → kayıtlı' yazılıyor, ad değil.
       · TEST BİR VARSAYIMI ÇÜRÜTTÜ: 'rezerveden çıkarsa temizle' dalı ULAŞILAMAZDI — `isCommitted` koruması bu geçişi zaten reddediyor ve temizlik `cancelSale`de. Ölü dal kaldırıldı.
       · Dört test eklendi (ad sızmıyor / geçiş reddediliyor / iptal kimliği bırakıyor / ortak yazamıyor). 38 Swift testi geçiyor.
+      · **TAMAM (21 Ağu 2026)** — model tarafı zaten hazırdı (`recalculate` 'devir + fişler' diye topluyor, CSV'ye madde 40'ta 'Devir' satırı eklenmişti); eksik olan tek şey GİRİŞ YOLUYDU.
+      · Devir bir HAREKET DEĞİL, açılış bakiyesi: ayrı sheet'ten giriliyor, hareket listesinde görünmüyor, fiyat geçmişine girmiyor.
+      · **DEĞİŞTİRME, EKLEME DEĞİL** — düzeltmek isteyen kullanıcı ikinci kez girince miktar iki katına çıkmasın. Form mevcut değerlerle doluyor ve 'üstüne yazılır' uyarısı ekranda.
+      · Giriş noktası Giren/Kullanılan/Kalan kutularının altında (o rakamların anlamını devir belirliyor) ve düğme kayıtlı devri YAZIYOR.
+      · Stoğu eksiye düşüremiyor: kayıtlı çıkışlar devirden besleniyor olabilir, devri küçültmek eksi kalan üretirdi.
+      · Dört test eklendi. 42 Swift testi geçiyor.
 
 #### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
 
