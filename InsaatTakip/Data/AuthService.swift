@@ -57,6 +57,11 @@ enum AuthError: LocalizedError, Equatable {
     /// buraya düşüyor. Ayrı tutulmasının sebebi: "Giriş yapılamadı" bu durumda
     /// hem kullanıcıyı hem geliştiriciyi yanlış yere bakmaya itiyordu.
     case appVerificationFailed
+    /// Auth kaydı zaten yok (17011/17024). Hesap silmede bu bir HATA DEĞİL:
+    /// sunucu kaydı sildi, istemci geriden geldi.
+    case alreadyDeleted
+    /// Kullanıcı doğrulama sayfasını kendi kapattı (17057).
+    case cancelled
     case unknown(String)
 
     /// Kullanıcıya gösterilen metin. Firebase'in İngilizce hata dizeleri
@@ -76,7 +81,14 @@ enum AuthError: LocalizedError, Equatable {
             return "Bu numara hesabına ait değil"
         case .appVerificationFailed:
             return "Uygulama doğrulaması yapılamadı · bildirim ayarları eksik"
-        case .unknown:          return "Giriş yapılamadı"
+        case .alreadyDeleted:   return "Bu hesap zaten silinmiş"
+        case .cancelled:        return "Doğrulama yarıda kaldı · tekrar dene"
+        // BAĞLAMDAN BAĞIMSIZ. "Giriş yapılamadı" yazıyordu ve bu enum yalnızca
+        // giriş ekranında değil HESAP SİLME ekranında da kullanılıyor: kullanıcı
+        // hesabını silerken "Giriş yapılamadı" okuyordu — yaptığı işle alakasız
+        // bir cümle. `requiresRecentLogin` yorumunun kaçınmak istediği durumun
+        // aynısı, bir dal ötede.
+        case .unknown:          return "İşlem tamamlanamadı"
         }
     }
 }

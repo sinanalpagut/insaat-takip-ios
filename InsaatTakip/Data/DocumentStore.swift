@@ -31,11 +31,19 @@ final class DocumentStore {
     private let storage: Storage
     private let directory: URL
 
+    /// Dizin adı TEK YERDE — gerekçesi `ImageStore.cacheDirectory` ile aynı.
+    /// `nonisolated`: yalnızca dosya sistemi yolunu üretiyor, sınıfın
+    /// hiçbir durumuna dokunmuyor. İzole kalsaydı hesap silme temizliği
+    /// onu ana aktörden okumak zorunda kalırdı.
+    nonisolated static var cacheDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory,
+                                 in: .userDomainMask)[0]
+            .appendingPathComponent("DocumentCache", isDirectory: true)
+    }
+
     init(storage: Storage = Storage.storage()) {
         self.storage = storage
-        let base = FileManager.default.urls(for: .applicationSupportDirectory,
-                                            in: .userDomainMask)[0]
-        directory = base.appendingPathComponent("DocumentCache", isDirectory: true)
+        directory = Self.cacheDirectory
         try? FileManager.default.createDirectory(at: directory,
                                                  withIntermediateDirectories: true)
     }

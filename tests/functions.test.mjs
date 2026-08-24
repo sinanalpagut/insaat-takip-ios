@@ -136,6 +136,25 @@ async function authUserExists(uid) {
   return users.length > 0;
 }
 
+// ── Eskimiş `auth_time` taşıyan jeton üretimi ──
+//
+// Auth emülatörünün ID jetonları İMZASIZ JWT ("alg":"none") ve firebase-admin
+// emülatör kipinde imza doğrulamıyor — `exp`, `aud`, `iss`, `sub` alanlarına
+// bakıyor. Bu yüzden `auth_time` alanını değiştirip yeniden paketlemek,
+// "bir saat önce kimlik doğrulamış kullanıcının hâlâ geçerli jetonu"nu
+// gerçekçi biçimde canlandırıyor. Kaçırılmış jeton senaryosu tam olarak bu.
+
+function b64url(obj) {
+  return Buffer.from(JSON.stringify(obj)).toString('base64url');
+}
+
+function withAuthTime(idToken, secondsAgo) {
+  const [header, payload, signature] = idToken.split('.');
+  const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  claims.auth_time = Math.floor(Date.now() / 1000) - secondsAgo;
+  return `${header}.${b64url(claims)}.${signature}`;
+}
+
 // ── Zemin ──
 
 async function seedProject() {
@@ -464,6 +483,26 @@ describe('deleteAccount — hesap silme', () => {
   // başarısız olabilecek adımlar: kullanıcıya "hesabın silindi" denip
   // hesabın durması, ya da fotoğraflarının kovada kalması, ekranda hiçbir
   // iz bırakmaz.
+
+  it('ESKİMİŞ doğrulama reddediliyor — SMS turu artık gerçek bir kapı', async () => {
+    const u = await newUser();
+    // Jeton geçerli, oturum geçerli; eksik olan tek şey YAKIN doğrulama.
+    const eski = withAuthTime(u.idToken, 60 * 60);   // bir saat önce
+    const { status, error } = await deleteAccount(eski);
+    assert.equal(status, 400);
+    assert.equal(error?.message, 'reauth-required');
+
+    // Ve hiçbir şey silinmemiş olmalı: reddedilen çağrı yan etki bırakmamalı.
+    assert.equal(await authUserExists(u.uid), true);
+  });
+
+  it('YAKIN doğrulama kabul ediliyor — kapı meşru kullanıcıyı engellemiyor', async () => {
+    const u = await newUser();
+    const taze = withAuthTime(u.idToken, 30);        // yarım dakika önce
+    const { status } = await deleteAccount(taze);
+    assert.equal(status, 200);
+    assert.equal(await authUserExists(u.uid), false);
+  });
 
   it('AUTH KAYDI gerçekten siliniyor — yoksa "silindim" diyen kişi tekrar girebilir', async () => {
     const u = await newUser();

@@ -1,4 +1,5 @@
 import FirebaseFunctions
+import Foundation
 
 // MARK: - Hesap silme (madde 28) — App Store 5.1.1(v)
 //
@@ -16,6 +17,77 @@ struct AccountDeletionSummary {
     let deletedProjects: Int
     /// Ortak olarak ayrılınan proje sayısı — verisi DURUYOR.
     let leftProjects: Int
+}
+
+// MARK: - Silme hatası
+//
+// Neden ayrı bir tip: silme ekranı hatayı `(error as? AuthError)` ile
+// çözmeye çalışıyordu ve Cloud Functions HİÇBİR ZAMAN `AuthError`
+// fırlatmıyor — `FunctionsErrorDomain` NSError fırlatıyor. Dönüşüm hep
+// başarısız olduğu için kullanıcı, sebep ne olursa olsun tek bir cümle
+// görüyordu: "Hesap silinemedi".
+//
+// Fark kullanıcı için gerçek: şantiyede kapsama yokken "Bağlantı yok" demek
+// ile "Hesap silinemedi" demek farklı davranışlara yol açıyor. İkincisini
+// okuyan kişi akışı baştan başlatıyor, her denemede yeni bir SMS yakıyor ve
+// sonunda Firebase kotasına çarpıyor — yani mesajın belirsizliği kullanıcıyı
+// çalışmayan bir döngüye sokuyor.
+enum AccountDeletionError: LocalizedError, Equatable {
+    /// Ağ yok ya da sunucuya ulaşılamadı — VERİ HENÜZ SİLİNMEMİŞ olabilir.
+    case unreachable
+    /// Oturum düşmüş; jeton sunucuda geçerli değil.
+    case signedOut
+    /// Sunucu yakın zamanlı doğrulama istiyor (`reauth-required`).
+    case reauthRequired
+    /// İşlev dağıtılmamış ya da bölge yanlış — kurulum hatası.
+    case notDeployed
+    /// Sunucu işi tamamlayamadı.
+    case serverFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .unreachable:    return "Bağlantı yok · silme tamamlanmadı"
+        case .signedOut:      return "Oturumun düşmüş · çıkıp tekrar gir"
+        case .reauthRequired: return "Doğrulamanın süresi doldu · baştan başla"
+        case .notDeployed:    return "Silme servisi bu projede kurulu değil"
+        case .serverFailed:   return "Sunucu silmeyi tamamlayamadı · tekrar dene"
+        }
+    }
+
+    /// Aynı oturumla yeniden denemenin anlamı var mı?
+    ///
+    /// `reauthRequired` ve `signedOut` için YOK: ekranın kod adımına dönüp
+    /// tekrar "sil" demek aynı hatayı üretir. Diğerleri geçici.
+    var retryable: Bool {
+        self == .unreachable || self == .serverFailed
+    }
+
+    /// `FunctionsErrorDomain` NSError'ından çeviri.
+    static func from(_ error: Error) -> AccountDeletionError {
+        #if DEBUG
+        // Ham hata DEBUG'da basılıyor: kullanıcıya Türkçe ve kısa bir cümle
+        // gösteriliyor, ama geliştiricinin sebebi okuyabilmesi gerekiyor.
+        print("deleteAccount hatası: \(error)")
+        #endif
+        let ns = error as NSError
+        guard ns.domain == FunctionsErrorDomain,
+              let code = FunctionsErrorCode(rawValue: ns.code) else {
+            return .unreachable
+        }
+        switch code {
+        case .unavailable, .deadlineExceeded, .aborted, .cancelled:
+            return .unreachable
+        case .unauthenticated, .permissionDenied:
+            return .signedOut
+        case .failedPrecondition:
+            // Sunucu `reauth-required` diyorsa doğrulama eskimiş demektir.
+            return ns.localizedDescription.contains("reauth") ? .reauthRequired : .serverFailed
+        case .notFound:
+            return .notDeployed
+        default:
+            return .serverFailed
+        }
+    }
 }
 
 @MainActor
@@ -46,7 +118,9 @@ final class FirebaseAccountDeletionService: AccountDeletionService {
     func deleteServerData() async throws -> AccountDeletionSummary {
         let callable = functions.httpsCallable("deleteAccount")
         callable.timeoutInterval = 600
-        let response = try await callable.call([:])
+        let response: HTTPSCallableResult
+        do { response = try await callable.call([:]) }
+        catch { throw AccountDeletionError.from(error) }
         let data = response.data as? [String: Any] ?? [:]
         return AccountDeletionSummary(
             deletedProjects: data["deletedProjects"] as? Int ?? 0,

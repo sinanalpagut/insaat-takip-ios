@@ -93,7 +93,13 @@ final class AppState: ObservableObject {
         #if DEBUG
         if LaunchConfig.emulatorHost != nil { return FirebaseAuthService() }
         #endif
-        #if targetEnvironment(simulator)
+        // `DEBUG` ŞARTI ZORUNLU. Yalnızca `targetEnvironment(simulator)`
+        // yazılsaydı, RELEASE yapılandırması simülatörde koşturulduğunda sahte
+        // kimlik devreye girerdi — yani "yayın derlemesini bir kez çalıştırıp
+        // görelim" denemesi (madde 70) gerçek yolu değil, taklidi sınardı ve
+        // geçtiğini sanırdık. Mağazaya giden ikili cihazda çalıştığı için
+        // etkilenmiyor; tehlike, sınamanın kendisinin yalan söylemesi.
+        #if DEBUG && targetEnvironment(simulator)
         // Rol kısayolu kullanılıyorsa sahte oturum O KULLANICIYLA kuruluyor —
         // gerekçesi FakeAuthService.init'te.
         let shortcut: User? = LaunchConfig.role.map { $0 == .admin ? .admin : .partner }
@@ -110,7 +116,7 @@ final class AppState: ObservableObject {
         #if DEBUG
         if LaunchConfig.emulatorHost != nil { return FirebaseAccountDeletionService() }
         #endif
-        #if targetEnvironment(simulator)
+        #if DEBUG && targetEnvironment(simulator)
         return FakeAccountDeletionService()
         #else
         return FirebaseAccountDeletionService()
@@ -214,6 +220,19 @@ final class AppState: ObservableObject {
             pendingNameSession = nil
             lastDeletionSummary = summary
         }
+
+        // CİHAZDAKİ VERİ — en sonda ve oturum düştükten SONRA.
+        //
+        // Onay ekranı "fotoğraf ve belgeler kalıcı olarak silinecek" diyor;
+        // bu satır olmadan o cümle yalnızca sunucu için doğruydu. Fotoğraflar,
+        // belgeler ve Firestore'un kalıcı önbelleği (alıcı adları dahil)
+        // telefonda kalıyordu.
+        //
+        // Ekran ağacı değiştikten sonra çağrılıyor: `terminate()` Firestore
+        // örneğini durduruyor ve hâlâ dinleyen bir ekran olsaydı ortada
+        // kalırdı. Bu noktada proje ekranları çoktan yok.
+        await LocalDataPurge.afterAccountDeletion()
+
         return summary
     }
 
@@ -222,6 +241,11 @@ final class AppState: ObservableObject {
         withAnimation(.easeInOut(duration: 0.25)) {
             currentUser = nil
             pendingNameSession = nil
+            // Silme özeti BURADA da temizleniyor. Temizlenmeseydi karşılama
+            // ekranındaki "Hesabın silindi · 2 proje silindi" afişi, sonraki
+            // sıradan bir ÇIKIŞTA yeniden belirirdi: kullanıcı çıkış yapar,
+            // ekranda hesabının silindiğini okur.
+            lastDeletionSummary = nil
         }
     }
 

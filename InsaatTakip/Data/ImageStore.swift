@@ -44,11 +44,21 @@ final class ImageStore {
     /// tavanının çok altında, ekran için ayırt edilemez.
     private static let jpegQuality: CGFloat = 0.8
 
+    /// Dizin adı TEK YERDE. Hesap silme bu dizini topluca boşaltıyor ve yolu
+    /// ikinci kez yazmak, ikisinin ayrışması demekti — silme yanlış klasörü
+    /// süpürür, fotoğraflar sessizce kalırdı.
+    /// `nonisolated`: yalnızca dosya sistemi yolunu üretiyor, sınıfın
+    /// hiçbir durumuna dokunmuyor. İzole kalsaydı hesap silme temizliği
+    /// onu ana aktörden okumak zorunda kalırdı.
+    nonisolated static var cacheDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory,
+                                 in: .userDomainMask)[0]
+            .appendingPathComponent("ImageCache", isDirectory: true)
+    }
+
     init(storage: Storage = Storage.storage()) {
         self.storage = storage
-        let base = FileManager.default.urls(for: .applicationSupportDirectory,
-                                            in: .userDomainMask)[0]
-        directory = base.appendingPathComponent("ImageCache", isDirectory: true)
+        directory = Self.cacheDirectory
         try? FileManager.default.createDirectory(at: directory,
                                                  withIntermediateDirectories: true)
     }

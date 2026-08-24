@@ -77,6 +77,13 @@ final class FirebaseAuthService: AuthService {
             .credential(withVerificationID: request.id, verificationCode: code)
         do {
             _ = try await user.reauthenticate(with: credential)
+            // JETONU ZORLA TAZELE. Yeniden doğrulama Firebase tarafında
+            // `auth_time`ı güncelliyor, ama Functions çağrısı ÖNBELLEKTEKİ ID
+            // jetonunu kullanıyor ve o jeton hâlâ ESKİ `auth_time`ı taşıyor
+            // olabilir. Sunucudaki yakın-doğrulama kapısı o eski değeri görüp
+            // isteği reddederdi: kullanıcı SMS turunu az önce geçmişken
+            // "Doğrulamanın süresi doldu" okurdu.
+            _ = try await user.getIDTokenResult(forcingRefresh: true)
         } catch {
             throw Self.mapped(error)
         }
@@ -132,6 +139,23 @@ final class FirebaseAuthService: AuthService {
         case .notificationNotForwarded, .missingAppToken, .appNotVerified,
              .captchaCheckFailed, .invalidAppCredential:
             return .appVerificationFailed
+        // ── Aşağıdaki üçü HESAP SİLME ekranında ortaya çıktı (madde 68) ──
+        // Üçü de eşlenmemişti, yani `.unknown`a düşüyor ve silme ekranında
+        // "Giriş yapılamadı" yazıyordu. Simülatörde görülemezlerdi:
+        // `FakeAuthService` yalnızca invalidCode/phoneMismatch/notConfigured
+        // üretebiliyor.
+        case .userTokenExpired:
+            // Kod ekranı uzun süre açık kaldıysa ya da uygulama arka planda
+            // beklediyse jeton düşüyor. Yeniden doğrulama gerekiyor.
+            return .requiresRecentLogin
+        case .userNotFound, .userMismatch:
+            // Sunucu Auth kaydını ZATEN sildiyse ve kullanıcı tekrar denerse
+            // buraya düşüyor — yani iş aslında bitmiş durumda.
+            return .alreadyDeleted
+        case .webContextCancelled:
+            // APNs sessiz doğrulaması düşüp reCAPTCHA sayfası açıldığında
+            // kullanıcı onu kapatırsa. Vazgeçme, hata değil.
+            return .cancelled
         default:
             return .unknown((error as NSError).domain)
         }

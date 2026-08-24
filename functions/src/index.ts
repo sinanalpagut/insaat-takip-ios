@@ -315,6 +315,30 @@ export const deleteAccount = onCall<unknown, Promise<DeleteResult>>(
       throw new HttpsError("unauthenticated", "signed-in-required");
     }
 
+    // ---- 0) YAKIN ZAMANLI DOĞRULAMA — SUNUCUDA ---------------------------
+    //
+    // İstemci silmeden önce bir SMS turu döndürüyor ve kullanıcıya "Güvenlik
+    // için numarana bir kod göndereceğiz" diyor. O tur BİR GÜVENLİK KAPISI
+    // DEĞİLDİ: callable uçları sıradan HTTPS uçları ve bu işlev yalnızca
+    // "oturum var mı" diye soruyordu. Testlerin kendisi bunun kanıtı —
+    // tests/functions.test.mjs uygulamayı hiç açmadan, düz bir POST ve Bearer
+    // jetonuyla silme çağırıyor.
+    //
+    // Yani kaçırılmış bir ID jetonu (bir saat geçerli) tek çağrıyla bütün
+    // projeleri, alıcı kayıtlarını ve dekontları geri dönüşsüz siliyordu ve
+    // kullanıcı hiçbir SMS görmüyordu. Ekranda yazan güvenlik gerekçesini
+    // uygulayan kimse yoktu.
+    //
+    // `auth_time` jetonun İÇİNDE ve kullanıcının en son NE ZAMAN kimlik
+    // doğruladığını söylüyor; yeniden doğrulama onu tazeliyor. Pencere 15
+    // dakika: kullanıcının okuyup düşünmesine, hatta sunucu hatasından sonra
+    // tekrar denemesine yetecek kadar geniş, çalınmış bir jetonun sessizce
+    // kullanılmasına yetmeyecek kadar dar.
+    const authTime = Number(request.auth?.token?.auth_time ?? 0);
+    if (!authTime || Date.now() / 1000 - authTime > 15 * 60) {
+      throw new HttpsError("failed-precondition", "reauth-required");
+    }
+
     // ---- 1) SAHİBİ OLDUĞU PROJELER: tamamen sil --------------------------
     const owned = await db.collection("projects").where("ownerUid", "==", uid).get();
 

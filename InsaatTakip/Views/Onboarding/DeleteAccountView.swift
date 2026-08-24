@@ -22,14 +22,32 @@ struct DeleteAccountView: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
-    private enum Step { case confirm, code, done }
+    // `done` adımı YOKTU ve olamazdı: `deleteAccount` `currentUser`ı nil'liyor,
+    // `RootView` tüm ağacı değiştiriyor ve bu ekran o anda yok oluyor. Ekranın
+    // kendi "bitti" adımı hiç çizilmiyordu — özet karşılama ekranında
+    // gösteriliyor (`AppState.lastDeletionSummary`). Çizilmeyen bir adımı
+    // taşımak, sonraki okuyucuya var olmayan bir yol gösteriyordu.
+    private enum Step { case confirm, code }
 
     @State private var step: Step = .confirm
     @State private var request: VerificationRequest?
     @State private var code = ""
     @State private var busy = false
     @State private var errorText: String?
-    @State private var summary: AccountDeletionSummary?
+
+    /// SMS turu GEÇİLDİ mi?
+    ///
+    /// Yeniden doğrulama kimlik bilgisi TEK KULLANIMLIK. Sunucu adımı ağ
+    /// yüzünden düştüğünde kullanıcı "sil" düğmesine tekrar bastığında eski
+    /// kod yeniden gönderiliyordu; Firebase onu tükenmiş sayıp "Kodun süresi
+    /// doldu" diyordu ve ekranda kodu yeniden gönderecek bir düğme yoktu. Yani
+    /// ilk sunucu hatasından sonra akış BİR DAHA TAMAMLANAMIYORDU ve mesaj
+    /// kullanıcıdan ekranda bulunmayan bir şeyi yapmasını istiyordu.
+    ///
+    /// Bu bayrak açıkken tekrar denemede SMS turu ATLANIYOR: doğrulama zaten
+    /// başarılı oldu, oturum Firebase açısından hâlâ "yakın zamanlı". Eksik
+    /// kalan yalnızca sunucu çağrısı, tekrarlanması gereken de o.
+    @State private var reauthDone = false
 
     /// Silinecek olanın büyüklüğü — kullanıcının kendi verisi üzerinden.
     private var owned: [Project] {
@@ -56,7 +74,6 @@ struct DeleteAccountView: View {
             switch step {
             case .confirm: confirmStep
             case .code:    codeStep
-            case .done:    doneStep
             }
 
             Spacer()
@@ -69,16 +86,21 @@ struct DeleteAccountView: View {
     private var header: some View {
         HStack {
             Spacer()
-            if step != .done {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .iconFont(14, weight: .semibold)
-                        .foregroundColor(.white.opacity(0.7))
-                        .frame(width: 38, height: 38)
-                        .background(Color.white.opacity(0.08))
-                        .cornerRadius(12)
-                }
+            // İŞ SÜRERKEN KAPATILAMAZ. Açık bırakıldığında kullanıcı, uzun
+            // süren silmeyi takılmış sanıp kapatıyordu; çağrı arka planda
+            // sürüyor ve sonucu — hata olsa bile — yok edilmiş bir görünümün
+            // `@State`ine yazılıp hiçbir yerde görünmüyordu. Kullanıcı hesabının
+            // silindiğini sanarak devam ediyor, oysa duruyor ya da yarım
+            // silinmiş olabiliyordu.
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .iconFont(14, weight: .semibold)
+                    .foregroundColor(.white.opacity(busy ? 0.25 : 0.7))
+                    .frame(width: 38, height: 38)
+                    .background(Color.white.opacity(0.08))
+                    .cornerRadius(12)
             }
+            .disabled(busy)
         }
         .padding(.top, 16)
     }
@@ -169,6 +191,10 @@ struct DeleteAccountView: View {
             TextField("", text: $code, prompt: Text("123456")
                 .foregroundColor(.white.opacity(0.3)))
                 .keyboardType(.numberPad)
+                // SMS'ten gelen kodu klavye üstünde önerir. Kardeş giriş
+                // ekranında vardı, burada yoktu — aynı işi yapan iki ekrandan
+                // biri kullanıcıyı kodu elle yazmaya zorluyordu.
+                .textContentType(.oneTimeCode)
                 .font(.sora(20, .bold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
@@ -189,60 +215,43 @@ struct DeleteAccountView: View {
             Button {
                 Task { await confirmDelete() }
             } label: {
-                Text(busy ? "Siliniyor…" : "Hesabı kalıcı olarak sil")
-                    .font(.manrope(15, .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(Palette.alertInk.opacity(code.count < 6 || busy ? 0.5 : 1))
-                    .cornerRadius(14)
+                HStack(spacing: 10) {
+                    // DÖNEN GÖSTERGE. Yalnızca metin ve %50 opaklık vardı;
+                    // gerçek silme saniyeler sürüyor ve duran bir ekran
+                    // "takıldı" gibi okunuyordu. Kardeş ekran PhoneSignInView
+                    // bunu zaten gösteriyordu.
+                    if busy {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(.white)
+                    }
+                    Text(busyText)
+                        .font(.manrope(15, .bold))
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(Palette.alertInk.opacity(canSubmit ? 1 : 0.5))
+                .cornerRadius(14)
             }
-            .disabled(code.count < 6 || busy)
+            .disabled(!canSubmit)
             .padding(.top, 22)
         }
     }
 
-    // MARK: 3 — Bitti
-
-    private var doneStep: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Hesabın silindi")
-                .font(.sora(27, .bold))
-                .foregroundColor(.white)
-                .padding(.top, 20)
-
-            // Ne yapıldığını SAYIYLA söylüyor: "silindi" demek tek başına
-            // doğrulanabilir bir bilgi taşımıyor.
-            Text(doneText)
-                .font(.manrope(14, .medium))
-                .foregroundColor(.white.opacity(0.65))
-                .lineSpacing(5)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 14)
-
-            Button { dismiss() } label: {
-                Text("Kapat")
-                    .font(.manrope(15, .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(Palette.accent)
-                    .cornerRadius(14)
-            }
-            .padding(.top, 26)
-        }
+    /// Düğme metni. Doğrulama geçildikten sonra tekrar denemede "Hesabı kalıcı
+    /// olarak sil" yazmak, kullanıcıya SMS turunu yeniden geçeceğini
+    /// düşündürüyordu; oysa eksik kalan yalnızca sunucu adımı.
+    private var busyText: String {
+        if busy { return "Siliniyor…" }
+        return reauthDone ? "Tekrar dene" : "Hesabı kalıcı olarak sil"
     }
 
-    private var doneText: String {
-        guard let summary else { return "Hesabın ve verilerin kalıcı olarak silindi." }
-        var parts = ["Hesabın ve profil bilgilerin kalıcı olarak silindi."]
-        if summary.deletedProjects > 0 {
-            parts.append("\(summary.deletedProjects) proje ve tüm kayıtları silindi.")
-        }
-        if summary.leftProjects > 0 {
-            parts.append("\(summary.leftProjects) projeden çıkarıldın.")
-        }
-        return parts.joined(separator: " ")
+    /// Doğrulama geçildiyse kod alanı artık gerekli değil — tekrar denemede
+    /// altı hane şartı koşulsaydı, kodu temizlenmiş bir ekranda düğme sonsuza
+    /// dek kapalı kalırdı.
+    private var canSubmit: Bool {
+        !busy && (reauthDone || code.count == 6)
     }
 
     // MARK: Aksiyonlar
@@ -270,16 +279,42 @@ struct DeleteAccountView: View {
         guard let request else { return }
         busy = true
         errorText = nil
+
+        // ADIM 1 — SMS turu. Yalnızca bir kez; kimlik bilgisi tek kullanımlık.
+        if !reauthDone {
+            do {
+                // `verify` DEĞİL `reauthenticate` — gerekçesi dosya başında.
+                try await appState.auth.reauthenticate(code: code, for: request)
+                reauthDone = true
+            } catch {
+                let authError = error as? AuthError
+                errorText = authError?.errorDescription ?? "İşlem tamamlanamadı"
+                // Yanlış kod ekranda KALMIYOR: kullanıcı altı hanenin hangisini
+                // yanlış yazdığını görmüyor, tek yapabileceği baştan yazmak.
+                // Kardeş ekran (PhoneSignInView) da böyle davranıyor.
+                if authError == .invalidCode { code = "" }
+                busy = false
+                return
+            }
+        }
+
+        // ADIM 2 — sunucu. Bitti adımı BURADA gösterilmiyor: `deleteAccount`
+        // oturumu düşürüyor ve `RootView` tüm ağacı değiştiriyor, yani bu ekran
+        // yok oluyor. Özet karşılama ekranında gösteriliyor
+        // (`AppState.lastDeletionSummary`).
         do {
-            // `verify` DEĞİL `reauthenticate` — gerekçesi dosya başında.
-            try await appState.auth.reauthenticate(code: code, for: request)
-            // Bitti adımı BURADA gösterilmiyor: `deleteAccount` oturumu
-            // düşürüyor ve `RootView` tüm ağacı değiştiriyor, yani bu ekran
-            // yok oluyor. Özet karşılama ekranında gösteriliyor
-            // (`AppState.lastDeletionSummary`).
             _ = try await appState.deleteAccount()
         } catch {
-            errorText = (error as? AuthError)?.errorDescription ?? "Hesap silinemedi"
+            let hata = error as? AccountDeletionError ?? .serverFailed
+            errorText = hata.errorDescription
+            // Doğrulama eskimişse ya da oturum düştüyse aynı ekranda tekrar
+            // denemek aynı hatayı üretir; kullanıcı BAŞA dönmeli. Bunu ona
+            // söylemek yetmez, ekranı da oraya götürmek gerekiyor.
+            if !hata.retryable {
+                reauthDone = false
+                code = ""
+                step = .confirm
+            }
         }
         busy = false
     }
