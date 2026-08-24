@@ -1295,7 +1295,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 - [ ] 59. **Devir stoğu girilemiyor.** `openingIn/Out/Cost` yalnızca demo
       tohumunda atanıyor; `addProject` her kalemi sıfırla açıyor. Yarısı bitmiş
       şantiyede eldeki malzeme ancak sahte geçmiş tarihli fişle yazılabiliyor.
-- [ ] 60. **Proje silinemiyor, arşivlenemiyor, kapatılamıyor.** İlk kurulan
+- [~] 60. **Proje silinemiyor, arşivlenemiyor, kapatılamıyor.** İlk kurulan
       "deneme" projesi sonsuza dek dashboard'da, portföy toplamlarında ve
       karşılaştırma tablosunda.
 - [ ] 61. **Daire eklenemiyor/silinemiyor, toplu düzenleme yok.** 12 yerine 14
@@ -1326,6 +1326,13 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · **SİLME ONAY SORUYOR:** diyalog hangi kaydın gittiğini yazıyor ve dekont/belge varsa 'o da silinecek' diye ayrıca söylüyor. Malzeme fişinde onay vardı, tahsilat ve giderde yoktu.
       · Simülatörde doğrulandı: menü, onay diyaloğu (Vazgeç ile kayıt korundu) ve düzenleme sheet'i (kayıtlı değerlerle doldu). GİDER tarafı kod olarak aynı desen ama görsel olarak doğrulanmadı.
       · **TAMAM (21 Ağu 2026)** — '+ N ödeme daha' artık dokunulabilir ve açılıyor; madde 50'de taksit planı için yazılan desenin aynısı. 36 aylık taksitli satışta ödemelerin çoğu uygulamada hiçbir yerden görülemiyordu; tek yol yedek dosyasını açmaktı.
+      · **ARŞİV TAMAM (21 Ağu 2026), SİLME AÇIK.**
+      · Sıra bilinçli: bitmiş projeyi silmek mali kayıt kaybı demek (vergi/muhasebe için rakamlar durmalı). Asıl şikâyet — toplamların kirlenmesi — arşivle çözülüyor ve arşiv GERİ ALINABİLİR.
+      · `Project.archivedAt` eklendi; `phase` DEĞİL, ayrı alan (phase inşaat aşaması, arşiv yaşam döngüsü). `visibleProjects`e dokunulmadı — o üyelik kümesi; `activeProjects`/`archivedProjects` eklendi. `portfolio` ve `comparisons` aktifleri topluyor.
+      · Arşiv GİZLENMİYOR, katlanıyor ve kapsamı yazılı.
+      · YAN DÜZELTME: alt başlık `visibleProjects` sayıyordu, portföy aktifleri — arşivleyince aynı ekranda iki farklı proje sayısı çıkıyordu.
+      · Simülatörde doğrulandı: portföy 5→4 projeye ve 134,78 M→92,13 M ciroya düştü, karşılaştırmadan çıktı, arşiv bölümü kapsam notuyla açıldı.
+      · AÇIK: proje SİLME. `deleteAccount`un `recursiveDelete` + Storage önek silme mantığı hazır; ayıklanıp `deleteProject` callable yapılabilir.
 
 #### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
 
