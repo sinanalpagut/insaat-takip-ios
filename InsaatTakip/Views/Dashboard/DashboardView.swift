@@ -10,6 +10,7 @@ struct DashboardView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .body) private var avatarSize: CGFloat = 40
+    @State private var showArchived = false
     @EnvironmentObject private var viewModel: ProjectViewModel
 
     @State private var showNewProject = false
@@ -20,8 +21,9 @@ struct DashboardView: View {
 
     /// Yalnızca kullanıcının erişebildiği projeler (yönetici: kurduğu,
     /// ortak: davetle katıldığı). Filtre ViewModel'de.
+    /// AKTİF projeler — arşivlenenler ayrı bölümde (madde 60).
     private var visibleProjects: [Project] {
-        viewModel.visibleProjects(for: appState.currentUser)
+        viewModel.activeProjects(for: appState.currentUser)
     }
 
     var body: some View {
@@ -68,6 +70,8 @@ struct DashboardView: View {
                         }
                         .buttonStyle(.plain)
                     }
+
+                    archivedSection
 
                     // Davet kartı ROLDEN BAĞIMSIZ. Eskiden `!isAdmin` koşuluyla
                     // gösteriliyordu; kimlik doğrulaması geldikten sonra her yeni
@@ -218,6 +222,52 @@ struct DashboardView: View {
     /// YENİ HESABIN gördüğü ilk ekran bu. Boş bırakılırsa kullanıcı, davet
     /// koduyla mı katılacağını yoksa proje mi kuracağını anlamadan bomboş bir
     /// sayfayla karşılaşıyordu.
+    /// Arşivlenmiş projeler — GİZLENMİYOR, katlanıyor.
+    ///
+    /// Listeden büsbütün çıkarmak, kullanıcının "hepsi bu" sanacağı bir yalan
+    /// olurdu (aynı ders `prefix(4)` ve yüklenemeyen projelerde iki kez
+    /// öğrenildi). Kapsam da yazılı: bu projeler yukarıdaki portföy
+    /// toplamlarına ve m² karşılaştırmasına GİRMİYOR.
+    @ViewBuilder
+    private var archivedSection: some View {
+        let arsiv = viewModel.archivedProjects(for: appState.currentUser)
+        if !arsiv.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showArchived.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: showArchived ? "chevron.down" : "chevron.right")
+                            .iconFont(11, weight: .bold)
+                        Text("Arşiv · \(arsiv.count) proje")
+                            .font(.manrope(12.5, .bold))
+                        Spacer()
+                    }
+                    .foregroundColor(Palette.textSecondary)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+
+                if showArchived {
+                    Text("Bu projeler portföy toplamlarına ve m² karşılaştırmasına dahil değil.")
+                        .font(.manrope(11, .medium))
+                        .foregroundColor(Palette.textTertiary)
+                        .padding(.bottom, 8)
+
+                    ForEach(arsiv) { project in
+                        NavigationLink(value: Route.project(project.id)) {
+                            ProjectCardView(project: project)
+                                .opacity(0.65)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.bottom, 10)
+                    }
+                }
+            }
+            .padding(.top, 14)
+        }
+    }
+
     /// Yükleme hatası — boş durumdan AYRI ve geri dönüşü var.
     private func loadErrorState(_ mesaj: String) -> some View {
         VStack(spacing: 0) {

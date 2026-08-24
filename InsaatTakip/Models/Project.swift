@@ -41,6 +41,21 @@ struct Project: Codable, Identifiable, Equatable {
     var invite: Invite?            // Üretilmiş aktif davet (kod + geçerlilik)
     var photoCount: Int            // Şantiye fotoğraf sayısı (arşiv dahil)
 
+    /// Arşivlenme anı — `nil` ise proje aktif (madde 60).
+    ///
+    /// AYRI ALAN, `phase` DEĞİL: `phase` inşaatın aşaması (temel → teslim),
+    /// arşiv ise projenin yaşam döngüsü durumu. Teslim edilmiş bir proje hâlâ
+    /// takip ediliyor olabilir; arşivlenmiş bir proje ise artık takip
+    /// edilmiyor. İkisini tek alana sıkıştırmak "teslim = arşiv" varsayımını
+    /// koda gömerdi.
+    ///
+    /// SİLME DEĞİL ARŞİV: bitmiş bir projeyi silmek mali kayıt kaybı demek —
+    /// müteahhidin geçmiş projelerinin rakamları vergi ve muhasebe için
+    /// duruyor olmalı. Arşiv geri alınabilir; silme ayrı bir iş.
+    var archivedAt: Date? = nil
+
+    var isArchived: Bool { archivedAt != nil }
+
     /// Kart başlığı: "145 Ada / 2 Parsel"
     var title: String { "\(blockNumber) Ada / \(parcelNumber) Parsel" }
 

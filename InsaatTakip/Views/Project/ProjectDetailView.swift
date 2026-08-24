@@ -263,6 +263,18 @@ struct ProjectDetailView: View {
                         } label: {
                             Label("İnşaat İlerlemesi", systemImage: "slider.horizontal.3")
                         }
+                        // ARŞİVLEME (madde 60). Onay diyaloğu YOK, bilerek:
+                        // işlem yıkıcı değil ve aynı menüden geri alınıyor.
+                        // Yıkıcı olan silmedir ve o ayrı bir iş.
+                        Button {
+                            viewModel.setArchived(!project.isArchived,
+                                                  role: .admin, projectId: projectId)
+                        } label: {
+                            Label(project.isArchived
+                                  ? "Arşivden Çıkar" : "Projeyi Arşivle",
+                                  systemImage: project.isArchived
+                                  ? "tray.and.arrow.up" : "archivebox")
+                        }
                     }
                 } label: {
                     darkHeaderIcon("ellipsis")

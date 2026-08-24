@@ -806,8 +806,45 @@ final class ProjectViewModel: ObservableObject {
         let difference: Kurus
     }
 
+    /// Aktif projeler — arşivlenenler HARİÇ.
+    ///
+    /// `visibleProjects`e DOKUNULMUYOR: o üyelik kümesi ve yetki denetimleri
+    /// dahil birçok yerde kullanılıyor; arşivlenmiş bir projeye erişim
+    /// kapanmamalı, yalnızca listeden ve TOPLAMLARDAN çıkmalı.
+    func activeProjects(for user: User?) -> [Project] {
+        visibleProjects(for: user).filter { !$0.isArchived }
+    }
+
+    /// Arşivlenmiş projeler, en yeniden eskiye.
+    func archivedProjects(for user: User?) -> [Project] {
+        visibleProjects(for: user).filter(\.isArchived)
+            .sorted { ($0.archivedAt ?? .distantPast) > ($1.archivedAt ?? .distantPast) }
+    }
+
+    /// Projeyi arşivler ya da geri alır (madde 60).
+    ///
+    /// Arşiv YIKICI DEĞİL: veri duruyor, proje açılabiliyor, rakamları
+    /// raporlanabiliyor. Değişen tek şey portföy toplamlarına ve projeler
+    /// arası karşılaştırmaya girmemesi — asıl şikâyet buydu: ilk kurulan
+    /// "deneme" projesi sonsuza dek ciroyu ve m² sıralamasını kirletiyordu.
+    func setArchived(_ archived: Bool, role: UserRole, projectId: UUID) {
+        guard role == .admin,
+              let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
+        projects[index].archivedAt = archived ? Date() : nil
+        var writes: [DocumentChange] = [.project(projects[index])]
+        writes += recordAudit(recordId: projectId, projectId: projectId,
+                              subject: "Proje · \(projects[index].title)",
+                              action: .update,
+                              changes: [.init(field: "Arşiv",
+                                              oldValue: archived ? "aktif" : "arşivde",
+                                              newValue: archived ? "arşivde" : "aktif")])
+        persist(writes, failureNote: archived ? "Arşivleme" : "Arşivden çıkarma")
+        flash(archived ? "Proje arşivlendi" : "Proje arşivden çıkarıldı")
+    }
+
     func portfolio(for user: User?) -> Portfolio? {
-        let visible = visibleProjects(for: user)
+        // Arşivlenenler toplamlara GİRMİYOR.
+        let visible = activeProjects(for: user)
         guard !visible.isEmpty else { return nil }
         var sales = Kurus.zero, collected = Kurus.zero
         var outstanding = Kurus.zero, cost = Kurus.zero
@@ -850,7 +887,9 @@ final class ProjectViewModel: ObservableObject {
     }
 
     func comparisons(for user: User?) -> [ProjectComparison] {
-        visibleProjects(for: user).map { project in
+        // Arşivlenen proje m² sıralamasına girmiyor: bitmiş ya da terk edilmiş
+        // bir işin rakamı, süren projelerin karşılaştırmasını bozar.
+        activeProjects(for: user).map { project in
             let sales = totalSales(for: project.id)
             let difference = netAmount(for: project.id)
             // Para/para bölmesi AÇIKÇA raw üzerinden (Kurus'ta bölme yok).
@@ -1238,7 +1277,11 @@ final class ProjectViewModel: ObservableObject {
     /// yanıltıcı olabileceği anda yanıltıyordu — ortak, yöneticinin az önce
     /// girdiği satışı göremezken ekran ona verinin taze olduğunu söylüyordu.
     func dashboardSubtitle(for user: User?) -> String {
-        let visible = visibleProjects(for: user)
+        // AKTİF projeler sayılıyor: portföy kartı da onları topluyor ve aynı
+        // ekranda iki farklı proje sayısı göstermek (üstte 5, portföyde 4)
+        // kullanıcıyı hangisinin doğru olduğunu aramaya iterdi. Arşivdekiler
+        // kendi bölümünde kendi sayısıyla duruyor.
+        let visible = activeProjects(for: user)
         let apartmentTotal = visible.reduce(0) { $0 + $1.totalApartments }
         return "\(visible.count) proje · \(apartmentTotal) daire · \(freshnessText)"
     }
