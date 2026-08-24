@@ -183,9 +183,37 @@ final class AppState: ObservableObject {
     }
 
     /// Rol değiştirme (avatar menüsü) — canlı demoda iki görünümü kıyaslamak için.
+    /// Geliştirme önizlemesi: rolü değiştirir, KİMLİĞİ DEĞİŞTİRMEZ.
+    ///
+    /// Önceden `currentUser`ı örnek kullanıcılarla (`.admin` / `.partner`)
+    /// değiştiriyordu. Sonucu gerçek veriyle test ederken ortaya çıktı:
+    /// "Ortak görünümü"ne basınca oturum bambaşka bir kimliğe geçiyor, o kimlik
+    /// hiçbir projenin üyesi olmadığı için ekran "0 proje · Henüz projen yok"
+    /// diyordu. "Yönetici görünümü"ne dönmek de gerçek kullanıcıyı geri
+    /// getirmiyordu — üçüncü bir örnek kullanıcı geliyordu. Gerçek oturum
+    /// yalnızca uygulama yeniden açılınca dönüyordu.
+    ///
+    /// ASIL TEHLİKE VERİ KAYBI DEĞİL, YANLIŞ SONUÇTU: bu araçla "ortak ne
+    /// görüyor" sorusunu sınamaya kalkan biri boş bir ekran görüp "ortak
+    /// projeyi göremiyor" diye YANLIŞ bir gizlilik sonucuna varabilirdi.
+    /// Kimliği değiştiren bir önizleme, önizlediğini iddia ettiği şeyi
+    /// göstermiyor.
+    ///
+    /// SINIR — bu önizleme EKRANI gösterir, VERİYİ DEĞİL. Yönetici oturumu
+    /// `buyers` belgelerini zaten indirmiş durumda, dolayısıyla önizlemede
+    /// daire kartında ALICI ADI görünebilir. Gerçek ortakta görünmez: kural
+    /// `buyers`ı ortağa kapatıyor, yani o veri istemciye hiç ulaşmıyor
+    /// (`tests/rules.test.mjs` bunu kanıtlıyor). Buradaki görüntüye bakıp
+    /// "ortak alıcı adını görüyor" sonucunu çıkarmak YANLIŞ olur; veri
+    /// katmanının kanıtı kural testleridir, bu araç değil.
     func switchRole(to role: UserRole) {
         withAnimation(.easeInOut(duration: 0.25)) {
-            currentUser = role == .admin ? .admin : .partner
+            guard let user = currentUser else {
+                currentUser = role == .admin ? .admin : .partner
+                return
+            }
+            currentUser = User(id: user.id, name: user.name,
+                               role: role, phone: user.phone)
         }
     }
 

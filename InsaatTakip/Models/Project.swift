@@ -72,6 +72,21 @@ struct Project: Codable, Identifiable, Equatable {
     /// reddediliyordu — güvenlik açığı değil ama yalan bir arayüz.
     func role(for user: User?) -> UserRole {
         guard let user else { return .partner }
+        // İNDİRME HER ZAMAN GEÇERLİ, YÜKSELTME ASLA.
+        //
+        // Proje rolü sahiplikten türetiliyor ve bu doğru: yetkinin kaynağı
+        // `ownerUid`, kullanıcının kendi hakkında söylediği şey değil. Ama tek
+        // yönlü bir istisna güvenli: kullanıcı kendini ORTAĞA indirdiyse
+        // sahiplik onu yönetici yapmaz.
+        //
+        // Bu istisna olmadan geliştirmedeki "Ortak görünümü" önizlemesi
+        // çalışamıyordu; kimliği değiştirerek çalıştırma denemesi ise ekranı
+        // boşaltıp yanlış sonuca götürüyordu (bkz. `AppState.switchRole`).
+        //
+        // Ters yön KAPALI kalıyor ve kapalı kalmalı: `user.role == .admin`
+        // olması tek başına yönetici yapmıyor, sahiplik yine de aranıyor.
+        // Yani bu dal yalnızca yetkiyi AZALTABİLİR.
+        guard user.role == .admin else { return .partner }
         return ownerUid == user.id ? .admin : .partner
     }
 
