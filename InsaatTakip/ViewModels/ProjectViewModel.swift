@@ -3313,8 +3313,18 @@ final class ProjectViewModel: ObservableObject {
         let sold = apartments(for: projectId).filter(\.countsAsRevenue)
 
         return (1...6).compactMap { offset in
-            // 6 ay geriden bir önceki aya kadar
-            guard let monthStart = calendar.date(byAdding: .month, value: offset - 7, to: Date()),
+            // SON ALTI AY — İÇİNDE BULUNULAN AY DAHİL.
+            //
+            // Önceden pencere "altı ay geriden BİR ÖNCEKİ aya kadar"dı, yani
+            // bu ay hariçti. Gerekçesi savunulabilirdi (yarım ayın çubuğu
+            // tamamlanmış aylara göre haksız kısa görünür), ama aynı ekranın
+            // ÜSTÜNDE dönem özeti bu ayın satışını sayıyor: kullanıcı 3,85 M ₺
+            // satışı özet satırında görüp hemen altındaki grafikte sıfırlar
+            // görüyordu. Gerçek fiş turunda birebir bu yaşandı.
+            //
+            // Kusur pencerenin seçimi değil, AYNI EKRANIN İKİ FARKLI ŞEY
+            // SÖYLEMESİYDİ. Grafik artık özetle aynı dönemi kapsıyor.
+            guard let monthStart = calendar.date(byAdding: .month, value: offset - 6, to: Date()),
                   let interval = calendar.dateInterval(of: .month, for: monthStart) else { return nil }
 
             let total = sold.reduce(Kurus.zero) { sum, apartment in
