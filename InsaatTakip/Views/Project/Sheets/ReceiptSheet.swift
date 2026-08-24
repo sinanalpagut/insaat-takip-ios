@@ -38,7 +38,8 @@ struct ReceiptSheet: View {
     /// aynı görünüyor ve ViewModel ikincisini birincisi sanıp kaldırmayı
     /// sessizce yutuyordu. Niyet ayrı taşınıyor.
     @State private var receiptCleared = false
-    @State private var showCamera = false
+    /// Kaynak seçimi (kamera / galeri) — madde 63.
+    @State private var showSource = false
     @State private var showNewMaterial = false
     /// Fişten cihaz üstü OCR ile okunanlar (arka planda çalışır).
     @State private var reading: ReceiptScanner.Reading?
@@ -160,7 +161,7 @@ struct ReceiptSheet: View {
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
 
                         Button {
-                            showCamera = true
+                            showSource = true
                         } label: {
                             Image(systemName: receiptImage == nil ? "camera.fill" : "checkmark")
                                 .iconFont(16, weight: .semibold)
@@ -277,17 +278,9 @@ struct ReceiptSheet: View {
             guard receiptImage == nil, !receiptCleared, let incoming else { return }
             receiptImage = incoming
         }
-        .fullScreenCover(isPresented: $showCamera) {
-            CameraPicker(
-                onCapture: { image in
-                    receiptImage = image
-                    receiptCleared = false
-                    showCamera = false
-                    scanReceipt(image)
-                },
-                onCancel: { showCamera = false }
-            )
-            .ignoresSafeArea()
+        .receiptSource(isPresented: $showSource, image: $receiptImage) { picked in
+            receiptCleared = false
+            scanReceipt(picked)
         }
         .sheet(isPresented: $showNewMaterial) {
             NewMaterialSheet(projectId: projectId) { created in

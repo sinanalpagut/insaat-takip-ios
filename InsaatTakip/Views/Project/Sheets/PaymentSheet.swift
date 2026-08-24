@@ -23,7 +23,8 @@ struct PaymentSheet: View {
     @State private var note = ""
     @State private var date = Date()
     @State private var receiptImage: UIImage?
-    @State private var showCamera = false
+    /// Kaynak seçimi (kamera / galeri) — madde 63.
+    @State private var showSource = false
 
     private var apartment: Apartment? {
         viewModel.apartments.first { $0.id == apartmentId }
@@ -107,7 +108,7 @@ struct PaymentSheet: View {
                     // Dekont fotoğrafı
                     HStack(spacing: 10) {
                         Button {
-                            showCamera = true
+                            showSource = true
                         } label: {
                             HStack(spacing: 9) {
                                 Image(systemName: receiptImage == nil ? "camera.fill" : "checkmark")
@@ -157,16 +158,7 @@ struct PaymentSheet: View {
         .onAppear { prefill() }
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)
-        .fullScreenCover(isPresented: $showCamera) {
-            CameraPicker(
-                onCapture: { image in
-                    receiptImage = image
-                    showCamera = false
-                },
-                onCancel: { showCamera = false }
-            )
-            .ignoresSafeArea()
-        }
+        .receiptSource(isPresented: $showSource, image: $receiptImage)
     }
 
     // MARK: Parçalar

@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 import UIKit
 
 // MARK: - Ortak Bileşenler
@@ -475,5 +476,80 @@ extension View {
             RoundedRectangle(cornerRadius: radius)
                 .stroke(color, style: StrokeStyle(lineWidth: lineWidth, dash: [dash, 4]))
         )
+    }
+}
+
+
+// MARK: - Fiş / dekont / belge görseli seçici (madde 63)
+
+/// Görsel eklemenin TEK yolu kamera olmasın.
+///
+/// Fiş, dekont ve gider belgesi yalnızca `CameraPicker` ile eklenebiliyordu.
+/// Oysa saha gerçeği başka: havale dekontu bankanın uygulamasından alınan bir
+/// EKRAN GÖRÜNTÜSÜ olarak galeride duruyor, fatura e-postadan inmiş oluyor.
+/// Tek yol kameraysa müteahhit ekrandaki dekontun fotoğrafını çekmek zorunda —
+/// okunaksız, eğri ve gereksiz bir adım.
+///
+/// DÜĞME DEĞİL DAVRANIŞ: üç ekranın düğme görünümü farklı (ikisi tam genişlik,
+/// biri kare ikon). Ortak bir düğme bileşeni tasarımı bozardı; ortak olan
+/// KAYNAK SEÇİMİ mantığı, o yüzden değiştirici olarak yazıldı.
+///
+/// TEK YERDE: üç ekrana ayrı ayrı yazılsaydı biri unutulur ve tam o ekranda
+/// galeri seçeneği eksik kalırdı — bekleyen yazma şeridinde öğrenilen ders.
+private struct ReceiptSourceModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    @Binding var image: UIImage?
+    /// Görsel seçildikten SONRA çalışır — kaynağı (kamera/galeri) fark etmez.
+    /// `ReceiptSheet` fişten tutar okumayı buradan tetikliyor; OCR'ın yalnızca
+    /// kameradan gelen kareye çalışması, galeriden eklenen dekontu ikinci
+    /// sınıf yapardı.
+    let onPicked: ((UIImage) -> Void)?
+
+    @State private var showCamera = false
+    @State private var showGallery = false
+    @State private var pickedItem: PhotosPickerItem?
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog("Görsel kaynağı", isPresented: $isPresented,
+                                titleVisibility: .visible) {
+                Button("Fotoğraf Çek") { showCamera = true }
+                Button("Galeriden Seç") { showGallery = true }
+                Button("Vazgeç", role: .cancel) {}
+            }
+            .photosPicker(isPresented: $showGallery, selection: $pickedItem, matching: .images)
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraPicker(onCapture: { picked in
+                    image = picked
+                    showCamera = false
+                    onPicked?(picked)
+                }, onCancel: { showCamera = false })
+                .ignoresSafeArea()
+            }
+            .onChange(of: pickedItem) { item in
+                guard let item else { return }
+                pickedItem = nil
+                Task {
+                    // `SitePhoto.downsample` ile AYNI yol: galeriden gelen kare
+                    // de 1200px'e indiriliyor. Ham kareyi taşımak, kameradan
+                    // gelenle farklı boyutta iki fiş görseli sınıfı yaratır ve
+                    // Storage kuralının 4 MB tavanına dayanabilirdi.
+                    guard let data = try? await item.loadTransferable(type: Data.self),
+                          let downsampled = SitePhoto.downsample(data) else { return }
+                    await MainActor.run {
+                        image = downsampled
+                        onPicked?(downsampled)
+                    }
+                }
+            }
+    }
+}
+
+extension View {
+    /// Fiş/dekont/belge görseli için kaynak seçimi (kamera ya da galeri).
+    func receiptSource(isPresented: Binding<Bool>, image: Binding<UIImage?>,
+                       onPicked: ((UIImage) -> Void)? = nil) -> some View {
+        modifier(ReceiptSourceModifier(isPresented: isPresented, image: image,
+                                       onPicked: onPicked))
     }
 }
