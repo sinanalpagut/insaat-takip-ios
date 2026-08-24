@@ -1308,10 +1308,10 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 - [ ] 63. **Fiş ve dekont yalnızca KAMERADAN.** Havale dekontu bankanın ekran
       görüntüsü olarak galeride, fatura PDF olarak e-postada duruyor; ikisi de
       eklenemiyor. Tek yol ekrandaki dekontun fotoğrafını çekmek.
-- [ ] 64. **Gider ve tahsilat düzenlenemiyor; tahsilat silme ONAYSIZ.** Yanlış
+- [x] 64. **Gider ve tahsilat düzenlenemiyor; tahsilat silme ONAYSIZ.** Yanlış
       tutar sil-yeniden gir demek ve belge/dekont o anda kalıcı gidiyor. Malzeme
       fişinde onay diyaloğu var, tahsilatta yok — aynı ürün içinde tutarsız.
-- [ ] 65. **Altıncıdan sonraki ödemeler hiçbir yerden görülemiyor.**
+- [x] 65. **Altıncıdan sonraki ödemeler hiçbir yerden görülemiyor.**
       "+ N ödeme daha" düz metin, dokunulmuyor. 36 aylık taksitli satışta
       ödemelerin çoğu erişilemez. (Madde 50'de plan tarafı açılır yapıldı,
       tahsilat defteri aynı düzeltmeyi almadı.)
@@ -1321,6 +1321,11 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       (`usedAt` okunması herkese kapalı `invites` koleksiyonunda kalıyor).
 - [ ] 67. **Rezerve dairede alıcı adayının adı yazılamıyor** — `buyerName`i
       yalnızca `saveSale` yazıyor ve o daireyi koşulsuz satıldıya çeviriyor.
+      · **TAMAM (21 Ağu 2026)** — `updatePayment` ve `updateExpense` yazıldı (`updateReceipt` deseni: alan alan denetim izi, değişiklik yoksa yazma yok). `paidAmount` elle yazılmıyor, `recalculateCollected` türetiyor.
+      · Formlar `Fmt.moneyText` ile dolduruluyor, `Fmt.money` ile DEĞİL — madde 52'nin miktar tarafındaki yuvarlama tuzağından baştan kaçınıldı.
+      · **SİLME ONAY SORUYOR:** diyalog hangi kaydın gittiğini yazıyor ve dekont/belge varsa 'o da silinecek' diye ayrıca söylüyor. Malzeme fişinde onay vardı, tahsilat ve giderde yoktu.
+      · Simülatörde doğrulandı: menü, onay diyaloğu (Vazgeç ile kayıt korundu) ve düzenleme sheet'i (kayıtlı değerlerle doldu). GİDER tarafı kod olarak aynı desen ama görsel olarak doğrulanmadı.
+      · **TAMAM (21 Ağu 2026)** — '+ N ödeme daha' artık dokunulabilir ve açılıyor; madde 50'de taksit planı için yazılan desenin aynısı. 36 aylık taksitli satışta ödemelerin çoğu uygulamada hiçbir yerden görülemiyordu; tek yol yedek dosyasını açmaktı.
 
 #### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
 
