@@ -80,6 +80,46 @@ struct ReceiptSheet: View {
                    unitPrice: ProjectViewModel.parseMoney(unitPriceText))
     }
 
+    /// "Yazdığın ile okuduğum aynı değil" uyarısı.
+    ///
+    /// `parseQuantity` bilerek HOŞGÖRÜLÜ: rakam ve ayraç dışındaki her şeyi
+    /// atıyor, böylece "12 500 kg" ya da "12.500" gibi girdiler çalışıyor.
+    /// Bunun bedeli sessizlik: ondalık ayracı tanınmazsa aradaki karakter
+    /// atılıyor ve KALAN RAKAMLAR BİRLEŞİYOR — "12ö5" 125 oluyor, yani sayı
+    /// ON KATINA çıkıyor. Alan hâlâ "12ö5" gösteriyor, toplam ise 125'e göre
+    /// hesaplanıyor; ekranda ikisinin ayrıştığına dair hiçbir işaret yok.
+    /// Gerçek fiş testinde birebir bu yaşandı.
+    ///
+    /// Hoşgörüyü kaldırmak yanlış olurdu — "12 500 kg" yazabilmek bu ekranın
+    /// işine yarıyor. Onun yerine SONUÇ GÖRÜNÜR KILINIYOR: yazılan metin,
+    /// okunan sayının kanonik yazımından (boşluklar dışında) farklıysa satır
+    /// beliriyor. Temiz girdide hiç görünmüyor, dolayısıyla gürültü değil.
+    private var readingHint: String? {
+        var parcalar: [String] = []
+
+        let miktarHam = quantityText.filter { !$0.isWhitespace }
+        if !miktarHam.isEmpty {
+            let okunan = ProjectViewModel.parseQuantity(quantityText)
+            let kanonik = Fmt.qtyText(okunan)
+            if kanonik.filter({ !$0.isWhitespace }) != miktarHam {
+                parcalar.append("miktar \(kanonik) \(selectedMaterial?.unit ?? "")"
+                    .trimmingCharacters(in: .whitespaces))
+            }
+        }
+
+        let fiyatHam = unitPriceText.filter { !$0.isWhitespace }
+        if !fiyatHam.isEmpty {
+            let okunan = ProjectViewModel.parseMoney(unitPriceText)
+            let kanonik = Fmt.moneyText(okunan)
+            if kanonik.filter({ !$0.isWhitespace }) != fiyatHam {
+                parcalar.append("birim fiyat \(kanonik) ₺")
+            }
+        }
+
+        guard !parcalar.isEmpty else { return nil }
+        return parcalar.joined(separator: " · ") + " olarak okundu"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetHeader(title: isEditing ? "Fişi Düzenle" : "Malzeme / Fiş Ekle",
@@ -133,6 +173,15 @@ struct ReceiptSheet: View {
                     .background(Palette.accentTint)
                     .cornerRadius(12)
                     .padding(.top, 12)
+
+                    // Yazılan ile okunan ayrıştıysa SÖYLE — gerekçesi
+                    // `readingHint` içinde. Temiz girdide hiç çizilmiyor.
+                    if let readingHint {
+                        Text(readingHint)
+                            .font(.manrope(12, .semiBold))
+                            .foregroundColor(Palette.alertInk)
+                            .padding(.top, 6)
+                    }
 
                     // Hareket tarihi — geçmiş güne kayıt girilebilsin.
                     VStack(alignment: .leading, spacing: 8) {
