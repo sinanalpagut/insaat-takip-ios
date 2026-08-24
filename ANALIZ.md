@@ -1302,7 +1302,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       girildiyse dönüş yolu yok (proje de silinemediği için baştan başlanamıyor).
       20 daireli blokta aynı tip ve m² 20 kez elle giriliyor; düzenleme ekranına
       yalnızca karta BASILI TUTARAK ulaşılıyor.
-- [ ] 62. **Çok kalemli irsaliye girilemiyor.** `addReceipt` tek `materialId`
+- [x] 62. **Çok kalemli irsaliye girilemiyor.** `addReceipt` tek `materialId`
       alıyor; çimento+kum+demir taşıyan tek fiş üç ayrı kayıt ve üç ayrı kamera
       çekimi demek. Haftada 20-30 fiş giren müteahhit için en büyük sürtünme.
 - [~] 63. **Fiş ve dekont yalnızca KAMERADAN.** Havale dekontu bankanın ekran
@@ -1357,6 +1357,11 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · Giriş noktası Giren/Kullanılan/Kalan kutularının altında (o rakamların anlamını devir belirliyor) ve düğme kayıtlı devri YAZIYOR.
       · Stoğu eksiye düşüremiyor: kayıtlı çıkışlar devirden besleniyor olabilir, devri küçültmek eksi kalan üretirdi.
       · Dört test eklendi. 42 Swift testi geçiyor.
+      · **TAMAM (21 Ağu 2026)** — MODEL DEĞİŞMEDİ, değişmemeliydi: her malzemenin stoğu ve maliyeti ayrı izlenmek zorunda, tek fişteki üç kalem modelde üç kayıttır. Sorun modelde değil TEKRAR GİRİLEN BİLGİDEYDİ.
+      · 'Kaydet ve Kalem Ekle' formu açık bırakıyor: tarih, fiş numarası ve görsel duruyor. İrsaliye bir kez yazılıyor, fotoğraf BİR KEZ çekiliyor.
+      · Eklenenler sayı değil LİSTE olarak gösteriliyor.
+      · MÜKERRER KALEM UYARISI — kendi düzeltmemin ürettiği riski kapatıyor: `selectedMaterial` nil olunca `materials.first`e düşüyor, yani kalem eklendikten sonra çip fiilen seçili kalıyor ve aynı malzeme ikinci kez girilebiliyor. Seçimi zorla temizlemek yerine durum SÖYLENİYOR.
+      · Simülatörde doğrulandı. KAPSAM: kayıtlar modelde ayrı kalıyor.
 
 #### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
 
