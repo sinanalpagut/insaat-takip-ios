@@ -1375,7 +1375,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 - [~] 68. **Hesap silmenin GERÇEK yolu hiç koşmadı** — madde 28'in düzeltmesi.
       Simülatör sahte servisi kullanıyor; gerçek `reauthenticate` + gerçek silme
       denenmedi. App Store 5.1.1(v) zorunluluğu ve gözden geçiren bunu dener.
-- [ ] 69. **App Review giriş YAPAMAZ.** Uygulamaya girmenin tek yolu Türkiye
+- [~] 69. **App Review giriş YAPAMAZ.** Uygulamaya girmenin tek yolu Türkiye
       numarasına gelen SMS. Review notlarına Firebase test telefon numarası +
       sabit kod konmazsa ilk ekran geçilemez → 2.1 reddi.
 - [ ] 70. **Release yapılandırması bir kez bile derlenip çalıştırılmadı.**
@@ -1397,6 +1397,16 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · İSTEMCİ (7): (a) Hata çevirisi `as? AuthError` ile yapılıyordu, Functions o tipi hiç fırlatmıyor — `??` yedeği TEK çalışan daldı, her sebep 'Hesap silinemedi' oluyordu. (b) İlk sunucu hatasından sonra akış BİR DAHA TAMAMLANAMIYORDU: tükenmiş kod yeniden gönderiliyor, mesaj kullanıcıdan ekranda bulunmayan bir düğmeyi istiyordu. (c) İş sürerken kapatma açıktı ve hata yok olmuş görünümün `@State`ine yazılıyordu. (d) 'Kalıcı olarak silinecek' denen fotoğraf, belge ve Firestore önbelleği (alıcı adları dahil) CİHAZDA kalıyordu. (e) Sunucu SMS turunun yapıldığını HİÇ denetlemiyordu: kaçırılmış bir jeton tek çağrıyla her şeyi siliyordu. (f) Sahte servisler `DEBUG` şartı olmadan seçiliyordu — Release'i simülatörde koşturmak (madde 70) taklidi sınardı. (g) Üç Auth kodu eşlenmemişti ve `.unknown` metni 'Giriş yapılamadı'ydı.
       · Sekiz emülatör + sekiz birim testi eklendi. Var olan testler işlevin Firestore tarafını doğruluyordu; Auth kaydının gerçekten gidip gitmediği, Storage nesnelerinin silinip silinmediği ve davet belgelerinin akıbeti HİÇ SORULMAMIŞTI — üçü de ekranda iz bırakmadan başarısız olabilecek adımlar.
       · **AÇIK KALAN:** gerçek cihazda gerçek bir hesabın gerçekten silinmesi. Bunun için ATILABİLİR gerçek bir hesap gerekiyor ve o da madde 69'un Firebase test numarası. İki madde tek işin iki yarısı.
+      · **GERÇEK TUR KOŞTU (24 Ağu 2026) ve ÜÇÜNCÜ BİR KUSUR ÇIKARDI — kodda değil, KURULUMDA.** Test numarasıyla üretimde hesap açıldı, proje kuruldu (900 Ada / 7 Parsel, 12 daire, 9 malzeme) ve silme çalıştırıldı. İşlev İLK Firestore sorgusunda `7 PERMISSION_DENIED` ile düştü. Çalıştırma hizmet hesabı varsayılan compute hesabı ve Firestore'a erişemiyor. Bu, uygulamanın kodundan bağımsız: düşen sorgu (`projects where ownerUid == uid`) maddenin ilk gününden beri oradaydı. `redeemInvite` günlüğü de aynı tabloyu doğruluyor — üretimde HİÇ doğrulanmış çağrı almamış. Yani Cloud Functions katmanı üretim Firestore'una bugüne kadar HİÇ dokunamamış. Yalnızca gerçekten koşturmak bunu ortaya çıkarabilirdi; maddenin varlık sebebi tam olarak bu.
+      · Düşüş KURTARILABİLİR oldu ve bu tesadüf değil: Storage'ı Firestore'dan öne almanın gerekçesi buydu. Hesap ve verinin tamamı yerinde kaldı (1 proje / 12 daire), ekran doğru cümleyi gösterdi ("Sunucu silmeyi tamamlayamadı") ve "Tekrar dene"ye döndü.
+      · GERÇEK TURDA DOĞRULANANLAR: `reauthenticate` gerçek Firebase'de çalışıyor; zorla tazelenen jeton sunucudaki `auth_time` kapısını geçiyor; onay ekranı gerçek sayıları okuyor; hata çevirisi doğru sınıfa düşüyor; yeniden deneme yolu kilitlenmiyor.
+      · **AÇIK KALAN:** IAM düzeltmesi (kullanıcının işi) ve ardından silmenin baştan sona tekrarı.
+      · **YOL AÇILDI (24 Ağu 2026), GİRİŞ UÇTAN UCA KOŞTU.**
+      · KODDA DEĞİŞİKLİK GEREKMEDİ ve bu kanıtlandı: `sendCode` sıradan `verifyPhoneNumber` çağırıyor, beyaz listedeki numara için Firebase doğrulama kimliğini SMS göndermeden döndürüyor. `appVerificationDisabledForTesting` EKLENMEDİ — yayın derlemesinde uygulama doğrulamasını tümden kapatırdı.
+      · TEST NUMARASI TEK BAŞINA YETMEZDİ. Gerçek turda çıktı ki kod alanına kod YAZILAMIYOR: iki TextField tek bir `Bool` odak durumuna bağlıydı ve odak hiçbirine gitmiyordu — dokunmak da açmıyordu. Gözden geçiren numarayı girse bile ilk ekranı geçemezdi. Odak artık alanı ayırt ediyor; düzeltmeden sonra giriş ilk denemede tamamlandı.
+      · DEPO HERKESE AÇIK (doğrulandı). Test numarası ve sabit kod repoya YAZILMADI: şablon `APP_REVIEW.md`de, gerçek değerler `.gitignore`daki `*.local.md` arkasında ve App Store Connect'te.
+      · GÖZDEN GEÇİRENİN GÖRECEĞİ EKRAN ÖLÇÜLDÜ: boş hesapla giren yalnızca "Henüz projen yok" görüyor — 2.1 reddinin ikinci biçimi. Test hesabı önceden kurulmuş bir demo projeyle teslim edilecek ve o projede GERÇEK ALICI ADI olmayacak.
+      · **AÇIK KALAN:** demo projenin kurulması ve App Store Connect Review Notes alanının doldurulması.
 
 #### D — VERİ GÜVENLİĞİ VE İZLENEBİLİRLİK
 
