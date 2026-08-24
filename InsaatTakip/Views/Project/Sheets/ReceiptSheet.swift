@@ -40,6 +40,14 @@ struct ReceiptSheet: View {
     @State private var receiptCleared = false
     /// Kaynak seçimi (kamera / galeri) — madde 63.
     @State private var showSource = false
+    /// Bu oturumda AYNI irsaliyeye eklenen kalemler (madde 62).
+    @State private var addedLines: [AddedLine] = []
+
+    struct AddedLine: Identifiable, Hashable {
+        let id = UUID()
+        let materialId: UUID
+        let text: String
+    }
     @State private var showNewMaterial = false
     /// Fişten cihaz üstü OCR ile okunanlar (arka planda çalışır).
     @State private var reading: ReceiptScanner.Reading?
@@ -228,8 +236,93 @@ struct ReceiptSheet: View {
                         .padding(.top, 10)
                     }
 
+                    // Bu irsaliyeye eklenenler — SAYI DEĞİL LİSTE.
+                    //
+                    // "3 kalem eklendi" demek kullanıcıya hangilerinin
+                    // girildiğini söylemez; üç kalemli bir irsaliyede ikincisini
+                    // iki kez girmek kolay ve stok sessizce şişer.
+                    if !addedLines.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Bu irsaliyeye eklendi · \(addedLines.count) kalem")
+                                .font(.manrope(11.5, .bold))
+                                .foregroundColor(Palette.success)
+                            ForEach(addedLines) { satir in
+                                HStack(spacing: 6) {
+                                    Image(systemName: "checkmark")
+                                        .iconFont(10, weight: .bold)
+                                    Text(satir.text)
+                                        .font(.manrope(12, .medium))
+                                }
+                                .foregroundColor(Palette.textSecondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Palette.successTint)
+                        .cornerRadius(12)
+                        .padding(.top, 16)
+                    }
+
+                    // MÜKERRER KALEM UYARISI.
+                    //
+                    // `selectedMaterial` nil olduğunda `materials.first`e
+                    // düşüyor, yani kalem eklendikten sonra malzeme çipi
+                    // fiilen SEÇİLİ kalıyor — hem de az önce eklenen kalem.
+                    // Kullanıcı miktarı yazıp tekrar dokunursa aynı malzeme
+                    // ikinci kez giriyor ve stok sessizce şişiyor. Seçimi
+                    // zorla temizlemek yerine durumu SÖYLÜYORUZ: girdi geçerli
+                    // olabilir (aynı irsaliyede iki ayrı parti), karar
+                    // kullanıcının.
+                    if let secili = selectedMaterial,
+                       addedLines.contains(where: { $0.materialId == secili.id }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .iconFont(12, weight: .semibold)
+                            Text("\(secili.name) bu irsaliyeye zaten eklendi.")
+                                .font(.manrope(12, .semiBold))
+                        }
+                        .foregroundColor(Palette.alertInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Palette.alertTint)
+                        .cornerRadius(12)
+                        .padding(.top, 12)
+                    }
+
+                    // ÇOK KALEMLİ İRSALİYE (madde 62).
+                    //
+                    // `addReceipt` tek `materialId` alıyor ve öyle kalıyor:
+                    // her malzemenin stoğu ve maliyeti AYRI izlenmek zorunda,
+                    // yani tek fişteki üç kalem modelde üç kayıttır. Sorun
+                    // model değil, TEKRAR GİRİLEN BİLGİYDİ — çimento, kum ve
+                    // demir taşıyan bir irsaliyede tarih, fiş numarası ve
+                    // fotoğraf üç kez elden geçiyordu, üstelik fotoğraf üç kez
+                    // ÇEKİLİYORDU.
+                    //
+                    // Bu düğme kaydı yazıp formu AÇIK bırakıyor: tarih, fiş
+                    // numarası ve görsel duruyor, yalnızca malzeme ve miktar
+                    // sıfırlanıyor.
+                    if !isEditing {
+                        Button {
+                            save(keepOpen: true)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "plus.circle")
+                                    .iconFont(13, weight: .semibold)
+                                Text("Kaydet ve Kalem Ekle")
+                                    .font(.manrope(13.5, .bold))
+                            }
+                            .foregroundColor(Palette.accent)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 48)
+                            .background(Palette.accentTint)
+                            .cornerRadius(13)
+                        }
+                        .padding(.top, 16)
+                    }
+
                     PrimaryButton(title: isEditing ? "Değişikliği Kaydet" : "Kaydet") { save() }
-                        .padding(.top, 20)
+                        .padding(.top, isEditing ? 20 : 10)
 
                     // Bu kayıt daha önce düzeltilmişse geçmişi burada durur.
                     if let editingLogId {
@@ -533,7 +626,7 @@ struct ReceiptSheet: View {
         return receiptCleared ? .cleared : .unchanged
     }
 
-    private func save() {
+    private func save(keepOpen: Bool = false) {
         let role: UserRole = isAdmin ? .admin : .partner
         if let editingLogId {
             let saved = viewModel.updateReceipt(role: role, logId: editingLogId,
@@ -550,6 +643,9 @@ struct ReceiptSheet: View {
             viewModel.flash("Malzeme seçilmedi")
             return
         }
+        let miktar = quantityText
+        let ad = selectedMaterial?.name ?? "—"
+        let birim = selectedMaterial?.unit ?? ""
         let saved = viewModel.addReceipt(role: role,
                                          materialId: materialId,
                                          type: direction,
@@ -558,6 +654,20 @@ struct ReceiptSheet: View {
                                          reference: referenceText,
                                          date: date,
                                          receiptImage: receiptImage)
-        if saved { dismiss() }
+        guard saved else { return }
+        if keepOpen {
+            // TARİH, FİŞ NO ve GÖRSEL DURUYOR — tekrar girilen bilgi buydu.
+            // Görsel her kaleme kendi kopyasıyla iniyor (Storage nesnesi kayıt
+            // kimliğiyle adlandırılıyor); tek nesneyi paylaştırmak ayrı bir
+            // adlandırma şeması ve kural değişikliği isterdi.
+            addedLines.append(AddedLine(materialId: materialId,
+                                        text: "\(ad) · \(miktar) \(birim)"))
+            selectedMaterialId = nil
+            quantityText = ""
+            unitPriceText = ""
+            reading = nil
+        } else {
+            dismiss()
+        }
     }
 }
