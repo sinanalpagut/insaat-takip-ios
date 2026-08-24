@@ -48,10 +48,48 @@ enum LocalDataPurge {
     static func afterAccountDeletion() {
         remove(ImageStore.cacheDirectory)
         remove(DocumentStore.cacheDirectory)
-        UserDefaults.standard.set(true, forKey: pendingKey)
+        markPending()
     }
 
-    private static let pendingKey = "firestoreCachePurgePending"
+    // ── Bekleyen temizlik işareti ───────────────────────────────────────────
+    //
+    // İŞARET DOSYA, `UserDefaults` DEĞİL — ve bu da ölçülerek öğrenildi.
+    //
+    // İlk sürüm `UserDefaults.standard.set(true, forKey:)` kullanıyordu.
+    // `UserDefaults` yazmayı ANINDA diske indirmiyor; sistem uygun bir anda
+    // topluca yazıyor. Hesabını silen kullanıcı uygulamayı hemen kapatırsa
+    // (ya da sistem öldürürse) o "uygun an" hiç gelmiyor ve işaret kayboluyor.
+    // Doğrudan görüldü: silmeden sonra süreç sonlandırıldı, sonraki açılışta
+    // `Library/Preferences` içindeki plist'te anahtar YOKTU — yani temizlik
+    // hiç koşmayacaktı ve kimse fark etmeyecekti.
+    //
+    // Sessizce kaybolan bir işaret, hiç olmayan işaretten daha kötü: kod
+    // temizliğin yapılacağını SÖYLÜYOR ama yapılmıyor. Dosya yazma ise
+    // döndüğünde diskte; kaybolma penceresi yok. `synchronize()` de işi
+    // görürdü ama o çağrı "gereksiz" diye kullanımdan kaldırıldı ve
+    // dayanıklılığı ona bağlamak, kaldırıldığı gün sessizce bozulmak demek.
+    private static var markerURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory,
+                                 in: .userDomainMask)[0]
+            .appendingPathComponent("firestore-cache-purge-pending")
+    }
+
+    private static func markPending() {
+        let url = markerURL
+        try? FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        do { try Data().write(to: url, options: .atomic) }
+        catch {
+            #if DEBUG
+            print("LocalDataPurge: temizlik işareti bırakılamadı — \(error)")
+            #endif
+        }
+    }
+
+    /// Test ve açılış yolu için: bekleyen temizlik var mı?
+    static var isPurgePending: Bool {
+        FileManager.default.fileExists(atPath: markerURL.path)
+    }
 
     /// Açılışta koşan kısım: FIRESTORE ÖNBELLEĞİ.
     ///
@@ -60,16 +98,15 @@ enum LocalDataPurge {
     /// şey yapmıyor — her açılışta önbelleği silmek, uygulamayı her seferinde
     /// sıfırdan veri çekmeye zorlardı.
     static func purgeFirestoreCacheIfPending() {
-        let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: pendingKey) else { return }
+        guard isPurgePending else { return }
         Firestore.firestore().clearPersistence { error in
             if let error {
                 #if DEBUG
                 print("LocalDataPurge: Firestore önbelleği temizlenemedi — \(error)")
                 #endif
-                return   // bayrak DURUYOR: sonraki açılışta tekrar denenir
+                return   // İŞARET DURUYOR: sonraki açılışta tekrar denenir
             }
-            defaults.set(false, forKey: pendingKey)
+            try? FileManager.default.removeItem(at: markerURL)
         }
     }
 

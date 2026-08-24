@@ -17,10 +17,14 @@ import XCTest
 @MainActor
 final class LocalDataPurgeTests: XCTestCase {
 
-    private let flagKey = "firestoreCachePurgePending"
+    private var markerURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory,
+                                 in: .userDomainMask)[0]
+            .appendingPathComponent("firestore-cache-purge-pending")
+    }
 
     override func tearDown() {
-        UserDefaults.standard.removeObject(forKey: flagKey)
+        try? FileManager.default.removeItem(at: markerURL)
         super.tearDown()
     }
 
@@ -50,12 +54,16 @@ final class LocalDataPurgeTests: XCTestCase {
     /// Bayrak bırakılmazsa temizlik hiç koşmaz ve alıcı adları (KVKK) cihazda
     /// kalır — üstelik kimse fark etmez, çünkü ekranda hiçbir iz yok.
     func testFirestorePurgeIsFlaggedForNextLaunch() {
-        UserDefaults.standard.removeObject(forKey: flagKey)
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: flagKey), "zemin: bayrak kapalı")
+        try? FileManager.default.removeItem(at: markerURL)
+        XCTAssertFalse(LocalDataPurge.isPurgePending, "zemin: işaret yok")
 
         LocalDataPurge.afterAccountDeletion()
 
-        XCTAssertTrue(UserDefaults.standard.bool(forKey: flagKey))
+        XCTAssertTrue(LocalDataPurge.isPurgePending)
+        // İŞARET DİSKTE OLMAK ZORUNDA, yalnızca bellekte değil: uygulama
+        // silmeden hemen sonra öldürülürse temizlik yine de koşmalı.
+        // `UserDefaults` sürümü tam burada sessizce kaybediyordu.
+        XCTAssertTrue(FileManager.default.fileExists(atPath: markerURL.path))
     }
 
     /// Bekleyen bir silme YOKKEN açılış temizliği hiçbir şey yapmamalı.
@@ -63,9 +71,9 @@ final class LocalDataPurgeTests: XCTestCase {
     /// Her açılışta önbelleği silmek, uygulamayı her seferinde sıfırdan veri
     /// çekmeye zorlardı: sahada kapsama zayıfken açılış ekranı boş kalırdı.
     func testLaunchPurgeIsNoOpWithoutPendingFlag() {
-        UserDefaults.standard.removeObject(forKey: flagKey)
+        try? FileManager.default.removeItem(at: markerURL)
         LocalDataPurge.purgeFirestoreCacheIfPending()
-        XCTAssertFalse(UserDefaults.standard.bool(forKey: flagKey))
+        XCTAssertFalse(LocalDataPurge.isPurgePending)
     }
 
     /// Dizin zaten yoksa temizlik hata vermemeli.
@@ -77,6 +85,6 @@ final class LocalDataPurgeTests: XCTestCase {
         try? FileManager.default.removeItem(at: ImageStore.cacheDirectory)
         try? FileManager.default.removeItem(at: DocumentStore.cacheDirectory)
         LocalDataPurge.afterAccountDeletion()   // patlamamalı
-        XCTAssertTrue(UserDefaults.standard.bool(forKey: flagKey))
+        XCTAssertTrue(LocalDataPurge.isPurgePending)
     }
 }
