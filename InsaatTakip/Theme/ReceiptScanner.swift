@@ -87,10 +87,46 @@ enum ReceiptScanner {
                 // KDV satırlarını toplam sanma
                 if normalized.contains("kdv") && !normalized.contains("dahil") { continue }
 
-                // Tutar aynı satırda olmayabilir; bir sonraki satıra da bak.
+                // TUTAR ETİKETİN HEMEN ALTINDA OLMAYABİLİR.
+                //
+                // Fişler iki sütunlu: solda etiket, sağda tutar. Vision bunu
+                // satır satır okumuyor — önce SOL sütunun tamamını, sonra SAĞ
+                // sütunun tamamını ayrı satırlar hâlinde veriyor:
+                //
+                //     TOPKDV                 →  *30,91
+                //     TOPLAM                 →  *340,00
+                //
+                // gerçekte şu diziyle geliyor:
+                //     ["TOPKDV", "TOPLAM", "*30,91", "*340,00"]
+                //
+                // Eski kural "bir sonraki satıra bak" diyordu ve o satır
+                // BİR SONRAKİ ETİKET oluyordu. İki gerçek fişte ölçüldü:
+                //   · Yemek fişinde "TOPLAM"ın altındaki satır *30,91 idi —
+                //     yani KDV. Toplam 340,00 iken 30,91 okundu.
+                //   · Market fişinde "Ödenecek KDV Dahil Tutar"ın altındaki
+                //     satır "Banka Kredi Kartı (1)" idi; parantezdeki 1
+                //     tutar sanıldı. Toplam 399,00 iken 1,00 okundu ve
+                //     ekranda "Toplam 1 ₺" yazdı.
+                //
+                // Yeni kural: etiket satırında tutar yoksa, İZLEYEN BİRKAÇ
+                // SATIRDAN yalnızca TUTARDAN İBARET olanlara bakılır ve en
+                // büyüğü alınır. İkisi de gerekli:
+                //   · "yalnızca tutar" şartı, "Banka Kredi Kartı (1)" gibi
+                //     etiket satırlarındaki rakamları eler,
+                //   · "en büyüğü" kuralı bu dosyanın zaten benimsediği
+                //     gerekçenin aynısı (aşağıdaki `candidates.max()`):
+                //     ödenecek tutar, kalemleri ve KDV'yi kapsadığı için o
+                //     komşulukta doğası gereği en büyük sayıdır.
+                //
+                // Pencere DAR tutuldu (6 satır): fişin altındaki "BAKİYE" gibi
+                // ilgisiz ve daha büyük tutarlar kapsama girmesin.
                 var pool = amounts(in: line)
-                if pool.isEmpty, index + 1 < lines.count {
-                    pool = amounts(in: lines[index + 1])
+                if pool.isEmpty {
+                    pool = lines.indices
+                        .dropFirst(index + 1)
+                        .prefix(6)
+                        .filter { isAmountOnly(lines[$0]) }
+                        .flatMap { amounts(in: lines[$0]) }
                 }
                 candidates.append(contentsOf: pool)
             }
@@ -102,6 +138,21 @@ enum ReceiptScanner {
         if let best = decimals.max() { return best }
 
         return nil
+    }
+
+    /// Satır SADECE bir tutardan mı ibaret?
+    ///
+    /// İki sütunlu fişte değer sütunu böyle geliyor ("*340,00", "399,00 TL").
+    /// Harf içeren satır etikettir ve içindeki rakam tutar değildir — market
+    /// fişindeki "Banka Kredi Kartı (1)" tam da bu yüzden 1,00 ₺ okunmuştu.
+    /// Para birimi sözcükleri harf sayılmıyor; "399,00 TL" hâlâ tutardır.
+    static func isAmountOnly(_ line: String) -> Bool {
+        guard !amounts(in: line).isEmpty else { return false }
+        var rest = line.lowercased()
+        for token in ["tl", "try", "₺"] {
+            rest = rest.replacingOccurrences(of: token, with: " ")
+        }
+        return !rest.contains { $0.isLetter }
     }
 
     /// "12.03.2026" / "12/03/26" → "12 Mar 2026"
