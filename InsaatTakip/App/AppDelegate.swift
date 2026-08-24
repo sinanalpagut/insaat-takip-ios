@@ -40,6 +40,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                         [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         FirebaseApp.configure()
         Self.connectEmulatorIfRequested()
+        // Hesap silindiyse Firestore'un disk önbelleği (alıcı adları dahil)
+        // BURADA temizleniyor: `clearPersistence()` yalnızca istemci
+        // BAŞLAMAMIŞKEN çalışıyor ve burası uygulamadaki tek böyle an.
+        // Silme anında denenen sürüm, uygulama ömrü boyunca yaşayan deponun
+        // yakaladığı Firestore örneğini öldürüp bir sonraki girişte çökmeye
+        // yol açıyordu (bkz. LocalDataPurge).
+        LocalDataPurge.purgeFirestoreCacheIfPending()
         return true
     }
 

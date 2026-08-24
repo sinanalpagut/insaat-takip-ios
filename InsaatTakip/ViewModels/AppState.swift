@@ -224,17 +224,17 @@ final class AppState: ObservableObject {
             lastDeletionSummary = summary
         }
 
-        // CİHAZDAKİ VERİ — en sonda ve oturum düştükten SONRA.
+        // CİHAZDAKİ DOSYALAR — en sonda ve oturum düştükten SONRA.
         //
         // Onay ekranı "fotoğraf ve belgeler kalıcı olarak silinecek" diyor;
         // bu satır olmadan o cümle yalnızca sunucu için doğruydu. Fotoğraflar,
         // belgeler ve Firestore'un kalıcı önbelleği (alıcı adları dahil)
         // telefonda kalıyordu.
         //
-        // Ekran ağacı değiştikten sonra çağrılıyor: `terminate()` Firestore
-        // örneğini durduruyor ve hâlâ dinleyen bir ekran olsaydı ortada
-        // kalırdı. Bu noktada proje ekranları çoktan yok.
-        await LocalDataPurge.afterAccountDeletion()
+        // Firestore önbelleği BURADA temizlenmiyor; bayrağı bırakılıp sonraki
+        // açılışa devrediliyor. Gerekçesi `LocalDataPurge` içinde yazılı ve
+        // gerçek cihazda çökmeyle öğrenildi.
+        LocalDataPurge.afterAccountDeletion()
 
         return summary
     }
