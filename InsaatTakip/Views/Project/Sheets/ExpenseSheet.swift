@@ -11,6 +11,12 @@ struct ExpenseSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let projectId: UUID
+    /// Doluysa DÜZENLEME kipi (madde 64). Gider düzeltmenin yolu hiç yoktu:
+    /// yanlış tutar "sil-yeniden gir" demekti ve silme belge fotoğrafını da
+    /// kalıcı olarak götürüyordu.
+    var editingExpenseId: UUID? = nil
+
+    @State private var didPrefill = false
 
     @State private var category: Expense.Category = .iscilik
     @State private var amountText = ""
@@ -26,7 +32,8 @@ struct ExpenseSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SheetHeader(title: "Gider Ekle", subtitle: project?.title) { dismiss() }
+            SheetHeader(title: editingExpenseId == nil ? "Gider Ekle" : "Gideri Düzenle",
+                        subtitle: project?.title) { dismiss() }
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
@@ -105,7 +112,8 @@ struct ExpenseSheet: View {
                     }
                     .padding(.top, 14)
 
-                    PrimaryButton(title: "Gideri Kaydet") { save() }
+                    PrimaryButton(title: editingExpenseId == nil
+                                  ? "Gideri Kaydet" : "Değişikliği Kaydet") { save() }
                         .padding(.top, 22)
 
                     Text("Girilen giderler \"Net\" rakamına ve dönem raporuna dahil edilir.")
@@ -124,6 +132,7 @@ struct ExpenseSheet: View {
         .keyboardDoneToolbar()
         .sheetHeight(0.85)
         .presentationDragIndicator(.visible)
+        .onAppear { prefill() }
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)
         .fullScreenCover(isPresented: $showCamera) {
@@ -179,13 +188,37 @@ struct ExpenseSheet: View {
         }
     }
 
+    /// Tutar `Fmt.moneyText` ile yazılıyor, `Fmt.money` ile DEĞİL: ikincisi tam
+    /// liraya yuvarlar ve 28,50 ₺'lik bir gider forma "29" olarak dolup
+    /// kaydedilince gerçekten 29 ₺ olurdu (madde 52'nin miktar tarafındaki
+    /// aynı tuzağı).
+    private func prefill() {
+        guard !didPrefill, let id = editingExpenseId,
+              let expense = viewModel.expenses.first(where: { $0.id == id }) else { return }
+        didPrefill = true
+        category = expense.category
+        amountText = Fmt.moneyText(expense.amount)
+        payee = expense.payee
+        note = expense.note
+        date = expense.date
+        receiptImage = viewModel.receiptImages[expense.id]
+    }
+
     private func save() {
-        let saved = viewModel.addExpense(role: viewModel.role(inProject: projectId, for: appState.currentUser),
-                                         projectId: projectId,
-                                         category: category,
-                                         amountText: amountText,
+        let role = viewModel.role(inProject: projectId, for: appState.currentUser)
+        let saved: Bool
+        if let id = editingExpenseId {
+            // Belge fotoğrafı düzenlemede DEĞİŞMİYOR: tutarı düzeltmek için
+            // fişi yeniden çekmeye zorlamak, düzeltmenin önündeki asıl engeldi.
+            saved = viewModel.updateExpense(role: role, expenseId: id, category: category,
+                                            amountText: amountText, payee: payee,
+                                            note: note, date: date)
+        } else {
+            saved = viewModel.addExpense(role: role, projectId: projectId,
+                                         category: category, amountText: amountText,
                                          payee: payee, note: note,
                                          date: date, receiptImage: receiptImage)
+        }
         if saved { dismiss() }
     }
 }

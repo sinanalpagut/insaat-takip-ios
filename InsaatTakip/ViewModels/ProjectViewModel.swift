@@ -1789,6 +1789,72 @@ final class ProjectViewModel: ObservableObject {
     }
 
     /// Yanlış girilen tahsilatı siler; toplam yeniden hesaplanır.
+    /// Tahsilat düzeltme (madde 64).
+    ///
+    /// NEDEN GEREKLİ: düzenleme yolu HİÇ YOKTU. Yanlış girilen bir tutarı
+    /// düzeltmenin tek yolu silip yeniden girmekti — ve silme dekont nesnesini
+    /// de Storage'dan kalıcı olarak düşürüyordu. Yani bir rakam hatası,
+    /// bankadan alınmış dekontun kaybı demekti.
+    ///
+    /// `paidAmount` BURADA YAZILMIYOR: `recalculateCollected` ödeme
+    /// kayıtlarından yeniden türetiyor. Elle yazılsaydı, tutarı düşüren bir
+    /// düzeltmede daire toplamı ile ödeme defteri ayrışırdı.
+    @discardableResult
+    func updatePayment(role: UserRole, paymentId: UUID, amountText: String,
+                       method: Payment.Method, note: String, date: Date) -> Bool {
+        guard role == .admin,
+              let index = payments.firstIndex(where: { $0.id == paymentId }),
+              let apartment = apartments.first(where: { $0.id == payments[index].apartmentId })
+        else { return false }
+
+        let amount = Self.parseMoney(amountText)
+        guard amount > .zero else {
+            flash("Tutar girilmedi")
+            return false
+        }
+
+        let before = payments[index]
+        var changes: [AuditEntry.Change] = []
+        if before.amount != amount {
+            changes.append(.init(field: "Tutar",
+                                 oldValue: Fmt.money(before.amount),
+                                 newValue: Fmt.money(amount)))
+        }
+        if before.method != method {
+            changes.append(.init(field: "Yöntem",
+                                 oldValue: before.method.rawValue, newValue: method.rawValue))
+        }
+        if before.note != note {
+            changes.append(.init(field: "Açıklama",
+                                 oldValue: before.note.isEmpty ? "—" : before.note,
+                                 newValue: note.isEmpty ? "—" : note))
+        }
+        if !Fmt.calendar.isDate(before.date, inSameDayAs: date) {
+            changes.append(.init(field: "Tarih",
+                                 oldValue: Fmt.shortDate(before.date),
+                                 newValue: Fmt.shortDate(date)))
+        }
+        guard !changes.isEmpty else {
+            flash("Değişiklik yok")
+            return true
+        }
+
+        payments[index].amount = amount
+        payments[index].method = method
+        payments[index].note = note
+        payments[index].date = date
+
+        var writes: [DocumentChange] = [.payment(payments[index])]
+        if let updated = recalculateCollected(for: apartment.id) { writes.append(.apartment(updated)) }
+        writes += recordAudit(recordId: paymentId, projectId: apartment.projectId,
+                              subject: "Daire No \(apartment.apartmentNumber) tahsilatı",
+                              action: .update, changes: changes)
+        persist(writes, failureNote: "Tahsilat düzeltme")
+        flash("Tahsilat güncellendi")
+        Task { @MainActor [weak self] in await self?.refreshReminders() }
+        return true
+    }
+
     func deletePayment(role: UserRole, id: UUID) {
         guard role == .admin,
               let payment = payments.first(where: { $0.id == id }),
@@ -1868,6 +1934,66 @@ final class ProjectViewModel: ObservableObject {
     }
 
     /// Yanlış girilen gideri siler (yalnızca yönetici).
+    /// Gider düzeltme (madde 64). Gerekçesi tahsilattaki ile aynı: düzenleme
+    /// yolu hiç yoktu ve silmek belge fotoğrafını da kalıcı olarak götürüyordu.
+    @discardableResult
+    func updateExpense(role: UserRole, expenseId: UUID, category: Expense.Category,
+                       amountText: String, payee: String, note: String, date: Date) -> Bool {
+        guard role == .admin,
+              let index = expenses.firstIndex(where: { $0.id == expenseId })
+        else { return false }
+
+        let amount = Self.parseMoney(amountText)
+        guard amount > .zero else {
+            flash("Tutar girilmedi")
+            return false
+        }
+
+        let before = expenses[index]
+        var changes: [AuditEntry.Change] = []
+        if before.category != category {
+            changes.append(.init(field: "Kategori",
+                                 oldValue: before.category.rawValue, newValue: category.rawValue))
+        }
+        if before.amount != amount {
+            changes.append(.init(field: "Tutar",
+                                 oldValue: Fmt.money(before.amount), newValue: Fmt.money(amount)))
+        }
+        if before.payee != payee {
+            changes.append(.init(field: "Ödenen",
+                                 oldValue: before.payee.isEmpty ? "—" : before.payee,
+                                 newValue: payee.isEmpty ? "—" : payee))
+        }
+        if before.note != note {
+            changes.append(.init(field: "Açıklama",
+                                 oldValue: before.note.isEmpty ? "—" : before.note,
+                                 newValue: note.isEmpty ? "—" : note))
+        }
+        if !Fmt.calendar.isDate(before.date, inSameDayAs: date) {
+            changes.append(.init(field: "Tarih",
+                                 oldValue: Fmt.shortDate(before.date),
+                                 newValue: Fmt.shortDate(date)))
+        }
+        guard !changes.isEmpty else {
+            flash("Değişiklik yok")
+            return true
+        }
+
+        expenses[index].category = category
+        expenses[index].amount = amount
+        expenses[index].payee = payee
+        expenses[index].note = note
+        expenses[index].date = date
+
+        var writes: [DocumentChange] = [.expense(expenses[index])]
+        writes += recordAudit(recordId: expenseId, projectId: before.projectId,
+                              subject: "Gider · \(category.rawValue)",
+                              action: .update, changes: changes)
+        persist(writes, failureNote: "Gider düzeltme")
+        flash("Gider güncellendi")
+        return true
+    }
+
     func deleteExpense(role: UserRole, id: UUID) {
         guard role == .admin, let expense = expenses.first(where: { $0.id == id }) else { return }
         expenses.removeAll { $0.id == id }

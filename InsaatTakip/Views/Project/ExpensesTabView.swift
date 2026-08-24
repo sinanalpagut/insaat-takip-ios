@@ -9,6 +9,8 @@ struct ExpensesTabView: View {
     @EnvironmentObject private var viewModel: ProjectViewModel
 
     /// Tam ekranda açılan gider fişi.
+    @State private var editingExpense: Expense?
+    @State private var pendingExpenseDelete: Expense?
     @State private var previewedReceipt: SharePayloadImage?
 
     let projectId: UUID
@@ -52,9 +54,15 @@ struct ExpensesTabView: View {
                             onReceiptTap: { previewedReceipt = SharePayloadImage(image: $0) })
                             .contextMenu {
                                 if isAdmin {
+                                    Button {
+                                        editingExpense = expense
+                                    } label: {
+                                        Label("Gideri düzenle", systemImage: "pencil")
+                                    }
                                     Button(role: .destructive) {
-                                        viewModel.deleteExpense(role: isAdmin ? .admin : .partner,
-                                                                id: expense.id)
+                                        // Doğrudan SİLMİYOR (madde 64): belge
+                                        // fotoğrafı da gittiği için onay şart.
+                                        pendingExpenseDelete = expense
                                     } label: {
                                         Label("Gideri sil", systemImage: "trash")
                                     }
@@ -68,6 +76,26 @@ struct ExpensesTabView: View {
             .padding(.horizontal, 16)
         }
         .receiptPreview($previewedReceipt)
+        .sheet(item: $editingExpense) { expense in
+            ExpenseSheet(projectId: projectId, editingExpenseId: expense.id)
+        }
+        .alert("Gider silinsin mi?", isPresented: Binding(
+            get: { pendingExpenseDelete != nil },
+            set: { if !$0 { pendingExpenseDelete = nil } }
+        ), presenting: pendingExpenseDelete) { expense in
+            Button("Vazgeç", role: .cancel) { pendingExpenseDelete = nil }
+            Button("Sil", role: .destructive) {
+                viewModel.deleteExpense(role: isAdmin ? .admin : .partner, id: expense.id)
+                pendingExpenseDelete = nil
+            }
+        } message: { expense in
+            // BELGENİN DE GİDECEĞİ YAZILI: kullanıcı bir satır sildiğini
+            // sanıyordu, oysa fatura fotoğrafı da Storage'dan düşüyor.
+            Text("\(expense.category.rawValue) · \(Fmt.money(expense.amount))"
+                 + (expense.receiptPath != nil || viewModel.receiptImages[expense.id] != nil
+                    ? "\n\nBelge fotoğrafı da silinecek ve geri alınamaz."
+                    : "\n\nBu işlem geri alınamaz."))
+        }
     }
 
     // MARK: Özet

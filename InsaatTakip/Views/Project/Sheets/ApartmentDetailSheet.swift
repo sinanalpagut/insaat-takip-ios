@@ -21,6 +21,17 @@ struct ApartmentDetailSheet: View {
     @State private var showCamera = false
     @State private var showCancelConfirm = false
     @State private var showPayment = false
+    /// Düzenlenen tahsilat (madde 64).
+    @State private var editingPayment: Payment?
+    /// Silinmesi ONAY BEKLEYEN tahsilat (madde 64).
+    ///
+    /// Önceden `contextMenu` doğrudan siliyordu: uzun basıp "Tahsilatı sil"e
+    /// dokunmak anında siliyor ve dekont nesnesini de Storage'dan düşürüyordu.
+    /// Malzeme fişinde onay diyaloğu VARDI, tahsilatta yoktu — aynı ürün
+    /// içinde tutarsız ve geri dönüşü olmayan tarafta eksik.
+    @State private var pendingPaymentDelete: Payment?
+    /// Tahsilat defteri uzunsa ilk altısı gösteriliyor; kalanı bununla açılır.
+    @State private var showAllPayments = false
     /// Plan uzunsa ilk altı vade gösteriliyor; kalanı bu bayrakla açılıyor.
     @State private var showAllInstallments = false
 
@@ -132,6 +143,26 @@ struct ApartmentDetailSheet: View {
             Text("Daire No \(apartment?.apartmentNumber ?? 0) tekrar boş duruma dönecek; alıcı ve tahsilat kayıtları silinecek. İşlem, silinen tutarın anlık görüntüsüyle değişiklik defterine yazılır ve ortakların akışında görünür.")
         }
         .receiptPreview($previewedReceipt)
+        .sheet(item: $editingPayment) { payment in
+            PaymentSheet(apartmentId: apartmentId, editingPaymentId: payment.id)
+        }
+        .alert("Tahsilat silinsin mi?", isPresented: Binding(
+            get: { pendingPaymentDelete != nil },
+            set: { if !$0 { pendingPaymentDelete = nil } }
+        ), presenting: pendingPaymentDelete) { payment in
+            Button("Vazgeç", role: .cancel) { pendingPaymentDelete = nil }
+            Button("Sil", role: .destructive) {
+                viewModel.deletePayment(role: isAdmin ? .admin : .partner, id: payment.id)
+                pendingPaymentDelete = nil
+            }
+        } message: { payment in
+            // DEKONTUN DA GİDECEĞİ YAZILI: kullanıcı yalnızca bir satır
+            // sildiğini sanıyordu, oysa bankadan alınmış görsel de düşüyor.
+            Text("\(payment.detailText) · \(Fmt.money(payment.amount))"
+                 + (payment.receiptPath != nil || viewModel.receiptImages[payment.id] != nil
+                    ? "\n\nDekont da silinecek ve geri alınamaz."
+                    : "\n\nBu işlem geri alınamaz."))
+        }
         .sheet(isPresented: $showPayment) {
             PaymentSheet(apartmentId: apartmentId)
         }
@@ -561,20 +592,33 @@ struct ApartmentDetailSheet: View {
                     .padding(.vertical, 16)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(payments.prefix(6).enumerated()), id: \.element.id) { index, payment in
+                    let gorunen = showAllPayments ? payments : Array(payments.prefix(6))
+                    ForEach(Array(gorunen.enumerated()), id: \.element.id) { index, payment in
                         paymentRow(payment)
-                        if index < min(payments.count, 6) - 1 {
+                        if index < gorunen.count - 1 {
                             Divider().overlay(Palette.divider)
                         }
                     }
                 }
                 .padding(.top, 6)
 
+                // KIRPMA DOKUNULABİLİR OLMALI (madde 65). Önceden bu düz bir
+                // metindi: altıncıdan sonraki ödemeler uygulamada HİÇBİR
+                // yerden görülemiyordu. 36 aylık taksitli bir satışta bu,
+                // ödemelerin çoğunun erişilemez olması demekti — ve tek yol
+                // yedek dosyasını açmaktı.
                 if payments.count > 6 {
-                    Text("+ \(payments.count - 6) ödeme daha")
-                        .font(.manrope(11.5, .semiBold))
-                        .foregroundColor(Palette.accent)
-                        .padding(.top, 4)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { showAllPayments.toggle() }
+                    } label: {
+                        Text(showAllPayments
+                             ? "İlk 6 ödemeyi göster"
+                             : "+ \(payments.count - 6) ödeme daha")
+                            .font(.manrope(11.5, .semiBold))
+                            .foregroundColor(Palette.accent)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
                 }
             }
 
@@ -639,8 +683,14 @@ struct ApartmentDetailSheet: View {
         .padding(.vertical, 11)
         .contextMenu {
             if isAdmin {
+                Button {
+                    editingPayment = payment
+                } label: {
+                    Label("Tahsilatı düzenle", systemImage: "pencil")
+                }
                 Button(role: .destructive) {
-                    viewModel.deletePayment(role: isAdmin ? .admin : .partner, id: payment.id)
+                    // Doğrudan SİLMİYOR: onay diyaloğu açılıyor (madde 64).
+                    pendingPaymentDelete = payment
                 } label: {
                     Label("Tahsilatı sil", systemImage: "trash")
                 }

@@ -11,6 +11,12 @@ struct PaymentSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let apartmentId: UUID
+    /// Doluysa DÜZENLEME kipi (madde 64). Önceden düzenleme yolu hiç yoktu:
+    /// yanlış girilen bir tutarı düzeltmenin tek yolu silip yeniden girmekti ve
+    /// silme, bankadan alınmış dekontu da Storage'dan kalıcı olarak düşürüyordu.
+    var editingPaymentId: UUID? = nil
+
+    @State private var didPrefill = false
 
     @State private var amountText = ""
     @State private var method: Payment.Method = .taksit
@@ -31,7 +37,7 @@ struct PaymentSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SheetHeader(title: "Tahsilat Ekle",
+            SheetHeader(title: editingPaymentId == nil ? "Tahsilat Ekle" : "Tahsilatı Düzenle",
                         subtitle: apartment.map { "Daire No \($0.apartmentNumber) · \($0.buyerName ?? "")" }) { dismiss() }
 
             ScrollView(showsIndicators: false) {
@@ -128,7 +134,8 @@ struct PaymentSheet: View {
                     }
                     .padding(.top, 14)
 
-                    PrimaryButton(title: "Tahsilatı Kaydet") { save() }
+                    PrimaryButton(title: editingPaymentId == nil
+                                  ? "Tahsilatı Kaydet" : "Değişikliği Kaydet") { save() }
                         .padding(.top, 22)
 
                     Text("Bedelin tamamı tahsil edilince ödeme durumu otomatik \"Tamamlandı\" olur.")
@@ -147,6 +154,7 @@ struct PaymentSheet: View {
         .keyboardDoneToolbar()
         .sheetHeight(0.85)
         .presentationDragIndicator(.visible)
+        .onAppear { prefill() }
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)
         .fullScreenCover(isPresented: $showCamera) {
@@ -202,12 +210,39 @@ struct PaymentSheet: View {
         }
     }
 
+    /// Düzenleme kipinde formu kayıtlı değerlerle açar.
+    ///
+    /// Tutar `Fmt.moneyText` ile yazılıyor, `Fmt.money` ile DEĞİL: ikincisi tam
+    /// liraya yuvarlıyor ve 28,50 ₺'lik bir tahsilat forma "29" olarak dolup
+    /// kaydedilince gerçekten 29 ₺ olurdu (aynı tuzak miktar tarafında madde
+    /// 52'de yaşandı).
+    private func prefill() {
+        guard !didPrefill, let id = editingPaymentId,
+              let payment = viewModel.payments.first(where: { $0.id == id }) else { return }
+        didPrefill = true
+        amountText = Fmt.moneyText(payment.amount)
+        method = payment.method
+        note = payment.note
+        date = payment.date
+        receiptImage = viewModel.receiptImages[payment.id]
+    }
+
     private func save() {
-        let saved = viewModel.addPayment(role: viewModel.role(forApartment: apartmentId, user: appState.currentUser),
-                                         apartmentId: apartmentId,
+        let role = viewModel.role(forApartment: apartmentId, user: appState.currentUser)
+        let saved: Bool
+        if let id = editingPaymentId {
+            // DEKONT DÜZENLEMEDE DEĞİŞMİYOR: görsel yolu ayrı bir akış
+            // (yükleme/silme) ve tutarı düzeltmek için dekontu yeniden
+            // çekmeye zorlamak, düzeltmenin önündeki asıl engeldi.
+            saved = viewModel.updatePayment(role: role, paymentId: id,
+                                            amountText: amountText, method: method,
+                                            note: note, date: date)
+        } else {
+            saved = viewModel.addPayment(role: role, apartmentId: apartmentId,
                                          amountText: amountText,
                                          method: method, note: note,
                                          date: date, receiptImage: receiptImage)
+        }
         if saved { dismiss() }
     }
 }
