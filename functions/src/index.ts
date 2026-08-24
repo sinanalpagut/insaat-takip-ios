@@ -173,6 +173,11 @@ export const redeemInvite = onCall<{ code?: string }, Promise<RedeemResult>>(
         title: `${name} projeye katıldı`,
         meta: title,
         timestamp: FieldValue.serverTimestamp(),
+        // `actorUid` EKRANA ÇIKMIYOR; hesap silinince bu satırı bulabilmek
+        // için var. `title` kişinin GERÇEK ADINI taşıyor ve uid olmadan o adı
+        // arayarak silmek gerekirdi — ada göre arama hem kırılgan hem de
+        // adaşları birbirine karıştırır.
+        actorUid: uid,
       });
 
       tx.update(inviteRef, {
@@ -221,12 +226,89 @@ export const redeemInvite = onCall<{ code?: string }, Promise<RedeemResult>>(
 // `request.auth` olmadan hiçbir şey yapmıyor.
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// VARSAYILAN KOVAYA GÜVENİLMİYOR — kanıtlanmış bir tuzak.
+//
+// `getStorage().bucket()` argümansız çağrıldığında adı `FIREBASE_CONFIG`
+// ortam değişkenindeki `storageBucket` alanından alıyor ve o alan tarihsel
+// olarak `<proje>.appspot.com` kalıbıyla üretiliyor. Bu projenin kovası ise
+// `<proje>.firebasestorage.app` — 2024 sonrası açılan projelerin yeni adı.
+// Doğrudan sınandı: `.appspot.com` HTTP 404 (kova YOK),
+// `.firebasestorage.app` HTTP 403 (kova VAR).
+//
+// Yanlış kova `deleteFiles` çağrısında istisna fırlatır ve o istisna hesap
+// silme döngüsünün ORTASINDA patlar; sonucu "projesi silinmiş ama hesabı
+// duran kullanıcı" olur.
+//
+// "ÖNCE VAR MI DİYE SOR" YOLU DENENDİ VE TERK EDİLDİ. `bucket.exists()` ile
+// aday yoklamak makul görünüyordu; emülatör bunun neden kırılgan olduğunu
+// gösterdi: Storage emülatörü, İÇİNDE NESNE OLAN kova için bile `exists()`
+// çağrısına false diyor. Yoklamaya güvenen sürüm bu yüzden hiçbir dosyayı
+// silmeden "silindi" dedi ve testte yakalandı. Silmeyi, silmenin kendisinden
+// başka bir çağrının cevabına bağlamak fazladan bir yalan söyleme yolu açıyor.
+//
+// BUGÜNKÜ YOL: adayları sırayla DENE, cevabı İŞİN KENDİSİNDEN al.
+//   · 404 (kova yok) → sıradaki aday. Yapısal hata kodu; metin eşleştirmesi yok.
+//   · Başka hata (izin, ağ) → FIRLAT. Yutulsaydı dosyalar kalırken kullanıcıya
+//     "silindi" denirdi.
+//   · Bütün adaylar 404 → gerçekten böyle bir kova yok, dolayısıyla o kovada
+//     dosya da yok. Silinecek bir şey olmadığı için devam edilir; bu sessiz
+//     bir atlama değil, çıkarımı kesin bir sonuç.
+// İlk başarılı ad saklanıyor: sonraki projeler doğrudan oradan siliyor.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function bucketAdaylari(): string[] {
+  const projectId = process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? "";
+  return [
+    process.env.STORAGE_BUCKET,
+    projectId ? `${projectId}.firebasestorage.app` : undefined,
+    projectId ? `${projectId}.appspot.com` : undefined,
+  ].filter((v): v is string => typeof v === "string" && v.length > 0);
+}
+
+let cachedBucketName: string | null = null;
+
+/// Bir projenin bütün Storage nesnelerini siler.
+///
+/// ÖNEK silmesi, belgeye bakan bir silmenin kaçıracağı nesneleri de yakalıyor:
+/// yüklemesi yarım kalmış ve yolu hiçbir belgeye yazılmamış dosyalar.
+async function deleteProjectFiles(projectId: string): Promise<void> {
+  const prefix = `projects/${projectId}/`;
+
+  if (cachedBucketName) {
+    await getStorage().bucket(cachedBucketName).deleteFiles({ prefix });
+    return;
+  }
+
+  for (const ad of bucketAdaylari()) {
+    try {
+      await getStorage().bucket(ad).deleteFiles({ prefix });
+      cachedBucketName = ad;
+      return;
+    } catch (error) {
+      const kod = (error as { code?: number }).code;
+      if (kod === 404) continue;   // böyle bir kova yok → sıradaki aday
+      throw error;                  // izin/ağ → sahibine söyle
+    }
+  }
+  // Hiçbir aday yok: silinecek nesne de yok.
+}
+
 interface DeleteResult {
   deletedProjects: number;
   leftProjects: number;
 }
 
+// SÜRE VE BELLEK AÇIKÇA YAZILI — varsayılan 60 saniye bu iş için YETMEZ ve
+// yetmediğinde sonucu "yarım silinmiş hesap" olur. Silme, proje sayısıyla
+// doğrusal büyüyen bir dizi: her proje için Storage önek silmesi (nesne
+// başına bir istek) + `recursiveDelete` (belge başına bir yazma). Beş projesi
+// ve birkaç yüz fotoğrafı olan bir müteahhitte 60 saniye gerçekçi bir tavan
+// değil. 540 saniye, işlevin ORTASINDA kesilme ihtimalini pratikte sıfırlıyor;
+// istemci tarafındaki bekleme süresi de buna göre ayarlandı
+// (`AccountDeletionService`).
 export const deleteAccount = onCall<unknown, Promise<DeleteResult>>(
+  { timeoutSeconds: 540, memory: "512MiB" },
   async (request): Promise<DeleteResult> => {
     const uid = request.auth?.uid;
     if (!uid) {
@@ -235,17 +317,58 @@ export const deleteAccount = onCall<unknown, Promise<DeleteResult>>(
 
     // ---- 1) SAHİBİ OLDUĞU PROJELER: tamamen sil --------------------------
     const owned = await db.collection("projects").where("ownerUid", "==", uid).get();
-    const bucket = getStorage().bucket();
 
+    // Storage'a DÖNGÜNÜN İÇİNDE dokunuluyor. Kova, döngünün dışında bir kez
+    // çözülseydi HİÇ PROJESİ OLMAYAN bir kullanıcı — uygulamayı açıp vazgeçen
+    // kişi — hiç ihtiyacı olmayan bir kova çağrısına takılır ve o çağrı hata
+    // verirse hesabını hiç silemezdi.
     for (const project of owned.docs) {
-      // `recursiveDelete` alt koleksiyonların TAMAMINI geziyor; tek tek
-      // koleksiyon adı yazmak yeni bir koleksiyon eklendiğinde sessizce
-      // eksik kalırdı (13 tane var ve madde 21'de bir tane daha eklendi).
-      await db.recursiveDelete(project.ref);
-
+      // SIRA: ÖNCE STORAGE, SONRA FIRESTORE. Tersi denenmişti ve
+      // KURTARILAMAZ: `recursiveDelete` çalışıp ardından Storage silmesi hata
+      // verirse proje belgesi gitmiş olur, dolayısıyla yeniden çağrıldığında
+      // `owned` sorgusu o projeyi ARTIK BULAMAZ ve dosyalara giden tek yol
+      // kapanır — nesneler kovada sonsuza dek öksüz kalır ve kimse listeleyemez.
+      //
+      // Bu sırayla iki dalın ikisi de toparlanabilir:
+      //   · Storage düşerse Firestore'a hiç dokunulmamıştır; kullanıcı hâlâ
+      //     her şeyine sahip ve tekrar deneyebilir.
+      //   · Firestore düşerse Storage önekinde silinecek bir şey kalmamıştır;
+      //     tekrar çağrı boş bir silme + eksik kalan belgeleri tamamlar.
+      // Yani işlev, hangi adımda kesilirse kesilsin, TEKRAR ÇAĞRILDIĞINDA
+      // ilerliyor. Yarım kalmanın kalıcı hâle geldiği tek düzen eski düzendi.
+      //
       // Storage ÖNEK silmesi: belgeye bakan bir silme, yüklemesi yarım kalmış
       // ve yolu belgeye hiç yazılmamış nesneleri kaçırırdı.
-      await bucket.deleteFiles({ prefix: `projects/${project.id}/` });
+      await deleteProjectFiles(project.id);
+
+      // ALT KOLEKSİYONLAR ÖNCE, ÜST BELGE EN SON — ve bu iki adım ayrı.
+      //
+      // `db.recursiveDelete(project.ref)` tek çağrıda her şeyi siliyor ama
+      // silme sırasını GARANTİ ETMİYOR: proje belgesi alt belgelerden önce
+      // gidebilir. Gider ve ardından bir alt silme hata verirse, proje belgesi
+      // yok olduğu için `owned` sorgusu bir daha o projeyi BULAMAZ; kalan alt
+      // belgeler (alıcı adları dahil) erişilemez öksüz kalır. Storage'daki
+      // tuzağın aynısı, bir katman içeride.
+      //
+      // `listCollections()` alt koleksiyon adlarını ÇALIŞMA ANINDA okuyor —
+      // yani 13 koleksiyonu elle saymanın sakıncası (yeni koleksiyon eklenince
+      // sessizce eksik kalması) burada da yok. Üst belge en sonda ve tek
+      // başına siliniyor: ona sıra geldiğinde altında silinecek bir şey
+      // kalmamıştır, kesinti olursa da proje hâlâ bulunabilir durumdadır.
+      for (const alt of await project.ref.listCollections()) {
+        await db.recursiveDelete(alt);
+      }
+      await project.ref.delete();
+
+      // DAVET BELGELERİ ÜST DÜZEYDE ve proje ağacının DIŞINDA duruyor
+      // (`invites/{KOD}`), yani `recursiveDelete` onlara hiç uğramıyor.
+      // Kural `allow update, delete: if false` diyor — yani bu belgeleri
+      // İSTEMCİ HİÇBİR ZAMAN silemez, sahibi bile. Buradan silinmezlerse
+      // sonsuza dek kalırlar ve içlerinde `usedByName` alanı, yani daveti
+      // kullanan kişinin GERÇEK ADI vardır (KVKK).
+      const invites = await db.collection("invites")
+        .where("projectId", "==", project.id).get();
+      await Promise.all(invites.docs.map((doc) => doc.ref.delete()));
     }
 
     // ---- 2) ORTAK OLDUĞU PROJELER: yalnızca kendini çıkar ----------------
@@ -266,9 +389,42 @@ export const deleteAccount = onCall<unknown, Promise<DeleteResult>>(
         .where("userUid", "==", uid).get();
       partners.docs.forEach((doc) => batch.delete(doc.ref));
 
+      // "X projeye katıldı" HAREKETİ de düşüyor: başlığı kişinin gerçek adı ve
+      // ortak kaydını adı yüzünden silerken aynı adı akışta bırakmak kararın
+      // kendisini boşa çıkarırdı.
+      //
+      // Bunu yapabilmemizin sebebi `activities`in ne olduğu: repository'de
+      // yazılı olduğu gibi bu koleksiyon HİÇBİR PARA TOPLAMINI beslemiyor ve
+      // JSON yedeğine girmiyor — salt bir akış ekranı. Satırı düşürmek hiçbir
+      // rakamı ve hiçbir kaydı değiştirmiyor.
+      //
+      // `auditEntries` İÇİN AYNI ŞEY YAPILMIYOR ve yapılmamalı: denetim izi
+      // yedeğe giriyor, kaydın kendisi o. Ortak zaten SALT OKUR — hiçbir
+      // denetim kaydının yazarı olamaz — dolayısıyla ayrılan ortağın adı orada
+      // yazar olarak zaten görünmüyor.
+      const joins = await project.ref.collection("activities")
+        .where("actorUid", "==", uid).get();
+      joins.docs.forEach((doc) => batch.delete(doc.ref));
+
       await batch.commit();
       left += 1;
     }
+
+    // ---- 2b) BAŞKASININ projesindeki davet izleri: AD silinir --------------
+    // Bu kişi bir daveti kullandıysa, o `invites/{KOD}` belgesinde adı ve
+    // uid'i yazılı kaldı. Belge BAŞKASININ projesine ait, o yüzden silinmiyor —
+    // kodun harcandığı bilgisi (`usedAt`) o projenin sahibinin verisi ve
+    // durmalı. Silinen yalnızca KİMLİK: ad ve uid.
+    //
+    // Bu, hemen yukarıdaki ortak kaydı silme kararının aynısı: orada da
+    // "adı taşıyor (KVKK)" gerekçesiyle kayıt düşürülüyor. Aynı gerekçe burada
+    // uygulanmasaydı, kural bir yerde geçerli bir yerde geçersiz olurdu.
+    const redeemed = await db.collection("invites")
+      .where("usedByUid", "==", uid).get();
+    await Promise.all(redeemed.docs.map((doc) => doc.ref.update({
+      usedByName: FieldValue.delete(),
+      usedByUid: FieldValue.delete(),
+    })));
 
     // ---- 3) Profil belgesi ------------------------------------------------
     await db.collection("users").doc(uid).delete();

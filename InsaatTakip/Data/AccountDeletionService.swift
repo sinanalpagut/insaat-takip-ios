@@ -32,8 +32,21 @@ final class FirebaseAccountDeletionService: AccountDeletionService {
         self.functions = functions
     }
 
+    /// İstemci beklemesi SUNUCUDAN UZUN olmak zorunda.
+    ///
+    /// Callable'ın istemci tarafındaki varsayılan sınırı 70 saniye, sunucu
+    /// tarafındaki sınır ise 540 saniyeye çıkarıldı. Varsayılan bırakılsaydı
+    /// uzun bir silmede istemci 70. saniyede pes eder, kullanıcıya "Hesap
+    /// silinemedi" derdi — oysa sunucu silmeye DEVAM ediyor ve birkaç saniye
+    /// sonra bitiriyor. Kullanıcıya söylenen şeyin tersi oluyor: hesabı
+    /// silindiği hâlde silinmedi sanıyor, tekrar girmeyi deniyor ve giremiyor.
+    ///
+    /// Bekleme süresi sunucununkinden UZUN: kimin pes edeceğine sunucu karar
+    /// versin ki istemci gerçek sonucu görebilsin.
     func deleteServerData() async throws -> AccountDeletionSummary {
-        let response = try await functions.httpsCallable("deleteAccount").call([:])
+        let callable = functions.httpsCallable("deleteAccount")
+        callable.timeoutInterval = 600
+        let response = try await callable.call([:])
         let data = response.data as? [String: Any] ?? [:]
         return AccountDeletionSummary(
             deletedProjects: data["deletedProjects"] as? Int ?? 0,

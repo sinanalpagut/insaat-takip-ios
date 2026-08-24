@@ -96,6 +96,46 @@ async function deleteAccount(idToken) {
   return { status: res.status, result: body.result, error: body.error };
 }
 
+// ── Storage emülatörü yardımcıları ──
+//
+// KOVA ADI BİLEREK `.appspot.com`: işlevin `projectBucket()` çözücüsü önce
+// `.firebasestorage.app` adayını yokluyor, o kova emülatörde YOK, ve
+// `.appspot.com`'a düşüyor. Yani bu testler çözücünün "adı tahmin etme, VAR
+// OLANI bul" davranışını da kanıtlıyor — ilk adayı körü körüne kullansaydı
+// dosyalar silinmeden kalır ve test kırmızıya dönerdi.
+const BUCKET = `${PROJECT_ID}.appspot.com`;
+const STORAGE = `http://127.0.0.1:9199/v0/b/${BUCKET}/o`;
+
+async function putObject(path) {
+  const res = await fetch(`${STORAGE}?name=${encodeURIComponent(path)}`, {
+    method: 'POST',
+    // Storage emülatörü de kuralları uyguluyor; "Bearer owner" yönetici geçişi
+    // (Firestore yardımcılarındaki `adminHeaders` ile aynı sözleşme).
+    headers: { 'Content-Type': 'image/jpeg', Authorization: 'Bearer owner' },
+    body: new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3]),
+  });
+  if (!res.ok) throw new Error(`putObject ${path}: ${res.status} ${await res.text()}`);
+}
+
+async function objectExists(path) {
+  const res = await fetch(`${STORAGE}/${encodeURIComponent(path)}`,
+                          { headers: { Authorization: 'Bearer owner' } });
+  return res.status === 200;
+}
+
+// ── Auth emülatörü: kullanıcı gerçekten silindi mi? ──
+
+async function authUserExists(uid) {
+  const res = await fetch(`${AUTH}/projects/${PROJECT_ID}/accounts:lookup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' },
+    body: JSON.stringify({ localId: [uid] }),
+  });
+  if (!res.ok) throw new Error(`accounts:lookup ${res.status} ${await res.text()}`);
+  const { users = [] } = await res.json();
+  return users.length > 0;
+}
+
 // ── Zemin ──
 
 async function seedProject() {
@@ -414,6 +454,109 @@ describe('deleteAccount — hesap silme', () => {
     // Ortağın kaydı düştü (adı KVKK kapsamında) ve üyelikten çıkarıldı.
     const partners = await listDocs(`projects/${pid}/partners`);
     assert.equal(partners.length, 0);
+  });
+
+  // ─── Aşağıdaki dördü madde 68 ile eklendi ───────────────────────────────
+  //
+  // Var olan testler işlevin FIRESTORE tarafını doğruluyordu; Auth kaydının
+  // gerçekten gidip gitmediği, Storage nesnelerinin silinip silinmediği ve
+  // davet belgelerinin akıbeti HİÇ SORULMAMIŞTI. Üçü de sessizce
+  // başarısız olabilecek adımlar: kullanıcıya "hesabın silindi" denip
+  // hesabın durması, ya da fotoğraflarının kovada kalması, ekranda hiçbir
+  // iz bırakmaz.
+
+  it('AUTH KAYDI gerçekten siliniyor — yoksa "silindim" diyen kişi tekrar girebilir', async () => {
+    const u = await newUser();
+    assert.equal(await authUserExists(u.uid), true, 'zemin: kullanıcı var olmalı');
+
+    const { status } = await deleteAccount(u.idToken);
+    assert.equal(status, 200);
+    assert.equal(await authUserExists(u.uid), false);
+  });
+
+  it('STORAGE nesneleri siliniyor — belgede yolu yazmayan yetim dahil', async () => {
+    const owner = await newUser();
+    const pid = `dosya-${owner.uid}`;
+    await putDoc(`projects/${pid}`, {
+      id: str(pid), ownerUid: str(owner.uid), memberUids: arr([owner.uid]),
+      blockNumber: str('902'), parcelNumber: str('3'), createdAt: ts(new Date()),
+    });
+    // Biri belgeye bağlı, biri YETİM (yüklemesi yarım kalmış, hiçbir belgede
+    // yolu yok). Önek silmesinin sebebi ikincisi.
+    await putObject(`projects/${pid}/sitePhotos/kayitli.jpg`);
+    await putObject(`projects/${pid}/paymentReceipts/yetim.jpg`);
+    assert.equal(await objectExists(`projects/${pid}/sitePhotos/kayitli.jpg`), true);
+
+    const { status } = await deleteAccount(owner.idToken);
+    assert.equal(status, 200);
+
+    assert.equal(await objectExists(`projects/${pid}/sitePhotos/kayitli.jpg`), false);
+    assert.equal(await objectExists(`projects/${pid}/paymentReceipts/yetim.jpg`), false);
+  });
+
+  it('silinen projenin DAVET belgeleri de gidiyor — kural onları istemciye kapatıyor', async () => {
+    const owner = await newUser();
+    const pid = `davet-${owner.uid}`;
+    await putDoc(`projects/${pid}`, {
+      id: str(pid), ownerUid: str(owner.uid), memberUids: arr([owner.uid]),
+      blockNumber: str('903'), parcelNumber: str('4'), createdAt: ts(new Date()),
+    });
+    await seedInvite('ZZZ111', { projectId: pid });
+
+    const { status } = await deleteAccount(owner.idToken);
+    assert.equal(status, 200);
+
+    // `invites/{KOD}` için kural `allow update, delete: if false` — yani bu
+    // belgeyi işlevden başka hiç kimse silemez. Kalsaydı sonsuza dek kalırdı.
+    assert.equal(await getFields('invites/ZZZ111'), null);
+  });
+
+  it('AYRILAN ORTAĞIN ADI davet belgesinde ve akışta kalmıyor (KVKK)', async () => {
+    const owner = await newUser();
+    const partner = await newUser();
+    const pid = `iz-${owner.uid}`;
+    await putDoc(`projects/${pid}`, {
+      id: str(pid), ownerUid: str(owner.uid),
+      memberUids: arr([owner.uid, partner.uid]),
+      blockNumber: str('904'), parcelNumber: str('5'), createdAt: ts(new Date()),
+    });
+    // Daveti kullanmış: adı davet belgesinde ve akışta duruyor.
+    await putDoc('invites/ZZZ222', {
+      projectId: str(pid), createdAt: ts(new Date()),
+      expiresAt: ts(new Date(Date.now() + 3600e3)),
+      usedAt: ts(new Date()), usedByUid: str(partner.uid),
+      usedByName: str('Serkan Aydın'),
+    });
+    await putDoc(`projects/${pid}/activities/a1`, {
+      id: str('a1'), projectId: str(pid), kind: str('partnerJoined'),
+      title: str('Serkan Aydın projeye katıldı'), meta: str('904 Ada / 5 Parsel'),
+      timestamp: ts(new Date()), actorUid: str(partner.uid),
+    });
+
+    const { status } = await deleteAccount(partner.idToken);
+    assert.equal(status, 200);
+
+    // Davet belgesi DURUYOR (sahibinin verisi, kod harcanmış olarak kalmalı)
+    // ama KİMLİK alanları gitmiş olmalı.
+    const invite = await getFields('invites/ZZZ222');
+    assert.ok(invite, 'davet belgesi sahibinin projesine ait, silinmemeli');
+    assert.ok(invite.usedAt, 'kodun harcandığı bilgisi kalmalı');
+    assert.equal(invite.usedByName, undefined);
+    assert.equal(invite.usedByUid, undefined);
+
+    // Katılma hareketi başlığında gerçek ad vardı — satır tümden düşmeli.
+    assert.equal(await getFields(`projects/${pid}/activities/a1`), null);
+  });
+
+  it('HİÇ PROJESİ OLMAYAN hesap da silinebiliyor', async () => {
+    // Uygulamayı açıp vazgeçen kişi. Kova çözümü döngünün dışında yapılsaydı
+    // bu kişi, hiç dosyası yokken kova arayan bir çağrıya takılırdı.
+    const u = await newUser();
+    const { status, result } = await deleteAccount(u.idToken);
+    assert.equal(status, 200);
+    assert.equal(result?.deletedProjects, 0);
+    assert.equal(result?.leftProjects, 0);
+    assert.equal(await authUserExists(u.uid), false);
   });
 
   it('profil belgesi siliniyor', async () => {
