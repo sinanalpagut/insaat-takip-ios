@@ -16,6 +16,7 @@ struct ApartmentEditSheet: View {
     @State private var type = ""
     @State private var area = ""
     @State private var floor = 0
+    @State private var showApplyScope = false
     @State private var status: Apartment.Status = .available
     /// Rezerve dairede alıcı adayının adı (madde 67).
     @State private var buyerName = ""
@@ -126,6 +127,35 @@ struct ApartmentEditSheet: View {
                             .padding(.top, 6)
                     }
 
+                    // TOPLU UYGULAMA (madde 61). 20 daireli blokta dairelerin
+                    // çoğu aynı tip ve m²; her birini tek tek açıp aynı iki
+                    // alanı yazmak ilk haftanın en can sıkıcı işiydi — üstelik
+                    // bu ekrana yalnızca karta BASILI TUTARAK ulaşılıyor.
+                    //
+                    // ÖNCE KAYDET, SONRA UYGULA: düğme kaynak daireyi de
+                    // yazıyor, yoksa "tümüne uygula"dan sonra kaynağın kendisi
+                    // eski değerde kalırdı.
+                    if !isSoldRecord {
+                        Button {
+                            showApplyScope = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "square.on.square")
+                                    .iconFont(12, weight: .semibold)
+                                Text("Tip ve alanı diğer dairelere uygula")
+                                    .font(.manrope(12.5, .bold))
+                                Spacer()
+                            }
+                            .foregroundColor(Palette.accent)
+                            .padding(.horizontal, 14)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 46)
+                            .background(Palette.accentTint)
+                            .cornerRadius(13)
+                        }
+                        .padding(.top, 14)
+                    }
+
                     field("TESLİM NOTU", text: $deliveryNote, placeholder: "Örn. Anahtar teslim bekliyor")
                         .padding(.top, 14)
 
@@ -148,6 +178,15 @@ struct ApartmentEditSheet: View {
         .keyboardDoneToolbar()
         .sheetHeight(0.85)
         .presentationDragIndicator(.visible)
+        .confirmationDialog("Tip ve alan nereye uygulansın?", isPresented: $showApplyScope,
+                            titleVisibility: .visible) {
+            Button("Bu kattaki dairelere") { applyTo(wholeProject: false) }
+            Button("Projedeki tüm dairelere") { applyTo(wholeProject: true) }
+            Button("Vazgeç", role: .cancel) {}
+        } message: {
+            Text("Yalnızca TİP ve ALAN kopyalanır. Bedel, durum ve teslim notu "
+                 + "her dairede kendi değerinde kalır.")
+        }
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)
         .onAppear(perform: load)
@@ -230,6 +269,23 @@ struct ApartmentEditSheet: View {
         buyerName = apartment.buyerName ?? ""
         listPriceText = apartment.price > .zero ? Fmt.moneyText(apartment.price) : ""
         deliveryNote = apartment.deliveryNote
+    }
+
+    /// Önce kaynağı kaydeder, sonra kopyalar. Sıra önemli: kaydetmeden
+    /// uygulasaydık kaynağın kendisi eski değerde kalırdı.
+    private func applyTo(wholeProject: Bool) {
+        let role = viewModel.role(forApartment: apartmentId, user: appState.currentUser)
+        guard viewModel.updateApartment(role: role, apartmentId: apartmentId,
+                                        type: type.isEmpty ? "—" : type,
+                                        areaM2: Apartment.parseLegacyArea(area),
+                                        floor: floor, status: status,
+                                        listPriceText: listPriceText,
+                                        deliveryNote: deliveryNote,
+                                        buyerName: buyerName) else { return }
+        let n = viewModel.applyTypeAndArea(role: role, from: apartmentId,
+                                           wholeProject: wholeProject)
+        if n == 0 { viewModel.flash("Diğer daireler zaten aynı") }
+        dismiss()
     }
 
     private func save() {

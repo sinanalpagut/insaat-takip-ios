@@ -77,6 +77,74 @@ final class ApartmentRosterTests: XCTestCase {
         XCTAssertTrue(vm.photos(forApartment: hedef.id).isEmpty)
     }
 
+    // MARK: Toplu düzenleme
+
+    /// Kat kapsamı: yalnızca AYNI kattaki daireler değişir.
+    func testApplyToFloorOnlyTouchesThatFloor() {
+        let (vm, proje) = kur()
+        let kaynak = vm.apartments(for: proje.id).first!
+        let baskaKat = vm.apartments(for: proje.id).first { $0.floor != kaynak.floor }
+
+        _ = vm.updateApartment(role: .admin, apartmentId: kaynak.id, type: "3+1",
+                               areaM2: 118, floor: kaynak.floor, status: kaynak.status,
+                               listPriceText: "0", deliveryNote: kaynak.deliveryNote)
+        _ = vm.applyTypeAndArea(role: .admin, from: kaynak.id, wholeProject: false)
+
+        for a in vm.apartments(for: proje.id) where a.floor == kaynak.floor {
+            XCTAssertEqual(a.type, "3+1")
+            XCTAssertEqual(a.areaM2, 118)
+        }
+        if let baskaKat, let sonra = vm.apartments.first(where: { $0.id == baskaKat.id }) {
+            XCTAssertNotEqual(sonra.areaM2, 118, "başka kat da değişti")
+        }
+    }
+
+    /// BEDEL, DURUM ve TESLİM NOTU KOPYALANMAZ.
+    ///
+    /// Bunlar daireye özgü; toplu yazılsaydı satılmış bir dairenin bedeli
+    /// sessizce değişir ve ciro bozulurdu. Yalnızca TİP ve ALAN fiziksel
+    /// özellik ve satış durumundan bağımsız.
+    func testApplyDoesNotCopyPriceOrStatus() {
+        let (vm, proje) = kur()
+        let kaynak = vm.apartments(for: proje.id).first { !$0.isCommitted }!
+        let satilan = vm.apartments(for: proje.id).first { $0.status == .sold }!
+        let bedelOnce = satilan.price
+        let durumOnce = satilan.status
+        let notOnce = satilan.deliveryNote
+
+        _ = vm.updateApartment(role: .admin, apartmentId: kaynak.id, type: "1+1",
+                               areaM2: 55, floor: kaynak.floor, status: kaynak.status,
+                               listPriceText: "9.999.999", deliveryNote: "TEST NOTU")
+        _ = vm.applyTypeAndArea(role: .admin, from: kaynak.id, wholeProject: true)
+
+        let sonra = vm.apartments.first { $0.id == satilan.id }!
+        XCTAssertEqual(sonra.type, "1+1", "tip uygulanmadı")
+        XCTAssertEqual(sonra.areaM2, 55, "alan uygulanmadı")
+        XCTAssertEqual(sonra.price, bedelOnce, "BEDEL kopyalandı")
+        XCTAssertEqual(sonra.status, durumOnce, "DURUM kopyalandı")
+        XCTAssertEqual(sonra.deliveryNote, notOnce, "TESLİM NOTU kopyalandı")
+    }
+
+    /// Zaten aynıysa yazma üretilmez — gereksiz kayıt denetim izini şişirir
+    /// ve çevrimdışı kuyruğa yük bindirir.
+    func testApplyIsIdempotent() {
+        let (vm, proje) = kur()
+        let kaynak = vm.apartments(for: proje.id).first!
+        _ = vm.updateApartment(role: .admin, apartmentId: kaynak.id, type: "2+1",
+                               areaM2: 95, floor: kaynak.floor, status: kaynak.status,
+                               listPriceText: "0", deliveryNote: kaynak.deliveryNote)
+        let ilk = vm.applyTypeAndArea(role: .admin, from: kaynak.id, wholeProject: true)
+        XCTAssertGreaterThan(ilk, 0)
+        XCTAssertEqual(vm.applyTypeAndArea(role: .admin, from: kaynak.id, wholeProject: true), 0,
+                       "ikinci uygulama gereksiz yazma üretti")
+    }
+
+    func testPartnerCannotApply() {
+        let (vm, proje) = kur()
+        let kaynak = vm.apartments(for: proje.id).first!
+        XCTAssertEqual(vm.applyTypeAndArea(role: .partner, from: kaynak.id, wholeProject: true), 0)
+    }
+
     func testPartnerCannotAddOrDelete() {
         let (vm, proje) = kur()
         let once = vm.apartments(for: proje.id).count

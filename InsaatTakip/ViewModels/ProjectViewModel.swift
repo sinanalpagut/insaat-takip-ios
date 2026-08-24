@@ -1984,6 +1984,56 @@ final class ProjectViewModel: ObservableObject {
         return apartments[index]
     }
 
+    /// Bir dairenin TİP ve ALAN bilgisini diğerlerine uygular (madde 61).
+    ///
+    /// 20 daireli blokta dairelerin çoğu aynı tip ve aynı m²; her birini tek
+    /// tek açıp aynı iki alanı 20 kez yazmak, ilk haftanın en can sıkıcı
+    /// işiydi. Üstelik düzenleme ekranına yalnızca karta BASILI TUTARAK
+    /// ulaşılıyor, yani 20 kez uzun basış demekti.
+    ///
+    /// YALNIZCA TİP VE ALAN: fiziksel özellikler, satış durumundan bağımsız.
+    /// Bedel, durum ve teslim notu kopyalanmıyor — onlar daireye özgü ve
+    /// toplu yazılsaydı satılmış bir dairenin bedeli sessizce değişirdi.
+    ///
+    /// - Parameter wholeProject: `false` ise yalnızca AYNI KATTAKİ daireler.
+    /// - Returns: değişen daire sayısı (0 ise çağıran "değişiklik yok" der).
+    @discardableResult
+    func applyTypeAndArea(role: UserRole, from apartmentId: UUID,
+                          wholeProject: Bool) -> Int {
+        guard role == .admin,
+              let source = apartments.first(where: { $0.id == apartmentId })
+        else { return 0 }
+
+        let hedefler = apartments.indices.filter { i in
+            let a = apartments[i]
+            guard a.projectId == source.projectId, a.id != source.id else { return false }
+            guard wholeProject || a.floor == source.floor else { return false }
+            // Zaten aynıysa yazma üretme: gereksiz kayıt hem denetim izini
+            // şişirir hem çevrimdışı kuyruğa yük bindirir.
+            return a.type != source.type || a.areaM2 != source.areaM2
+        }
+        guard !hedefler.isEmpty else { return 0 }
+
+        var writes: [DocumentChange] = []
+        for i in hedefler {
+            apartments[i].type = source.type
+            apartments[i].areaM2 = source.areaM2
+            writes.append(.apartment(apartments[i]))
+        }
+        // TEK denetim kaydı, daire başına değil: 19 ayrı kayıt izi okunmaz
+        // hale getirirdi. Kapsam ve sayı yazılı.
+        writes += recordAudit(recordId: apartmentId, projectId: source.projectId,
+                              subject: "Daire No \(source.apartmentNumber)",
+                              action: .update,
+                              changes: [.init(field: wholeProject ? "Tümüne uygulandı"
+                                                                  : "\(source.floor). kata uygulandı",
+                                              oldValue: "\(hedefler.count) daire",
+                                              newValue: "\(source.type) · \(Fmt.area(source.areaM2))")])
+        persist(writes, failureNote: "Toplu düzenleme")
+        flash("\(hedefler.count) daireye uygulandı")
+        return hedefler.count
+    }
+
     /// Projeye daire ekler (madde 61).
     ///
     /// Kuruluşta yanlış sayı girildiyse dönüş yolu YOKTU: `addApartment`
