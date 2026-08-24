@@ -20,7 +20,24 @@ struct PhoneSignInView: View {
     @State private var codeText = ""
     @State private var isBusy = false
     @State private var errorText: String?
-    @FocusState private var focused: Bool
+    /// ODAK ALANI AYIRT EDİYOR — tek bir `Bool` DEĞİL.
+    ///
+    /// Önceden `@FocusState private var focused: Bool` vardı ve İKİ ayrı
+    /// `TextField` (telefon ve kod) aynı bağa `.focused($focused)` ile
+    /// bağlanıyordu. Bir `Bool` "hangi alan" sorusunu cevaplayamıyor: kod
+    /// alanına dokunulduğunda SwiftUI bağı `true` yapıyor, ama `true`
+    /// telefon alanı için de geçerli olduğundan odak hangi alana gideceğini
+    /// çözemiyor ve HİÇBİRİNE gitmiyordu.
+    ///
+    /// Sonucu ölçüldü (simülatör, gerçek Firebase): kod ekranına gelindiğinde
+    /// alanda imleç yok, klavye açılmıyor ve ALANA DOKUNMAK DA AÇMIYOR —
+    /// yani kod yazılamıyor. Ekran çalışıyor görünüyor çünkü düğmeler ve
+    /// metinler yerinde; çalışmayan tek şey, ekranın var olma sebebi.
+    ///
+    /// Bu, madde 69'un tam kalbi: gözden geçiren test numarasını girse bile
+    /// kodu yazamazsa uygulamaya giremez.
+    private enum Field { case phone, code }
+    @FocusState private var focused: Field?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -88,7 +105,7 @@ struct PhoneSignInView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Palette.ink.ignoresSafeArea())
         .toastOverlay(viewModel.toast)
-        .onAppear { focused = true }
+        .onAppear { focused = .phone }
     }
 
     private var subtitle: String {
@@ -110,7 +127,7 @@ struct PhoneSignInView: View {
                 .foregroundColor(.white.opacity(0.3)))
                 .keyboardType(.phonePad)
                 .textContentType(.telephoneNumber)
-                .focused($focused)
+                .focused($focused, equals: .phone)
                 .font(.sora(18, .bold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
@@ -131,7 +148,7 @@ struct PhoneSignInView: View {
                 .foregroundColor(.white.opacity(0.3)))
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)   // iOS klavyeden kodu önerir
-                .focused($focused)
+                .focused($focused, equals: .code)
                 .font(.sora(22, .bold))
                 .tracking(6)
                 .foregroundColor(.white)
@@ -181,7 +198,7 @@ struct PhoneSignInView: View {
                     let request = try await appState.auth.sendCode(to: phoneText)
                     stage = .code(request)
                     codeText = ""
-                    focused = true
+                    focused = .code
 
                 case .code(let request):
                     let session = try await appState.auth.verify(code: codeText, for: request)

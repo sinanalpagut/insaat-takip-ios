@@ -49,6 +49,13 @@ struct DeleteAccountView: View {
     /// kalan yalnızca sunucu çağrısı, tekrarlanması gereken de o.
     @State private var reauthDone = false
 
+    /// Kod adımına gelindiğinde klavye kendiliğinden açılsın.
+    ///
+    /// Burada tek bir alan var, o yüzden `Bool` yeterli — kardeş ekranda
+    /// (PhoneSignInView) İKİ alan aynı `Bool`a bağlıydı ve odak hiçbirine
+    /// gitmiyordu; oradaki bağ artık alanı ayırt ediyor.
+    @FocusState private var codeFocused: Bool
+
     /// Silinecek olanın büyüklüğü — kullanıcının kendi verisi üzerinden.
     private var owned: [Project] {
         guard let user = appState.currentUser else { return [] }
@@ -195,6 +202,7 @@ struct DeleteAccountView: View {
                 // ekranında vardı, burada yoktu — aynı işi yapan iki ekrandan
                 // biri kullanıcıyı kodu elle yazmaya zorluyordu.
                 .textContentType(.oneTimeCode)
+                .focused($codeFocused)
                 .font(.sora(20, .bold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
@@ -269,6 +277,7 @@ struct DeleteAccountView: View {
         do {
             request = try await appState.auth.sendCode(to: phone)
             step = .code
+            codeFocused = true
         } catch {
             errorText = (error as? AuthError)?.errorDescription ?? "Kod gönderilemedi"
         }

@@ -92,6 +92,8 @@ final class AppState: ObservableObject {
     private static func makeAuthService() -> AuthService {
         #if DEBUG
         if LaunchConfig.emulatorHost != nil { return FirebaseAuthService() }
+        // "-auth firebase": test telefon numarasıyla gerçek yol, simülatörde de.
+        if LaunchConfig.usesFirebaseAuth { return FirebaseAuthService() }
         #endif
         // `DEBUG` ŞARTI ZORUNLU. Yalnızca `targetEnvironment(simulator)`
         // yazılsaydı, RELEASE yapılandırması simülatörde koşturulduğunda sahte
@@ -115,6 +117,7 @@ final class AppState: ObservableObject {
     private static func makeDeletionService() -> AccountDeletionService {
         #if DEBUG
         if LaunchConfig.emulatorHost != nil { return FirebaseAccountDeletionService() }
+        if LaunchConfig.usesFirebaseAuth { return FirebaseAccountDeletionService() }
         #endif
         #if DEBUG && targetEnvironment(simulator)
         return FakeAccountDeletionService()

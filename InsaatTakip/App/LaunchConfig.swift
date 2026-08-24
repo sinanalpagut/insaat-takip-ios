@@ -67,6 +67,31 @@ enum LaunchConfig {
         #endif
     }
 
+    /// "-auth firebase" → simülatörde de GERÇEK Firebase kimliği (madde 68/69).
+    ///
+    /// Simülatörde sahte kimlik kullanılmasının TEK gerekçesi vardı: telefon
+    /// doğrulaması APNs sessiz bildirimi istiyor ve simülatörde push hiç
+    /// çalışmıyor. Firebase'in TEST TELEFON NUMARASI o gerekçeyi ortadan
+    /// kaldırıyor — beyaz listedeki numara için ne SMS ne APNs ne de reCAPTCHA
+    /// devreye giriyor, dolayısıyla gerçek `PhoneAuthProvider` yolu simülatörde
+    /// de birebir çalışıyor.
+    ///
+    /// Bu anahtar olmadan hesap silmenin GERÇEK yolu yalnızca fiziksel cihazda
+    /// denenebiliyordu ve madde 68'in tespiti tam olarak buydu: "simülatör
+    /// sahte servisi kullanıyor, gerçek reauthenticate + gerçek silme
+    /// denenmedi". Denenemeyen şey doğrulanamıyor.
+    ///
+    /// `-backend firestore` ile birlikte kullanılmak üzere: gerçek Firestore'a
+    /// SAHTE kimlikle bağlanmanın anlamı yok, çünkü kurallar `request.auth.uid`
+    /// istiyor ve her yazma reddedilirdi.
+    static var usesFirebaseAuth: Bool {
+        #if DEBUG
+        return value(for: "auth") == "firebase"
+        #else
+        return true
+        #endif
+    }
+
     /// "-emulator 127.0.0.1:8080" → Firestore ve Auth emülatörüne bağlan.
     ///
     /// Kural testleri (tests/rules.test.mjs) kuralları JavaScript tarafından
