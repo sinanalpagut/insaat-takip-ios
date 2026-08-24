@@ -1984,6 +1984,78 @@ final class ProjectViewModel: ObservableObject {
         return apartments[index]
     }
 
+    /// Açılış devri — yarısı bitmiş şantiyede eldeki stok (madde 59).
+    ///
+    /// `openingIn/openingOut/openingCost` yalnızca demo tohumunda atanıyordu;
+    /// `addProject` her kalemi SIFIRLA açıyor. Sonuç: işin ortasında uygulamaya
+    /// geçen müteahhit eldeki 20 ton demiri ancak SAHTE geçmiş tarihli bir fiş
+    /// yazarak girebiliyordu — olmayan bir irsaliye, olmayan bir tedarikçi ve
+    /// fiyat geçmişini bozan bir kayıt.
+    ///
+    /// DEVİR EKLEME DEĞİL DEĞİŞTİRMEDİR: yanlış giren kullanıcı ikinci kez
+    /// yazdığında miktar iki katına çıkmasın. Bu yüzden alanlar mevcut değerle
+    /// doldurulup üstüne yazılıyor.
+    ///
+    /// FİŞ DE DEĞİL: devir bir hareket değil, açılış bakiyesi. Hareket olarak
+    /// yazılsaydı tarihsiz bir fiş gerekirdi ve fiyat geçmişi (madde 25) onu
+    /// bir alım sanardı. `Material.recalculate` zaten `openingCost + fişler`
+    /// diye topluyor; dosyaya da kendi satırıyla giriyor (madde 40).
+    @discardableResult
+    func setOpeningBalance(role: UserRole, materialId: UUID,
+                           inText: String, outText: String, costText: String) -> Bool {
+        guard role == .admin,
+              let index = materials.firstIndex(where: { $0.id == materialId })
+        else { return false }
+
+        let girenDevir = Self.parseQuantity(inText)
+        let cikanDevir = Self.parseQuantity(outText)
+        let tutar = Self.parseMoney(costText)
+
+        let before = materials[index]
+        // Sonuç stok EKSİYE düşemez: devri düşürmek, kayıtlı çıkışların
+        // altında bir açılış bırakabilir.
+        let fisGiren = before.totalIn - before.openingIn
+        let fisCikan = before.totalOut - before.openingOut
+        guard (girenDevir + fisGiren) - (cikanDevir + fisCikan) >= 0 else {
+            flash("Bu devir stoğu eksiye düşürür · kayıtlı çıkış \(Fmt.qty(fisCikan, unit: before.unit))")
+            return false
+        }
+
+        var changes: [AuditEntry.Change] = []
+        if before.openingIn != girenDevir {
+            changes.append(.init(field: "Devir giren",
+                                 oldValue: Fmt.qty(before.openingIn, unit: before.unit),
+                                 newValue: Fmt.qty(girenDevir, unit: before.unit)))
+        }
+        if before.openingOut != cikanDevir {
+            changes.append(.init(field: "Devir çıkan",
+                                 oldValue: Fmt.qty(before.openingOut, unit: before.unit),
+                                 newValue: Fmt.qty(cikanDevir, unit: before.unit)))
+        }
+        if before.openingCost != tutar {
+            changes.append(.init(field: "Devir tutarı",
+                                 oldValue: Fmt.money(before.openingCost),
+                                 newValue: Fmt.money(tutar)))
+        }
+        guard !changes.isEmpty else {
+            flash("Değişiklik yok")
+            return true
+        }
+
+        materials[index].openingIn = girenDevir
+        materials[index].openingOut = cikanDevir
+        materials[index].openingCost = tutar
+
+        var writes: [DocumentChange] = []
+        if let updated = recalculateMaterial(materialId) { writes.append(.material(updated)) }
+        writes += recordAudit(recordId: materialId, projectId: before.projectId,
+                              subject: "Malzeme · \(before.name)",
+                              action: .update, changes: changes)
+        persist(writes, failureNote: "Açılış devri")
+        flash("Açılış devri kaydedildi")
+        return true
+    }
+
     /// Malzeme dışı gider kaydeder (işçilik, taşeron, arsa, harç…).
     /// Tarih serbesttir: akşam toplu giriş yapan müteahhit geçmiş güne yazabilir.
     @discardableResult

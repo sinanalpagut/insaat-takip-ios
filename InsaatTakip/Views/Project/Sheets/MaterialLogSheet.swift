@@ -14,6 +14,7 @@ struct MaterialLogSheet: View {
     /// Dokunulan fiş fotoğrafının tam ekran önizlemesi.
     @State private var previewedReceipt: SharePayloadImage?
     /// Düzenlenmek üzere açılan hareket.
+    @State private var showOpening = false
     @State private var editingLog: MaterialLog?
     /// Silme onayı — tek dokunuşla veri kaybı olmasın.
     @State private var pendingDelete: MaterialLog?
@@ -76,6 +77,36 @@ struct MaterialLogSheet: View {
                 }
                 .padding(.top, 18)
 
+                // AÇILIŞ DEVRİ (madde 59). Buraya konuyor çünkü üstteki
+                // Giren/Kullanılan/Kalan rakamlarının anlamını devir belirliyor:
+                // `recalculate` toplamları `devir + fişler` diye kuruyor.
+                // Kayıtlı devir varsa düğme onu YAZIYOR — kullanıcı, gördüğü
+                // stoğun ne kadarının fişlerden geldiğini bilmeli.
+                if isAdmin {
+                    Button {
+                        showOpening = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "tray.and.arrow.down")
+                                .iconFont(12, weight: .semibold)
+                            Text(material.openingIn != 0 || material.openingCost != .zero
+                                 ? "Açılış devri · \(Fmt.qty(material.openingIn, unit: material.unit))"
+                                 : "Açılış Devri Gir")
+                                .font(.manrope(12.5, .bold))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .iconFont(10, weight: .bold)
+                        }
+                        .foregroundColor(Palette.accent)
+                        .padding(.horizontal, 14)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 46)
+                        .background(Palette.accentTint)
+                        .cornerRadius(13)
+                    }
+                    .padding(.top, 12)
+                }
+
                 priceHistoryCard(material)
 
                 HStack(alignment: .firstTextBaseline) {
@@ -115,6 +146,10 @@ struct MaterialLogSheet: View {
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)
+        .sheet(isPresented: $showOpening) {
+            OpeningBalanceSheet(materialId: materialId)
+                .presentationDetents([.medium, .large])
+        }
         .sheet(item: $editingLog) { log in
             if let projectId = material?.projectId {
                 ReceiptSheet(projectId: projectId, editingLogId: log.id)
