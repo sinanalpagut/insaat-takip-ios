@@ -1413,6 +1413,48 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · **KAPANDI (24 Ağu 2026).** Test numarası tanımlandı, giriş uçtan uca koştu ve demo hesap kuruldu: *145 Ada / 2 Parsel · Gebze, Kocaeli · 4 Kat / 12 Daire · 9 malzeme kalemi · 1 taksitli satış* (850.000 ₺ peşinat + 12 × 250.000 ₺). ALICI ADI UYDURMA — gözden geçirene gösterilen veride gerçek kişi yok.
       · **AÇIK KALAN (kullanıcının işi):** App Store Connect → App Review Information → Notes alanına `APP_REVIEW.md` bölüm 2'deki metnin yapıştırılması.
 
+#### C-EK — GERÇEK FİŞ TURU (24 Ağu 2026)
+
+Gerçek market ve yemek fişleriyle uçtan uca test. Kullanıcının kendi
+fişleri kullanıldı; test bitince hesap silinip demo temizlendi (fişler
+kişisel veri ve demo hesabı App Review'a gidiyor). Beş kusur çıktı, beşi de
+kapatıldı — hiçbiri kod okunarak bulunamazdı.
+
+- [x] F1. **Fiş okuyucu iki fişte de YANLIŞ toplam okudu** (340,00 → 30,91 ve
+      399,00 → 1,00) ve yanlış değeri "FİŞTEN OKUNDU · Toplam 1 ₺" diye KESİN
+      bir cümleyle gösterdi; "Uygula" onu doğrudan birim fiyata çeviriyor.
+      Kök neden içerik değil DÜZEN: fiş iki sütunlu ve Vision önce etiketlerin
+      tamamını, sonra tutarların tamamını veriyor. "Bir sonraki satıra bak"
+      kuralı bir sonraki ETİKETİ okuyordu; market fişinde "Banka Kredi Kartı
+      (1)" satırındaki 1 tutar sanıldı. Yeni kural: izleyen birkaç satırdan
+      YALNIZCA TUTARDAN İBARET olanlar, en büyüğü. 7 test.
+- [x] F2. **Miktar alanı sessizce yeniden yorumluyordu.** "12,5" yerine
+      "12ö5" girildiğinde geçersiz karakter atılıp rakamlar BİRLEŞİYOR: 125.
+      Sayı on katına çıkıyor, alan hâlâ "12ö5" gösteriyor, toplam 118.750 ₺
+      diyor ve ayrışmaya dair hiçbir işaret yok. Hoşgörü doğru ("12 500 kg"
+      çalışmalı), SESSİZLİK yanlıştı. Artık toplamın altında "miktar 125 ton
+      olarak okundu" beliriyor; yalnızca boşluk farkı varsa susuyor. 2 test.
+- [x] F3. **Aylık satış grafiği içinde bulunulan ayı dışarıda bırakıyordu.**
+      Aynı ekranın üstünde "Satış geliri 3.850.000 ₺" yazarken grafikteki tüm
+      çubuklar sıfırdı. İkisi de kendi içinde doğruydu; kusur ÖZETLE GRAFİĞİN
+      FARKLI DÖNEM KAPSAMASIYDI. 2 test.
+- [x] F4. **Rol önizlemesi gerçek kullanıcıyı sahte biriyle değiştiriyordu.**
+      "Ortak görünümü" bambaşka bir kimliğe geçiyor, ekran "0 proje" diyordu;
+      geri dönmek de gerçek kullanıcıyı getirmiyordu. Asıl tehlike veri kaybı
+      değil YANLIŞ SONUÇ: bu araçla gizlilik sınavı yapan biri boş ekranı
+      görüp "ortak projeyi göremiyor" diye yanlış bir sonuca varabilirdi.
+      `switchRole` artık kimliği koruyor; `Project.role(for:)` İNDİRMEYİ kabul
+      ediyor, yükseltmeyi asla. Bölüm zaten `#if DEBUG` — yayın etkilenmiyor.
+- [x] F5. **Temizlik işareti `UserDefaults`ta sessizce kayboluyordu**
+      (madde 68'in yerel temizliği). Hesabını silip uygulamayı hemen kapatan
+      kullanıcıda işaret diske hiç yazılmıyordu; ölçüldü. İşaret artık dosya.
+
+**DOĞRULANANLAR:** görsel 3,1 MB'tan ~190 KB'a küçülüyor · yükleme ve indirme
+üretim Storage'ında çalışıyor (yerel önbellek silinip fiş yeniden açıldı) ·
+dönem raporu kuruşu kuruşuna tutuyor (3.850.000 − 11.400 − 340 = 3.838.260) ·
+taksit planı 13 satır, peşinat sözleşme tarihinde, 1. taksit bir ay sonra ·
+FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
+
 #### D — VERİ GÜVENLİĞİ VE İZLENEBİLİRLİK
 
 - [ ] 75. **Yedekten geri dönüş yok.** `Yedek.json` üretiliyor ama okuyan tek
