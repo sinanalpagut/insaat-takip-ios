@@ -1319,7 +1319,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       (ne ekran ne fonksiyon var), üretilen kod geri alınamıyor ve "Yeni Kod"
       eskisini öldürmüyor, yönetici kodun kullanılıp kullanılmadığını göremiyor
       (`usedAt` okunması herkese kapalı `invites` koleksiyonunda kalıyor).
-- [ ] 67. **Rezerve dairede alıcı adayının adı yazılamıyor** — `buyerName`i
+- [x] 67. **Rezerve dairede alıcı adayının adı yazılamıyor** — `buyerName`i
       yalnızca `saveSale` yazıyor ve o daireyi koşulsuz satıldıya çeviriyor.
       · **TAMAM (21 Ağu 2026)** — `updatePayment` ve `updateExpense` yazıldı (`updateReceipt` deseni: alan alan denetim izi, değişiklik yoksa yazma yok). `paidAmount` elle yazılmıyor, `recalculateCollected` türetiyor.
       · Formlar `Fmt.moneyText` ile dolduruluyor, `Fmt.money` ile DEĞİL — madde 52'nin miktar tarafındaki yuvarlama tuzağından baştan kaçınıldı.
@@ -1346,6 +1346,11 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · Kurucu çıkarılamıyor (kural zaten reddederdi); onay metni bunun bir ERİŞİM İPTALİ olduğunu yazıyor.
       · İki kural testi eklendi (sahip çıkarabilir / ortak çıkaramaz) — izin ileride sessizce kapanmasın diye. 166 emülatör testi geçiyor.
       · AÇIK: davet kodu İPTALİ (`invites` kuralı `update, delete: if false`; aynayı temizlemek sahte güvenlik olur) ve kodun kullanılıp kullanılmadığının görünmesi (`usedAt` istemciye kapalı). İkisi de sunucu işi. NOT: kodlar tek kullanımlık olduğu için çıkarılan ortak eski kodla geri DÖNEMEZ; iptal sorunu sızmış kullanılmamış kodlarla ilgili.
+      · **TAMAM (21 Ağu 2026)** — alan 'Daire Bilgisini Düzenle' formunda, YALNIZCA rezerve durumunda. Satılan dairede gösterilmiyor: orada kimlik satış formunun işi ve iki yazma yolu belirsizlik yaratırdı.
+      · KVKK yolu birebir korundu: ad `buyers/{apartmentId}` belgesine yazılıyor (madde 18), ekranda 'yalnızca yöneticiye görünür' yazılı.
+      · **DENETİM İZİNE AD YAZILMIYOR.** `auditEntries` kuralı ORTAĞA okuma veriyor; adı oraya koymak madde 18'i arka kapıdan açardı. 'Alıcı adayı: yok → kayıtlı' yazılıyor, ad değil.
+      · TEST BİR VARSAYIMI ÇÜRÜTTÜ: 'rezerveden çıkarsa temizle' dalı ULAŞILAMAZDI — `isCommitted` koruması bu geçişi zaten reddediyor ve temizlik `cancelSale`de. Ölü dal kaldırıldı.
+      · Dört test eklendi (ad sızmıyor / geçiş reddediliyor / iptal kimliği bırakıyor / ortak yazamıyor). 38 Swift testi geçiyor.
 
 #### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
 
