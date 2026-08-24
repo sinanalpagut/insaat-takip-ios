@@ -1372,7 +1372,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 
 #### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
 
-- [ ] 68. **Hesap silmenin GERÇEK yolu hiç koşmadı** — madde 28'in düzeltmesi.
+- [~] 68. **Hesap silmenin GERÇEK yolu hiç koşmadı** — madde 28'in düzeltmesi.
       Simülatör sahte servisi kullanıyor; gerçek `reauthenticate` + gerçek silme
       denenmedi. App Store 5.1.1(v) zorunluluğu ve gözden geçiren bunu dener.
 - [ ] 69. **App Review giriş YAPAMAZ.** Uygulamaya girmenin tek yolu Türkiye
@@ -1392,6 +1392,11 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       ve dosya seçici ekranlarının Türkçe geldiği hiç ölçülmedi.
 - [ ] 74. **Build numarası otomasyonu derleme dışında** — arşivden önce ELLE
       çalıştırılması gerekiyor, unutulursa "redundant binary" reddi.
+      · **KOD TAMAM (24 Ağu 2026) · GERÇEK TUR AÇIK.** Maddenin tespiti doğruydu ve tahmin edilenden ağırdı: koşmamış yol ON ÜÇ kusur taşıyordu.
+      · SUNUCU (6): (a) `getStorage().bucket()` varsayılanı `<proje>.appspot.com` çözüyor, bu projenin kovası ise `.firebasestorage.app` — doğrudan sınandı, eski ad HTTP 404, yeni ad 403. Yanlış kova silme döngüsünün ORTASINDA patlar. Çözücü artık adayları sırayla DENİYOR ve cevabı işin kendisinden alıyor; `bucket.exists()` ile yoklayan sürüm yazıldı ve TERK EDİLDİ, çünkü Storage emülatörü dolu kova için bile false diyor ve o sürüm hiçbir dosyayı silmeden 'silindi' dedi. (b) Sıra tersti: Firestore önce silinince Storage hatası dosyaları KURTARILAMAZ biçimde öksüz bırakıyordu — tekrar çağrı projeyi artık bulamıyor. (c) `recursiveDelete` silme sırasını garanti etmiyor; üst belge artık `listCollections()` sonrası EN SONDA. (d) `invites/{KOD}` üst düzey ve kural `delete: if false` diyor — silinen her hesap, içinde gerçek ad yazan ÖLÜMSÜZ belgeler bırakıyordu. (e) Ayrılan ortağın adı davet belgesinde ve katılma hareketinde kalıyordu; ortak kaydı zaten aynı gerekçeyle siliniyordu. (f) Süre/bellek varsayılandaydı (60 sn).
+      · İSTEMCİ (7): (a) Hata çevirisi `as? AuthError` ile yapılıyordu, Functions o tipi hiç fırlatmıyor — `??` yedeği TEK çalışan daldı, her sebep 'Hesap silinemedi' oluyordu. (b) İlk sunucu hatasından sonra akış BİR DAHA TAMAMLANAMIYORDU: tükenmiş kod yeniden gönderiliyor, mesaj kullanıcıdan ekranda bulunmayan bir düğmeyi istiyordu. (c) İş sürerken kapatma açıktı ve hata yok olmuş görünümün `@State`ine yazılıyordu. (d) 'Kalıcı olarak silinecek' denen fotoğraf, belge ve Firestore önbelleği (alıcı adları dahil) CİHAZDA kalıyordu. (e) Sunucu SMS turunun yapıldığını HİÇ denetlemiyordu: kaçırılmış bir jeton tek çağrıyla her şeyi siliyordu. (f) Sahte servisler `DEBUG` şartı olmadan seçiliyordu — Release'i simülatörde koşturmak (madde 70) taklidi sınardı. (g) Üç Auth kodu eşlenmemişti ve `.unknown` metni 'Giriş yapılamadı'ydı.
+      · Sekiz emülatör + sekiz birim testi eklendi. Var olan testler işlevin Firestore tarafını doğruluyordu; Auth kaydının gerçekten gidip gitmediği, Storage nesnelerinin silinip silinmediği ve davet belgelerinin akıbeti HİÇ SORULMAMIŞTI — üçü de ekranda iz bırakmadan başarısız olabilecek adımlar.
+      · **AÇIK KALAN:** gerçek cihazda gerçek bir hesabın gerçekten silinmesi. Bunun için ATILABİLİR gerçek bir hesap gerekiyor ve o da madde 69'un Firebase test numarası. İki madde tek işin iki yarısı.
 
 #### D — VERİ GÜVENLİĞİ VE İZLENEBİLİRLİK
 
