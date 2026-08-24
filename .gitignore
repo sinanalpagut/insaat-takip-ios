@@ -52,3 +52,9 @@ AuthKey_*.p8
 # Cloud Functions derleme çıktısı
 functions/lib/
 functions/node_modules/
+
+# App Review giriş bilgileri — DEPO HERKESE AÇIK. Test telefon numarası ve
+# sabit kodu, o hesaba girmeye yeten bir kimlik bilgisidir; şablon
+# (APP_REVIEW.md) repoda, gerçek değerler yalnızca burada ve App Store
+# Connect'te durur.
+*.local.md
