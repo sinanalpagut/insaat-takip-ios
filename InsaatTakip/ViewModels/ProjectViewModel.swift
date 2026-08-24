@@ -1691,9 +1691,12 @@ final class ProjectViewModel: ObservableObject {
     /// düzeltilemiyordu — raporun "1. gün bırakma anı" dediği yer burasıydı.
     /// Satış bu fonksiyondan YAPILAMAZ; .sold'a yalnızca saveSale geçirir.
     @discardableResult
+    /// - Parameter buyerName: YALNIZCA rezerve dairede anlamlı — alıcı adayının
+    ///   adı (madde 67). Satılan dairede kimlik satış formundan yazılır.
     func updateApartment(role: UserRole, apartmentId: UUID, type: String, areaM2: Double?,
                          floor: Int, status: Apartment.Status,
-                         listPriceText: String, deliveryNote: String) -> Bool {
+                         listPriceText: String, deliveryNote: String,
+                         buyerName: String = "") -> Bool {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return false }
 
@@ -1727,11 +1730,50 @@ final class ProjectViewModel: ObservableObject {
             // Boş/rezerve dairede girilen rakam LİSTE fiyatıdır — satış formunda önerilir.
             apartment.price = Self.parseMoney(listPriceText)
         }
+
+        // ALICI ADAYI — madde 67.
+        //
+        // Rezerve daireye kapora yatıran kişinin adı hiçbir yere yazılamıyordu:
+        // `buyerName`i yalnızca `saveSale` yazıyor ve o daireyi KOŞULSUZ
+        // satıldıya çeviriyor. Sonuç, kapora almış ama henüz sözleşme
+        // imzalanmamış dairenin kartında ve detay başlığında boş bir isim
+        // alanıydı — müteahhit kimden kapora aldığını uygulamada tutamıyordu.
+        //
+        // Rezerveden ÇIKAN daire kimliğini de bırakır: boşa dönen bir dairede
+        // eski adayın adının kalması, hem yanıltıcı hem gereksiz veri saklama.
+        var buyerWrite: DocumentChange?
+        if status == .reserved {
+            let trimmed = buyerName.trimmingCharacters(in: .whitespaces)
+            apartment.buyerName = trimmed.isEmpty ? nil : trimmed
+            if trimmed.isEmpty {
+                // Hiç kayıt yoksa silme yazması da üretmiyoruz.
+                buyerWrite = before.buyerName == nil ? nil
+                    : .deleteBuyer(apartmentId: apartmentId, projectId: apartment.projectId)
+            } else {
+                buyerWrite = .buyer(ApartmentBuyer(apartmentId: apartmentId,
+                                                   projectId: apartment.projectId, name: trimmed))
+            }
+        }
+        // REZERVEDEN ÇIKIŞ BU FONKSİYONDA OLMUYOR: yukarıdaki `isCommitted`
+        // koruması rezerve daireyi bu formdan başka duruma çevirmeyi zaten
+        // reddediyor ("Önce satışı iptal et"). Temizlik `cancelSale`de ve orada
+        // hem ad siliniyor hem `deleteBuyer` yazılıyor. Buraya ikinci bir dal
+        // koymak ulaşılamaz kod olurdu — nitekim ilk yazışta koydum ve test
+        // yakaladı.
         apartments[index] = apartment
 
         var changes: [AuditEntry.Change] = []
         if before.status != apartment.status {
             changes.append(.init(field: "Durum", oldValue: before.status.label, newValue: apartment.status.label))
+        }
+        // ALICI ADI DENETİM İZİNE YAZILMAZ. `auditEntries` kuralı ORTAĞA OKUMA
+        // veriyor (`allow read: if isMember`); adı buraya koymak madde 18'in
+        // kapattığı sızıntıyı arka kapıdan geri açardı. `saveSale` de aynı
+        // sebeple yalnızca "kayıtlı / kaldırıldı" yazıyor.
+        if before.buyerName != apartment.buyerName {
+            changes.append(.init(field: "Alıcı adayı",
+                                 oldValue: before.buyerName == nil ? "yok" : "kayıtlı",
+                                 newValue: apartment.buyerName == nil ? "kaldırıldı" : "kayıtlı"))
         }
         if before.type != apartment.type {
             changes.append(.init(field: "Tip", oldValue: before.type, newValue: apartment.type))
@@ -1757,7 +1799,10 @@ final class ProjectViewModel: ObservableObject {
             return true
         }
         var writes: [DocumentChange] = [.apartment(apartment)]
-        if before.buyerName != nil, apartment.buyerName == nil {
+        if let buyerWrite {
+            // Rezerve dalı kendi yazmasını belirledi (madde 67).
+            writes.append(buyerWrite)
+        } else if before.buyerName != nil, apartment.buyerName == nil {
             // Kat karşılığına çevrilen dairenin alıcı belgesi yetim kalmasın.
             writes.append(.deleteBuyer(apartmentId: apartmentId,
                                        projectId: apartment.projectId))

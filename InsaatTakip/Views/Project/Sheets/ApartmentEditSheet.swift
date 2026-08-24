@@ -17,6 +17,8 @@ struct ApartmentEditSheet: View {
     @State private var area = ""
     @State private var floor = 0
     @State private var status: Apartment.Status = .available
+    /// Rezerve dairede alıcı adayının adı (madde 67).
+    @State private var buyerName = ""
     @State private var listPriceText = ""
     @State private var deliveryNote = ""
     @State private var didLoad = false
@@ -100,6 +102,25 @@ struct ApartmentEditSheet: View {
                               placeholder: "Örn. 3.400.000", keyboard: .decimalPad)
                             .padding(.top, 14)
                         Text("Satış formunda hazır gelir; ciroya ancak satış kaydedilince girer.")
+                            .font(.manrope(11, .medium))
+                            .foregroundColor(Palette.textTertiary)
+                            .padding(.top, 6)
+                    }
+
+                    // ALICI ADAYI — yalnızca REZERVE dairede (madde 67).
+                    //
+                    // Kapora yatıran kişinin adı hiçbir yere yazılamıyordu:
+                    // `buyerName`i yalnızca satış formu yazıyor ve o daireyi
+                    // koşulsuz satıldıya çeviriyor. Müteahhit kimden kapora
+                    // aldığını uygulamada tutamıyordu.
+                    //
+                    // SATILAN dairede burada GÖSTERİLMİYOR: orada kimlik satış
+                    // formunun işi ve iki ayrı yazma yolu olması, hangisinin
+                    // kazandığı belirsiz bir durum yaratırdı.
+                    if status == .reserved {
+                        field("ALICI ADAYI", text: $buyerName, placeholder: "Örn. Ahmet Yılmaz")
+                            .padding(.top, 14)
+                        Text("Yalnızca yöneticiye görünür; ortak bu adı göremez.")
                             .font(.manrope(11, .medium))
                             .foregroundColor(Palette.textTertiary)
                             .padding(.top, 6)
@@ -206,6 +227,7 @@ struct ApartmentEditSheet: View {
         area = apartment.areaM2.map { Fmt.qtyText($0) } ?? ""   // qty DEĞİL: 111,55 m² → 112 oluyordu
         floor = apartment.floor
         status = apartment.status
+        buyerName = apartment.buyerName ?? ""
         listPriceText = apartment.price > .zero ? Fmt.moneyText(apartment.price) : ""
         deliveryNote = apartment.deliveryNote
     }
@@ -218,7 +240,8 @@ struct ApartmentEditSheet: View {
                                               floor: floor,
                                               status: status,
                                               listPriceText: listPriceText,
-                                              deliveryNote: deliveryNote)
+                                              deliveryNote: deliveryNote,
+                                              buyerName: buyerName)
         if saved { dismiss() }
     }
 }
