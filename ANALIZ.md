@@ -1315,7 +1315,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       "+ N ödeme daha" düz metin, dokunulmuyor. 36 aylık taksitli satışta
       ödemelerin çoğu erişilemez. (Madde 50'de plan tarafı açılır yapıldı,
       tahsilat defteri aynı düzeltmeyi almadı.)
-- [ ] 66. **Ortak yönetimi eksik:** ayrılan ortağın erişimi KESİLEMİYOR
+- [~] 66. **Ortak yönetimi eksik:** ayrılan ortağın erişimi KESİLEMİYOR
       (ne ekran ne fonksiyon var), üretilen kod geri alınamıyor ve "Yeni Kod"
       eskisini öldürmüyor, yönetici kodun kullanılıp kullanılmadığını göremiyor
       (`usedAt` okunması herkese kapalı `invites` koleksiyonunda kalıyor).
@@ -1340,6 +1340,12 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · Galeriden gelen kare de 1200px'e indiriliyor (kamerayla aynı yol).
       · Simülatörde uçtan uca doğrulandı.
       · AÇIK: PDF fatura. `ImageStore` JPEG tutuyor, PDF `DocumentStore`un işi; fiş akışına sokmak dönüştürme ya da ayrı depolama yolu gerektiriyor.
+      · **ORTAK ÇIKARMA TAMAM (21 Ağu 2026)** — kod iptali ve kod durumu açık.
+      · CLOUD FUNCTION GEREKMEDİ: kural zaten izin veriyordu (`projects` update ve `partners` delete sahibe açık). Eksik olan istemcideki eylemdi.
+      · İki yazma TEK partide: `memberUids`ten çıkarma + ortak kaydının silinmesi. Ayrı gitselerdi ara durum kalırdı.
+      · Kurucu çıkarılamıyor (kural zaten reddederdi); onay metni bunun bir ERİŞİM İPTALİ olduğunu yazıyor.
+      · İki kural testi eklendi (sahip çıkarabilir / ortak çıkaramaz) — izin ileride sessizce kapanmasın diye. 166 emülatör testi geçiyor.
+      · AÇIK: davet kodu İPTALİ (`invites` kuralı `update, delete: if false`; aynayı temizlemek sahte güvenlik olur) ve kodun kullanılıp kullanılmadığının görünmesi (`usedAt` istemciye kapalı). İkisi de sunucu işi. NOT: kodlar tek kullanımlık olduğu için çıkarılan ortak eski kodla geri DÖNEMEZ; iptal sorunu sızmış kullanılmamış kodlarla ilgili.
 
 #### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
 

@@ -2443,6 +2443,55 @@ final class ProjectViewModel: ObservableObject {
         guard let uid = user?.id else { return nil }
         return partners(for: projectId).first { $0.userUid == uid }
     }
+    /// Ortağı projeden çıkarır (madde 66).
+    ///
+    /// BU BİR YETKİ İŞLEMİ, LİSTE TEMİZLİĞİ DEĞİL. Ayrılan ortağın erişimini
+    /// kesmenin hiçbir yolu yoktu: ne ekranda bir eylem ne ViewModel'de bir
+    /// fonksiyon vardı. Hisse sıfırlansa bile kişi projeyi okumaya devam
+    /// ediyordu — finansal veri, daire durumu, belgeler.
+    ///
+    /// İKİ YAZMA TEK PARTİDE: `memberUids`ten çıkarma (asıl erişim kapısı) ve
+    /// ortak kaydının silinmesi. Ayrı gitselerdi "listede yok ama hâlâ
+    /// okuyabiliyor" ya da tersi bir ara durum kalırdı. Kurallar ikisine de
+    /// izin veriyor (`projects` update sahibe açık, `partners` delete sahibe
+    /// açık), yani Cloud Function gerekmiyor.
+    ///
+    /// KURUCU ÇIKARILAMAZ: `isFounder` projenin sahibi ve `memberUids`ten
+    /// düşerse kendi projesini okuyamaz hale gelir — kural `uid() in
+    /// request.resource.data.memberUids` istiyor, yani yazma zaten reddedilirdi.
+    /// Sessiz bir 403 yerine burada açıkça engelleniyor.
+    @discardableResult
+    func removePartner(role: UserRole, partnerId: UUID) -> Bool {
+        guard role == .admin,
+              let index = partners.firstIndex(where: { $0.id == partnerId }),
+              let projectIndex = projects.firstIndex(where: { $0.id == partners[index].projectId })
+        else { return false }
+
+        let partner = partners[index]
+        guard !partner.isFounder else {
+            flash("Proje kurucusu çıkarılamaz")
+            return false
+        }
+
+        var writes: [DocumentChange] = []
+        // Üyelik kapısı: uid yoksa (davetle katılmamış, elle eklenmiş kayıt)
+        // yalnızca kayıt siliniyor — silecek bir erişim de yok.
+        if let uid = partner.userUid, !uid.isEmpty {
+            projects[projectIndex].memberUids.removeAll { $0 == uid }
+            writes.append(.project(projects[projectIndex]))
+        }
+        partners.remove(at: index)
+        writes.append(.deletePartner(id: partnerId, projectId: partner.projectId))
+        writes += recordAudit(recordId: partnerId, projectId: partner.projectId,
+                              subject: "Ortak · \(partner.name)", action: .delete,
+                              changes: [.init(field: "Proje erişimi",
+                                              oldValue: "açık · %\(partner.sharePercent)",
+                                              newValue: "kaldırıldı")])
+        persist(writes, failureNote: "Ortak çıkarma")
+        flash("\(partner.name) projeden çıkarıldı")
+        return true
+    }
+
 
 
     /// Bir ortağın hisse yüzdesini değiştirir (yalnızca yönetici).

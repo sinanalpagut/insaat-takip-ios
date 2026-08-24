@@ -12,6 +12,7 @@ struct PartnersTabView: View {
     let projectId: UUID
 
     /// Hissesi düzenlenen ortak (yalnızca yönetici).
+    @State private var pendingRemoval: Partner?
     @State private var editingPartner: Partner?
 
     /// PROJE BAZLI rol — global rol DEĞİL. `appState.isAdmin` her gerçek
@@ -59,6 +60,17 @@ struct PartnersTabView: View {
                             // %100, davetle katılan %0.
                             if isAdmin { editingPartner = partner }
                         }
+                        .contextMenu {
+                            // KURUCU listelenmiyor: kendini çıkarırsa projeyi
+                            // okuyamaz hale gelir ve kural zaten reddeder.
+                            if isAdmin, !partner.isFounder {
+                                Button(role: .destructive) {
+                                    pendingRemoval = partner
+                                } label: {
+                                    Label("Projeden Çıkar", systemImage: "person.badge.minus")
+                                }
+                            }
+                        }
                 }
 
                 // Ortak görünümü: davet yetkisinin kimde olduğunu açıklayan not.
@@ -87,6 +99,24 @@ struct PartnersTabView: View {
         .sheet(item: $editingPartner) { partner in
             PartnerShareSheet(partner: partner)
                 .presentationDetents([.medium, .large])
+        }
+        .alert("Ortak projeden çıkarılsın mı?", isPresented: Binding(
+            get: { pendingRemoval != nil },
+            set: { if !$0 { pendingRemoval = nil } }
+        ), presenting: pendingRemoval) { partner in
+            Button("Vazgeç", role: .cancel) { pendingRemoval = nil }
+            Button("Çıkar", role: .destructive) {
+                viewModel.removePartner(role: isAdmin ? .admin : .partner, partnerId: partner.id)
+                pendingRemoval = nil
+            }
+        } message: { partner in
+            // NE OLACAĞI YAZILI: bu bir liste temizliği değil, erişim iptali.
+            // Hissesinin de kaybolacağı söyleniyor çünkü geri alındığında
+            // yönetici onu yeniden tanımlamak zorunda.
+            Text("\(partner.name) bu projeyi artık göremeyecek: finansal veriler, "
+                 + "daireler ve belgeler dahil.\n\n"
+                 + "%\(partner.sharePercent) hissesi de kaydından düşer. Geri almak için "
+                 + "yeni bir davet kodu göndermen gerekir.")
         }
     }
 

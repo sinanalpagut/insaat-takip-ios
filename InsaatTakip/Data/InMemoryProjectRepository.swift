@@ -88,6 +88,7 @@ final class InMemoryProjectRepository: ProjectRepository {
         case .deleteExpense(let id, _):         expenses.removeAll { $0.id == id }
         case .deletePayment(let id, _):         payments.removeAll { $0.id == id }
         case .deleteApartmentPhoto(let id, _):  apartmentPhotos.removeAll { $0.id == id }
+        case .deletePartner(let id, _):         partners.removeAll { $0.id == id }
         case .deletePayments(let ids, _):
             let dropped = Set(ids)
             payments.removeAll { dropped.contains($0.id) }

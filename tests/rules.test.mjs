@@ -212,6 +212,21 @@ describe('projects/{pid}', () => {
     }));
   });
 
+  it('SAHİP başka bir üyeyi çıkarabilir — ortak çıkarma (madde 66)', async () => {
+    // Ayrılan ortağın erişimini kesmenin hiçbir yolu yoktu. Kural buna zaten
+    // izin veriyor (sahip kendisi listede kaldığı sürece); eksik olan
+    // istemcideki eylemdi. Bu test o iznin KAPANMADIĞINI koruyor.
+    await assertSucceeds(updateDoc(doc(ownerDb, 'projects', P1), {
+      memberUids: [OWNER],
+    }));
+  });
+
+  it('ORTAK başka bir üyeyi ÇIKARAMAZ — çıkarma yönetici yetkisi', async () => {
+    await assertFails(updateDoc(doc(memberDb, 'projects', P1), {
+      memberUids: [OWNER],
+    }));
+  });
+
   it('proje silinemez — alt koleksiyonlar istemciden atomik temizlenemez', async () => {
     await assertFails(deleteDoc(doc(ownerDb, 'projects', P1)));
   });

@@ -257,6 +257,8 @@ final class FirestoreProjectRepository: ProjectRepository {
                 latest.payments.removeAll { $0.id == id }
             case .deleteApartmentPhoto(let id, _):
                 latest.apartmentPhotos.removeAll { $0.id == id }
+            case .deletePartner(let id, _):
+                latest.partners.removeAll { $0.id == id }
             case .deletePayments(let ids, _):
                 latest.payments.removeAll { ids.contains($0.id) }
             case .deleteInstallments(let ids, _):
@@ -340,6 +342,8 @@ final class FirestoreProjectRepository: ProjectRepository {
             for id in ids { batch.deleteDocument(ref(.installments, pid, id)) }
         case .deleteApartmentPhoto(let id, let pid):
             batch.deleteDocument(ref(.apartmentPhotos, pid, id))
+        case .deletePartner(let id, let pid):
+            batch.deleteDocument(ref(.partners, pid, id))
         case .deletePayments(let ids, let pid):
             for id in ids { batch.deleteDocument(ref(.payments, pid, id)) }
         }

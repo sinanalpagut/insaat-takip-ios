@@ -96,6 +96,10 @@ enum DocumentChange {
     case deleteExpense(id: UUID, projectId: UUID)
     case deletePayment(id: UUID, projectId: UUID)
     case deleteApartmentPhoto(id: UUID, projectId: UUID)
+    /// Ortak kaydının silinmesi (madde 66). Üyeliğin kendisi `projects`
+    /// belgesindeki `memberUids` alanında; ikisi AYNI partide gitmeli, yoksa
+    /// "listede yok ama hâlâ okuyabiliyor" ya da tersi bir ara durum kalır.
+    case deletePartner(id: UUID, projectId: UUID)
     /// Satış iptali / kat karşılığına çevirme: kimlik, gereklilik bitince
     /// SİLİNİR (veri minimizasyonu) — daire .available olurken alıcı belgesi
     /// yetim kalmasın.
