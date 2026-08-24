@@ -100,6 +100,10 @@ enum DocumentChange {
     /// belgesindeki `memberUids` alanında; ikisi AYNI partide gitmeli, yoksa
     /// "listede yok ama hâlâ okuyabiliyor" ya da tersi bir ara durum kalır.
     case deletePartner(id: UUID, projectId: UUID)
+    /// Dairenin silinmesi (madde 61). Yalnızca TAAHHÜTSÜZ dairede çağrılır;
+    /// satılmış dairenin tahsilatı ve taksit planı ayrı temizlik ister ve
+    /// `cancelSale` onu zaten yapıyor.
+    case deleteApartment(id: UUID, projectId: UUID)
     /// Satış iptali / kat karşılığına çevirme: kimlik, gereklilik bitince
     /// SİLİNİR (veri minimizasyonu) — daire .available olurken alıcı belgesi
     /// yetim kalmasın.

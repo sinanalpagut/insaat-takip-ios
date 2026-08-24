@@ -1984,6 +1984,100 @@ final class ProjectViewModel: ObservableObject {
         return apartments[index]
     }
 
+    /// Projeye daire ekler (madde 61).
+    ///
+    /// Kuruluşta yanlış sayı girildiyse dönüş yolu YOKTU: `addApartment`
+    /// diye bir şey yazılmamıştı ve projeyi silmek de mümkün değildi (madde 60),
+    /// yani 12 yerine 14 giren müteahhit baştan başlayamıyordu bile.
+    ///
+    /// `totalApartments` BURADA DA GÜNCELLENİYOR. O alan saklanan bir sayı ve
+    /// gerçek listeden ayrışabilir — "5 Kat / 20 Daire" yazan bir projede 21
+    /// daire olması, projenin kendi "türetilen rakam saklanmaz" ilkesinin
+    /// ihlali olurdu. Alan kuruluş girdisi olduğu için kaldırılmadı, ama
+    /// listeyle birlikte hareket ediyor.
+    @discardableResult
+    func addApartment(role: UserRole, projectId: UUID) -> Bool {
+        guard role == .admin,
+              let projectIndex = projects.firstIndex(where: { $0.id == projectId })
+        else { return false }
+
+        let roster = apartments(for: projectId)
+        let nextNumber = (roster.map(\.apartmentNumber).max() ?? 0) + 1
+        let project = projects[projectIndex]
+        // Kat, kuruluştaki formülle aynı: daire sayısı / kat sayısı.
+        let perFloor = max(1, Int((Double(max(project.totalApartments, 1))
+                                   / Double(max(project.floors, 1))).rounded(.up)))
+
+        let apartment = Apartment(id: UUID(), projectId: projectId,
+                                  apartmentNumber: nextNumber,
+                                  floor: min((nextNumber - 1) / perFloor + 1, max(project.floors, 1)),
+                                  type: "—", areaM2: nil, status: .available,
+                                  buyerName: nil, price: .zero, paidAmount: .zero,
+                                  paymentStatus: nil, saleDate: nil,
+                                  deliveryNote: "Yapım sürüyor")
+        apartments.append(apartment)
+        projects[projectIndex].totalApartments = roster.count + 1
+
+        var writes: [DocumentChange] = [.apartment(apartment), .project(projects[projectIndex])]
+        writes += recordAudit(recordId: apartment.id, projectId: projectId,
+                              subject: "Daire No \(nextNumber)", action: .create,
+                              changes: [.init(field: "Daire", oldValue: "—",
+                                              newValue: "eklendi")])
+        persist(writes, failureNote: "Daire ekleme")
+        flash("Daire No \(nextNumber) eklendi")
+        return true
+    }
+
+    /// Daireyi projeden siler (madde 61).
+    ///
+    /// YALNIZCA TAAHHÜTSÜZ DAİRE: satılmış ya da rezerve bir dairenin
+    /// tahsilatı, taksit planı ve alıcı kaydı var; onları burada sessizce
+    /// silmek parayı toplamlardan düşürürdü. Kullanıcı önce satışı iptal eder
+    /// (`cancelSale` zaten hepsini temizliyor), sonra siler. Aynı kapı
+    /// `updateApartment`ta da var: "Önce satışı iptal et".
+    @discardableResult
+    func deleteApartment(role: UserRole, apartmentId: UUID) -> Bool {
+        guard role == .admin,
+              let index = apartments.firstIndex(where: { $0.id == apartmentId }),
+              let projectIndex = projects.firstIndex(where: { $0.id == apartments[index].projectId })
+        else { return false }
+
+        let apartment = apartments[index]
+        guard !apartment.isCommitted else {
+            flash("Önce satışı iptal et")
+            return false
+        }
+
+        // Daire görselleri de gitmeli: yetim kalan nesne, projenin HER üyesinin
+        // okuyabildiği bir dosya olarak Storage'da kalırdı.
+        let photos = apartmentPhotos.filter { $0.apartmentId == apartmentId }
+        apartmentPhotos.removeAll { $0.apartmentId == apartmentId }
+        apartments.remove(at: index)
+        projects[projectIndex].totalApartments = max(0, apartments(for: apartment.projectId).count)
+
+        var writes: [DocumentChange] = [
+            .deleteApartment(id: apartmentId, projectId: apartment.projectId),
+            .project(projects[projectIndex]),
+        ]
+        writes += photos.map { .deleteApartmentPhoto(id: $0.id, projectId: $0.projectId) }
+        // Bulut temizliği en iyi çaba — `removeApartmentPhoto` ile aynı
+        // gerekçe: belge silindi, kalan nesne yetim olur (sızıntı değil,
+        // temizlik borcu), o yüzden persist beklenmiyor.
+        Task { [images] in
+            for photo in photos {
+                await images?.delete(bucket: .apartmentPhotos, projectId: photo.projectId,
+                                     id: photo.id, storagePath: photo.storagePath)
+            }
+        }
+        writes += recordAudit(recordId: apartmentId, projectId: apartment.projectId,
+                              subject: "Daire No \(apartment.apartmentNumber)", action: .delete,
+                              changes: [.init(field: "Daire", oldValue: apartment.status.label,
+                                              newValue: "silindi")])
+        persist(writes, failureNote: "Daire silme")
+        flash("Daire No \(apartment.apartmentNumber) silindi")
+        return true
+    }
+
     /// Açılış devri — yarısı bitmiş şantiyede eldeki stok (madde 59).
     ///
     /// `openingIn/openingOut/openingCost` yalnızca demo tohumunda atanıyordu;

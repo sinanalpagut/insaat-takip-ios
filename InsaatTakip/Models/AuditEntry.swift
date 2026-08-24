@@ -12,11 +12,15 @@ struct AuditEntry: Codable, Identifiable, Equatable {
     enum Action: String, Codable {
         case update = "düzenlendi"
         case delete = "silindi"
+        /// Kayıt OLUŞTURMA (madde 61 · daire ekleme). Yeni bir ham değer;
+        /// eski belgelerde hiç geçmediği için geriye dönük uyumlu.
+        case create = "eklendi"
 
         var icon: String {
             switch self {
             case .update: return "pencil"
             case .delete: return "trash"
+            case .create: return "plus"
             }
         }
     }

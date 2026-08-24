@@ -23,6 +23,8 @@ struct ApartmentsTabView: View {
             .role(for: appState.currentUser) == .admin
     }
 
+    @State private var pendingApartmentDelete: Apartment?
+
     @State private var searchText = ""
     /// nil = tümü.
     @State private var statusFilter: Apartment.Status?
@@ -104,6 +106,17 @@ struct ApartmentsTabView: View {
                                 } label: {
                                     Label("Daire Bilgisini Düzenle", systemImage: "pencil")
                                 }
+                                // SİLME YALNIZCA TAAHHÜTSÜZ DAİREDE (madde 61).
+                                // Satılmış/rezerve dairenin tahsilatı, taksit
+                                // planı ve alıcı kaydı var; seçeneği hiç
+                                // göstermemek, dokunup hata almaktan iyi.
+                                if !apartment.isCommitted {
+                                    Button(role: .destructive) {
+                                        pendingApartmentDelete = apartment
+                                    } label: {
+                                        Label("Daireyi Sil", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
                     }
@@ -112,6 +125,19 @@ struct ApartmentsTabView: View {
                 Spacer().frame(height: 90)
             }
             .padding(.horizontal, 16)
+        }
+        .alert("Daire silinsin mi?", isPresented: Binding(
+            get: { pendingApartmentDelete != nil },
+            set: { if !$0 { pendingApartmentDelete = nil } }
+        ), presenting: pendingApartmentDelete) { daire in
+            Button("Vazgeç", role: .cancel) { pendingApartmentDelete = nil }
+            Button("Sil", role: .destructive) {
+                viewModel.deleteApartment(role: isAdmin ? .admin : .partner, apartmentId: daire.id)
+                pendingApartmentDelete = nil
+            }
+        } message: { daire in
+            Text("Daire No \(daire.apartmentNumber) listeden kalkacak ve görselleri silinecek."
+                 + "\n\nBu işlem geri alınamaz.")
         }
     }
 

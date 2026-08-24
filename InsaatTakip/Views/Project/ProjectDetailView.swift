@@ -263,6 +263,17 @@ struct ProjectDetailView: View {
                         } label: {
                             Label("İnşaat İlerlemesi", systemImage: "slider.horizontal.3")
                         }
+                        // DAİRE EKLEME (madde 61) — proje düzeyinde bir
+                        // işlem olduğu için buraya konuyor. Kuruluşta yanlış
+                        // sayı girildiyse dönüş yolu yoktu ve proje de
+                        // silinemiyordu, yani baştan başlamak bile mümkün
+                        // değildi.
+                        Button {
+                            viewModel.addApartment(role: .admin, projectId: projectId)
+                        } label: {
+                            Label("Daire Ekle", systemImage: "plus.rectangle.on.rectangle")
+                        }
+
                         // ARŞİVLEME (madde 60). Onay diyaloğu YOK, bilerek:
                         // işlem yıkıcı değil ve aynı menüden geri alınıyor.
                         // Yıkıcı olan silmedir ve o ayrı bir iş.
