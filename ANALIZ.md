@@ -1305,7 +1305,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 - [ ] 62. **Çok kalemli irsaliye girilemiyor.** `addReceipt` tek `materialId`
       alıyor; çimento+kum+demir taşıyan tek fiş üç ayrı kayıt ve üç ayrı kamera
       çekimi demek. Haftada 20-30 fiş giren müteahhit için en büyük sürtünme.
-- [ ] 63. **Fiş ve dekont yalnızca KAMERADAN.** Havale dekontu bankanın ekran
+- [~] 63. **Fiş ve dekont yalnızca KAMERADAN.** Havale dekontu bankanın ekran
       görüntüsü olarak galeride, fatura PDF olarak e-postada duruyor; ikisi de
       eklenemiyor. Tek yol ekrandaki dekontun fotoğrafını çekmek.
 - [x] 64. **Gider ve tahsilat düzenlenemiyor; tahsilat silme ONAYSIZ.** Yanlış
@@ -1333,6 +1333,13 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · YAN DÜZELTME: alt başlık `visibleProjects` sayıyordu, portföy aktifleri — arşivleyince aynı ekranda iki farklı proje sayısı çıkıyordu.
       · Simülatörde doğrulandı: portföy 5→4 projeye ve 134,78 M→92,13 M ciroya düştü, karşılaştırmadan çıktı, arşiv bölümü kapsam notuyla açıldı.
       · AÇIK: proje SİLME. `deleteAccount`un `recursiveDelete` + Storage önek silme mantığı hazır; ayıklanıp `deleteProject` callable yapılabilir.
+      · **GALERİ TAMAM (21 Ağu 2026), PDF AÇIK.**
+      · Galeri deseni projede ZATEN vardı (şantiye ve daire görselleri), yalnızca fiş/dekont/gider yoluna uygulanmamıştı.
+      · DÜĞME değil DAVRANIŞ ortaklaştırıldı: üç ekranın düğme görünümü farklı, ortak bileşen tasarımı bozardı. `.receiptSource(isPresented:image:)` değiştiricisi yazıldı; düzen aynı.
+      · `onPicked` geri çağrısı OCR'ı da besliyor — yalnızca kameradan gelen kareye çalışsaydı galeriden eklenen dekont ikinci sınıf olurdu.
+      · Galeriden gelen kare de 1200px'e indiriliyor (kamerayla aynı yol).
+      · Simülatörde uçtan uca doğrulandı.
+      · AÇIK: PDF fatura. `ImageStore` JPEG tutuyor, PDF `DocumentStore`un işi; fiş akışına sokmak dönüştürme ya da ayrı depolama yolu gerektiriyor.
 
 #### C — YAYIN ENGELLERİ (27 ve 29'un ötesinde)
 
