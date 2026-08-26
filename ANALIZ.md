@@ -1457,7 +1457,7 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
 
 #### D — VERİ GÜVENLİĞİ VE İZLENEBİLİRLİK
 
-- [ ] 75. **Yedekten geri dönüş yok.** `Yedek.json` üretiliyor ama okuyan tek
+- [~] 75. **Yedekten geri dönüş yok.** `Yedek.json` üretiliyor ama okuyan tek
       satır kod yok; "kapsam dışı" notu da yok, yani ERTELENMİŞ DEĞİL ATLANMIŞ.
       Telefon kaybolursa veri kaybolur. Hesap silmede de "önce verini dışa
       aktar" adımı sunulmuyor.
@@ -1473,6 +1473,14 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
       dekontlar ve tüm proje finansallarını taşıyor.
 - [ ] 79. **Arama ve süzgeç yalnızca dairelerde.** Giderler, malzeme hareketleri,
       tahsilatlar ve hareket akışında arama/tarih aralığı/sıralama yok.
+      · **GERİ YÜKLEME TAMAM (25 Ağu 2026).** Dosya seçici → çözme → geri yükleme yolu kuruldu ve simülatörde uçtan uca doğrulandı.
+      · KİMLİKLER KORUNUYOR, ÇAKIŞMA REDDEDİLİYOR. Yeni kimlik üretmek her referansı yeniden eşlemeyi gerektirirdi; tek hata parayı yanlış daireye yazar. Üzerine yazma ve birleştirme ikisi de reddedildi: yedekten YENİ olan veriyi yok etmek geri dönüşsüz, hangisinin doğru olduğunu ise kimse bilemez.
+      · SAHİPLİK GERİ YÜKLEYENE GEÇİYOR — yoksa kurallar dosyayı elinde tutan kişiyi de dışarıda bırakırdı. ORTAKLARIN BAĞLANTISI KOPUYOR (adları/hisseleri kalıyor): dosyaya bakarak erişim açmak davet akışının denetimini atlamak olurdu.
+      · TÜRETİLEN RAKAMLAR YEDEKTEN OKUNMUYOR, ham kayıttan yeniden hesaplanıyor — dosya dışarıdan geliyor. Test bunu bilerek bozulmuş toplamlarla sabitliyor.
+      · BİLİNMEYEN SÜRÜM REDDEDİLİYOR (madde 56'nın dosya karşılığı): yarım okuma, kullanıcının eksiği aylar sonra fark etmesi demekti.
+      · ÖZET GELMEYENİ DE SÖYLÜYOR: belgeler geri gelmiyor (yedek kaydı taşır, dosyayı değil), sahipsiz kayıtlar sayılıyor, alıcı adı eksikse belirtiliyor, ortakların yeniden davet edilmesi yazılıyor.
+      · 15 test (90 toplam).
+      · **AÇIK KALAN:** hesap silmede "önce verini dışa aktar" adımı hâlâ sunulmuyor — silme ekranına eklenecek. Belgelerin ve fotoğrafların yedeğe girmesi ayrı bir iş (dosya boyutu kararı gerektiriyor).
 
 #### E — PLANLANMAMIŞ ÜRÜN ALANLARI
 
