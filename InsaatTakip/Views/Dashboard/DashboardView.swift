@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Projeler / Dashboard (Ekran 01)
 // Koyu app bar (alt köşeleri 22px yuvarlak): wordmark, bildirim zili, avatar,
@@ -16,6 +17,9 @@ struct DashboardView: View {
     @State private var showNewProject = false
     @State private var showRoleMenu = false
     @State private var showJoinSheet = false
+    @State private var showRestorePicker = false
+    @State private var restoreSummary: ProjectViewModel.RestoreSummary?
+    @State private var restoreError: String?
 
     private var isAdmin: Bool { appState.isAdmin }
 
@@ -82,6 +86,8 @@ struct DashboardView: View {
                     // bağlamak o durumu da imkânsız kılıyordu.
                     joinCard
 
+                    if isAdmin { restoreCard }
+
                     Spacer().frame(height: 90)
                 }
                 .padding(.horizontal, 16)
@@ -89,6 +95,28 @@ struct DashboardView: View {
         }
         // Çekerek yenileme — gerekçe ProjectDetailView'da.
         .refreshable { await viewModel.refresh() }
+        .fileImporter(isPresented: $showRestorePicker,
+                      allowedContentTypes: [.json],
+                      allowsMultipleSelection: false,
+                      onCompletion: loadBackup)
+        // SONUÇ ŞERİTLE DEĞİL UYARIYLA. Geri yükleme birkaç rakam ve iki
+        // uyarı taşıyor (belgeler gelmedi, ortaklar yeniden davet edilmeli);
+        // kaybolan bir şerit bunları taşıyamaz ve kullanıcı neyin eksik
+        // kaldığını hiç öğrenemez.
+        .alert("Geri yüklendi",
+               isPresented: Binding(get: { restoreSummary != nil },
+                                    set: { if !$0 { restoreSummary = nil } })) {
+            Button("Tamam", role: .cancel) { restoreSummary = nil }
+        } message: {
+            Text(restoreSummary?.message ?? "")
+        }
+        .alert("Geri yüklenemedi",
+               isPresented: Binding(get: { restoreError != nil },
+                                    set: { if !$0 { restoreError = nil } })) {
+            Button("Tamam", role: .cancel) { restoreError = nil }
+        } message: {
+            Text(restoreError ?? "")
+        }
         .background(Palette.page.ignoresSafeArea())
         .navigationBarHidden(true)
         .floatingActionButton("Yeni Proje", visible: isAdmin) {
@@ -509,6 +537,69 @@ struct DashboardView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Yedekten geri yükleme (madde 75)
+
+    /// KARTIN YERİ BİLİNÇLİ: `joinCard` ile yan yana, listenin en altında ve
+    /// projesi olmayan kullanıcıda ekranın ortasında.
+    ///
+    /// Bu düğmeyi arayacak kişi telefonunu yeni kaybetmiş, yeni telefonuna
+    /// girmiş ve ekranında hiç proje yok. Ayarların içine gömülseydi tam da
+    /// ihtiyaç duyulduğu anda bulunamazdı.
+    private var restoreCard: some View {
+        Button {
+            showRestorePicker = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.down.doc")
+                    .iconFont(15, weight: .semibold)
+                    .foregroundColor(Palette.accent)
+                    .frame(width: 38, height: 38)
+                    .background(Palette.accentTint)
+                    .cornerRadius(12)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Yedekten geri yükle")
+                        .font(.manrope(13.5, .bold))
+                        .foregroundColor(Palette.ink)
+                    Text("Dışa aktardığın Yedek.json dosyasını seç")
+                        .font(.manrope(11.5, .medium))
+                        .foregroundColor(Palette.textSecondary)
+                }
+                Spacer()
+            }
+            .padding(14)
+            .background(Palette.surface)
+            .cornerRadius(16)
+            .dashedBorder(Palette.dashed, radius: 16)
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 10)
+    }
+
+    private func loadBackup(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure:
+            restoreError = "Dosya seçilemedi"
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            // İçe aktarılan dosya UYGULAMANIN KUMU DIŞINDA; erişim açıkça
+            // istenmeli ve kapatılmalı, yoksa okuma sessizce boş döner.
+            let erisim = url.startAccessingSecurityScopedResource()
+            defer { if erisim { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let data = try Data(contentsOf: url)
+                let backup = try ProjectExporter.decodeBackup(data)
+                guard let ozet = viewModel.restore(from: backup, user: appState.currentUser) else {
+                    return   // sebebi `restore` kendi şeridinde söylüyor
+                }
+                restoreSummary = ozet
+            } catch let error as ProjectExporter.BackupError {
+                restoreError = error.errorDescription
+            } catch {
+                restoreError = "Dosya okunamadı"
+            }
+        }
     }
 
     private var joinCard: some View {

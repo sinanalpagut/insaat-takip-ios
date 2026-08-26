@@ -278,6 +278,49 @@ struct ProjectExporter {
         let denetimIzi: [AuditEntry]
     }
 
+    /// Yedeğin şema sürümü. Değiştiğinde ESKİ uygulama yeni dosyayı REDDETMELİ,
+    /// yarım okumamalı — madde 56'nın yedek dosyasındaki karşılığı.
+    static let backupVersion = 1
+
+    /// Yedek okunamama sebepleri. Hepsi kullanıcıya AYRI cümleyle söyleniyor:
+    /// "dosya okunamadı" tek başına kişiye ne yapacağını söylemiyor.
+    enum BackupError: LocalizedError, Equatable {
+        /// JSON çözülemedi — dosya bozuk ya da yedek değil.
+        case unreadable
+        /// Dosya bu uygulamanın anlamadığı bir sürümden.
+        case unsupportedVersion(Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .unreadable:
+                return "Dosya okunamadı · geçerli bir yedek değil"
+            case .unsupportedVersion(let v):
+                return "Yedek sürüm \(v) · bu uygulama sürüm \(backupVersion) okuyor"
+            }
+        }
+    }
+
+    /// JSON yedeğini çözer.
+    ///
+    /// SÜRÜM ÖNCE DENETLENİYOR ve bilinmeyen sürüm REDDEDİLİYOR. Yarım okumak
+    /// en kötü sonuç olurdu: yeni sürümde eklenmiş bir koleksiyon sessizce
+    /// düşer, kullanıcı verisinin tamamının geldiğini sanır ve eksiği ancak
+    /// aylar sonra bir rakam tutmadığında fark eder.
+    static func decodeBackup(_ data: Data) throws -> Backup {
+        struct VersionProbe: Decodable { let surum: Int }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        guard let probe = try? decoder.decode(VersionProbe.self, from: data) else {
+            throw BackupError.unreadable
+        }
+        guard probe.surum == backupVersion else {
+            throw BackupError.unsupportedVersion(probe.surum)
+        }
+        do { return try decoder.decode(Backup.self, from: data) }
+        catch { throw BackupError.unreadable }
+    }
+
     static func backupJSON(_ backup: Backup) -> Data? {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

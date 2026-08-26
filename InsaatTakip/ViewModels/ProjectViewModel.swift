@@ -2573,6 +2573,211 @@ final class ProjectViewModel: ObservableObject {
         return true
     }
 
+    // MARK: - Yedekten geri yükleme (madde 75)
+
+    /// Geri yüklemenin sonucu — RAKAMLA.
+    ///
+    /// "Geri yüklendi" tek başına doğrulanabilir bir bilgi taşımıyor. Kullanıcı
+    /// telefonunu kaybetmiş ve elinde tek bir dosya var; ona kaç dairenin, kaç
+    /// tahsilatın geldiğini ve NEYİN GELMEDİĞİNİ söylemek zorundayız.
+    struct RestoreSummary: Equatable {
+        var projectTitle = ""
+        var apartments = 0
+        var materialLogs = 0
+        var expenses = 0
+        var payments = 0
+        var installments = 0
+        var partners = 0
+        var buyers = 0
+        var auditEntries = 0
+        /// Yedekte kayıtlı ama geri YÜKLENMEYEN belgeler (dosyaları yok).
+        var skippedDocuments = 0
+        /// Ait olduğu kayıt yedekte bulunmadığı için düşürülenler.
+        var droppedRecords = 0
+        /// Yedek alıcı adlarını içeriyor muydu?
+        var buyersIncluded = false
+
+        /// Kullanıcıya gösterilecek özet.
+        ///
+        /// GELMEYENİ DE SÖYLÜYOR. "Geri yüklendi" demek ve belgelerin
+        /// gelmediğini yutmak, bu uygulamanın tekrar tekrar düzelttiği hatanın
+        /// aynısı olurdu: doğru bir cümleyle yanlış bir izlenim bırakmak.
+        /// Kullanıcı telefonunu kaybetmiş; neyi yeniden yüklemesi gerektiğini
+        /// buradan öğrenecek.
+        var message: String {
+            var satirlar = ["\(projectTitle) geri yüklendi."]
+
+            var gelenler: [String] = ["\(apartments) daire"]
+            if materialLogs > 0 { gelenler.append("\(materialLogs) malzeme hareketi") }
+            if expenses > 0 { gelenler.append("\(expenses) gider") }
+            if payments > 0 { gelenler.append("\(payments) tahsilat") }
+            if installments > 0 { gelenler.append("\(installments) taksit") }
+            if partners > 0 { gelenler.append("\(partners) ortak") }
+            satirlar.append(gelenler.joined(separator: ", ") + ".")
+
+            if skippedDocuments > 0 {
+                satirlar.append("\(skippedDocuments) belge GERİ YÜKLENMEDİ · yedek kayıtları taşır, dosyaları taşımaz.")
+            }
+            if droppedRecords > 0 {
+                satirlar.append("\(droppedRecords) kayıt atlandı · ait olduğu daire ya da malzeme yedekte yoktu.")
+            }
+            if !buyersIncluded {
+                satirlar.append("Alıcı adları yedeğe girmemiş · bu yedek ortak görünümünden alınmış.")
+            }
+            if partners > 0 {
+                satirlar.append("Ortakların erişimi geri gelmez · yeniden davet etmen gerekiyor.")
+            }
+            return satirlar.joined(separator: "\n")
+        }
+    }
+
+    /// JSON yedeğini YENİ bir proje olarak geri yükler.
+    ///
+    /// ═══ KARARLAR ═══
+    ///
+    /// KİMLİKLER KORUNUR, ÇAKIŞMA REDDEDİLİR. Yeni kimlik üretmek her kaydın
+    /// birbirine verdiği referansı (hangi tahsilat hangi daireye, hangi denetim
+    /// kaydı hangi işleme) yeniden eşlemeyi gerektirirdi; tek bir eşleme hatası
+    /// parayı yanlış daireye yazar. Aynı kimlikli proje zaten duruyorsa geri
+    /// yükleme YAPILMIYOR — üzerine yazmak, yedekten YENİ olan veriyi geri
+    /// dönüşsüz yok etmek olurdu ve bu uygulama sessiz veri kaybını kabul
+    /// etmiyor. Birleştirme hiç düşünülmedi: iki kaydın hangisinin doğru
+    /// olduğunu kimse bilemez.
+    ///
+    /// SAHİPLİK GERİ YÜKLEYENE YAZILIR. Yedeğin asıl senaryosu "telefon
+    /// kayboldu, yeni hesapla giriyorum". `ownerUid` eski hesapta bırakılsaydı
+    /// kurallar herkesi — geri yükleyen kişi dahil — dışarıda bırakırdı ve
+    /// dosya elde olmasına rağmen veri erişilemez olurdu.
+    ///
+    /// ORTAKLARIN BAĞLANTISI KOPARILIR (`userUid` temizlenir), adları ve
+    /// hisseleri KALIR. Üyelik vermek erişim vermektir; bir dosyanın içeriğine
+    /// bakarak birine erişim açmak, davet akışının tüm denetimini atlamak
+    /// olurdu. Ortaklar yeniden davet edilir.
+    ///
+    /// BELGELER GERİ GELMEZ ve bu SÖYLENİR. Yedek JSON'u belgelerin KAYDINI
+    /// taşıyor, DOSYASINI değil — dosyalar Storage'da ve silinen projeyle
+    /// birlikte gitmiş durumda. Kaydı geri yüklemek, dokunulduğunda açılmayan
+    /// satırlar üretirdi. Sayısı özette bildiriliyor ki kullanıcı neyi yeniden
+    /// yüklemesi gerektiğini bilsin.
+    ///
+    /// SAHİPSİZ KAYIT DÜŞÜRÜLÜR VE SAYILIR. Ait olduğu daire ya da malzeme
+    /// yedekte yoksa kayıt alınmıyor; sessizce alınsaydı toplamlar hiçbir
+    /// ekranda açıklanamayan bir farkla şişerdi.
+    @discardableResult
+    func restore(from backup: ProjectExporter.Backup, user: User?) -> RestoreSummary? {
+        guard let user, user.role == .admin else { return nil }
+        let pid = backup.proje.id
+        guard !projects.contains(where: { $0.id == pid }) else {
+            flash("Bu proje zaten duruyor · geri yükleme yapılmadı")
+            return nil
+        }
+
+        var ozet = RestoreSummary()
+        ozet.buyersIncluded = backup.aliciDahil
+
+        // ---- Proje: sahiplik, davet ve sayaçlar yeniden yazılıyor ----------
+        var proje = backup.proje
+        proje.ownerUid = user.id
+        proje.memberUids = [user.id]
+        proje.invite = nil          // eski kod artık `invites` içinde yok
+        proje.photoCount = 0        // fotoğraflar gelmiyor
+        proje.archivedAt = nil      // aktif olarak dönüyor
+
+        // ---- Alt kayıtlar: yalnızca bu projeye ait olanlar ------------------
+        let bu: (UUID) -> Bool = { $0 == pid }
+        let malzemeler = backup.malzemeler.filter { bu($0.projectId) }
+        var daireler = backup.daireler.filter { bu($0.projectId) }
+
+        let malzemeKimlikleri = Set(malzemeler.map(\.id))
+        let daireKimlikleri = Set(daireler.map(\.id))
+
+        let hareketler = backup.malzemeHareketleri.filter {
+            bu($0.projectId) && malzemeKimlikleri.contains($0.materialId)
+        }
+        let giderler = backup.giderler.filter { bu($0.projectId) }
+        let tahsilatlar = backup.tahsilatlar.filter {
+            bu($0.projectId) && daireKimlikleri.contains($0.apartmentId)
+        }
+        let taksitler = backup.taksitler.filter {
+            bu($0.projectId) && daireKimlikleri.contains($0.apartmentId)
+        }
+        let aliciKayitlari = backup.alicilar.filter {
+            bu($0.projectId) && daireKimlikleri.contains($0.apartmentId)
+        }
+        var ortaklar = backup.ortaklar.filter { bu($0.projectId) }
+        let denetim = backup.denetimIzi.filter { bu($0.projectId) }
+
+        // Düşürülenlerin sayısı — sessiz kalmıyor.
+        ozet.droppedRecords =
+            (backup.malzemeHareketleri.count - hareketler.count) +
+            (backup.tahsilatlar.count - tahsilatlar.count) +
+            (backup.taksitler.count - taksitler.count) +
+            (backup.alicilar.count - aliciKayitlari.count)
+        ozet.skippedDocuments = backup.belgeler.count
+
+        // Alıcı adı bellekte dairenin üstünde yaşıyor, Firestore'da ayrı
+        // belgede (madde 18). Yedekte de ayrı dizi; ikisini burada birleştir.
+        let adlar = Dictionary(uniqueKeysWithValues: aliciKayitlari.map { ($0.apartmentId, $0.name) })
+        for i in daireler.indices { daireler[i].buyerName = adlar[daireler[i].id] }
+
+        // Ortakların erişimi geri VERİLMİYOR; kimlikleri kopuyor.
+        for i in ortaklar.indices { ortaklar[i].userUid = nil }
+
+        // ---- Belleğe al ----------------------------------------------------
+        projects.append(proje)
+        materials.append(contentsOf: malzemeler)
+        apartments.append(contentsOf: daireler)
+        materialLogs.append(contentsOf: hareketler)
+        expenses.append(contentsOf: giderler)
+        payments.append(contentsOf: tahsilatlar)
+        installments.append(contentsOf: taksitler)
+        partners.append(contentsOf: ortaklar)
+        auditEntries.append(contentsOf: denetim)
+
+        // ---- Yazmalar ------------------------------------------------------
+        var writes: [DocumentChange] = [.project(proje)]
+        writes += malzemeler.map { .material($0) }
+        writes += daireler.map { .apartment($0) }
+        writes += hareketler.map { .materialLog($0) }
+        writes += giderler.map { .expense($0) }
+        writes += tahsilatlar.map { .payment($0) }
+        writes += taksitler.map { .installment($0) }
+        writes += ortaklar.map { .partner($0) }
+        writes += aliciKayitlari.map { .buyer($0) }
+        writes += denetim.map { .audit($0) }
+
+        // Geri yüklemenin KENDİSİ de denetim izine giriyor: veri bir dosyadan
+        // geldiyse bu, kaydın geçmişinin bir parçası.
+        writes += recordAudit(recordId: pid, projectId: pid,
+                              subject: proje.title, action: .create,
+                              changes: [.init(field: "Yedekten geri yükleme",
+                                              oldValue: "—",
+                                              newValue: Fmt.shortDate(backup.olusturma) + " yedeği")])
+
+        persist(writes, failureNote: "Yedekten geri yükleme")
+
+        // TÜRETİLEN RAKAMLAR YEDEKTEN OKUNMUYOR, HAM KAYITTAN YENİDEN
+        // HESAPLANIYOR. Stok, birikmiş maliyet ve tahsil edilen tutar
+        // türetilebilir değerler; yedekteki hâllerine güvenmek, dosyanın
+        // yazıldığı andan bu yana değişmiş bir hesabı taşımak olurdu. Projenin
+        // "türetilen rakam saklanmaz, ham kayıtlardan hesaplanır" ilkesi burada
+        // da geçerli — üstelik burası ilkenin en çok işe yaradığı yer: dosya
+        // dışarıdan geliyor ve içindeki toplamlara güvenmek için sebep yok.
+        for material in malzemeler { _ = recalculateMaterial(material.id) }
+        for apartment in daireler { _ = recalculateCollected(for: apartment.id) }
+
+        ozet.projectTitle = proje.title
+        ozet.apartments = daireler.count
+        ozet.materialLogs = hareketler.count
+        ozet.expenses = giderler.count
+        ozet.payments = tahsilatlar.count
+        ozet.installments = taksitler.count
+        ozet.partners = ortaklar.count
+        ozet.buyers = aliciKayitlari.count
+        ozet.auditEntries = denetim.count
+        return ozet
+    }
+
     /// Yeni proje (ada/parsel) oluşturur; daireleri boş olarak açar.
     @discardableResult
     /// Yeni proje kurar.
