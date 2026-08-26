@@ -56,6 +56,9 @@ struct DeleteAccountView: View {
     /// gitmiyordu; oradaki bağ artık alanı ayırt ediyor.
     @FocusState private var codeFocused: Bool
 
+    /// Silmeden önce indirilen dosyalar — paylaşım sayfasına gidiyor.
+    @State private var exportPayload: ExportPayload?
+
     /// Silinecek olanın büyüklüğü — kullanıcının kendi verisi üzerinden.
     private var owned: [Project] {
         guard let user = appState.currentUser else { return [] }
@@ -88,6 +91,9 @@ struct DeleteAccountView: View {
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Palette.ink.ignoresSafeArea())
+        .sheet(item: $exportPayload) { payload in
+            ShareSheet(items: payload.urls)
+        }
     }
 
     private var header: some View {
@@ -138,6 +144,46 @@ struct DeleteAccountView: View {
                     .font(.manrope(12.5, .semiBold))
                     .foregroundColor(Palette.accentLight)
                     .padding(.top, 12)
+            }
+
+            // VERİYİ İNDİRME ADIMI SİLMEDEN ÖNCE VE BURADA.
+            //
+            // Madde 75'in ikinci cümlesi: "Hesap silmede de 'önce verini dışa
+            // aktar' adımı sunulmuyor." Sunulmadığı için kullanıcı, geri dönüşü
+            // olmayan işlemi verisini alma imkânı olduğunu bilmeden yapıyordu.
+            //
+            // Bağlantı vermek yerine DÜĞME: "her projenin Dönem Raporu
+            // ekranına tek tek git" demek, silmenin hemen öncesinde en kötü
+            // yönlendirme olurdu — kişi zaten vazgeçmeye değil bitirmeye
+            // gelmiş, araya konan her adım atlanır.
+            //
+            // Yalnızca SAHİBİ OLUNAN projeler indiriliyor; ortak olunan
+            // projeler zaten silinmiyor ve başkasının verisi bu akışın işi
+            // değil (gerekçe `exportOwnedFiles` içinde).
+            if !owned.isEmpty {
+                Button {
+                    exportData()
+                } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: "square.and.arrow.down")
+                            .iconFont(14, weight: .semibold)
+                        Text("Önce verilerini indir")
+                            .font(.manrope(14, .bold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(Color.white.opacity(0.10))
+                    .cornerRadius(14)
+                }
+                .padding(.top, 22)
+
+                Text("\(owned.count) projenin Excel (CSV) dosyaları ve JSON yedeği. Yedek dosyası daha sonra geri yüklenebilir.")
+                    .font(.manrope(11.5, .medium))
+                    .foregroundColor(.white.opacity(0.55))
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 9)
             }
 
             Button {
@@ -263,6 +309,15 @@ struct DeleteAccountView: View {
     }
 
     // MARK: Aksiyonlar
+
+    private func exportData() {
+        let urls = viewModel.exportOwnedFiles(user: appState.currentUser)
+        guard !urls.isEmpty else {
+            errorText = "Dışa aktarılacak kayıt yok"
+            return
+        }
+        exportPayload = ExportPayload(urls: urls)
+    }
 
     private func sendCode() async {
         // Numara yoksa kullanıcıyı SUÇLAMA. `sendCode("")` "Telefon numarası

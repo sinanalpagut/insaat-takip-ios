@@ -990,6 +990,26 @@ final class ProjectViewModel: ObservableObject {
         return urls
     }
 
+    /// Kullanıcının SAHİBİ OLDUĞU tüm projelerin dosyaları — hesap silmeden
+    /// önce (madde 75).
+    ///
+    /// Neden proje bazlı değil de toplu: hesabını silen kişiye "her projenin
+    /// Dönem Raporu ekranına tek tek git" demek, geri dönüşü olmayan bir
+    /// işlemin hemen öncesinde en kötü yönlendirme olurdu. Verisini isteyen
+    /// kişi onu SİLME EKRANINDA almalı.
+    ///
+    /// ORTAK OLDUĞU PROJELER ALINMIYOR: onlar silinmiyor zaten (kullanıcı
+    /// yalnızca listeden düşüyor) ve başkasının verisini indirmek bu akışın
+    /// işi değil. `role` her projede yeniden çözülüyor — global role bakmak,
+    /// ortak olunan projeyi de yönetici kapsamıyla dışa aktarır ve alıcı
+    /// adlarını (KVKK) dosyaya koyardı.
+    func exportOwnedFiles(user: User?) -> [URL] {
+        guard let user else { return [] }
+        return projects
+            .filter { $0.role(for: user) == .admin }
+            .flatMap { exportFiles(for: $0.id, role: .admin) }
+    }
+
     /// Yedek için alıcı kayıtları. Bellekte dairenin üstünde duruyor
     /// (`buyerName`), Firestore'da ayrı belgede — yedeğe ayrı dizi olarak
     /// giriyor, bkz. `ProjectExporter.Backup`.

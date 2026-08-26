@@ -321,4 +321,33 @@ final class BackupRestoreTests: XCTestCase {
         XCTAssertFalse(metin.contains("yeniden davet"))
         XCTAssertFalse(metin.contains("Alıcı adları"))
     }
+
+    // MARK: Silmeden önce dışa aktarma (madde 75'in ikinci cümlesi)
+
+    /// SAHİBİ OLUNAN projeler dışa aktarılır.
+    func testExportCoversOwnedProjects() {
+        let model = vm()
+        let urls = model.exportOwnedFiles(user: .admin)
+        XCTAssertFalse(urls.isEmpty, "yöneticinin projeleri dışa aktarılmalı")
+        XCTAssertTrue(urls.contains { $0.lastPathComponent.hasSuffix("-Yedek.json") },
+                      "geri yüklenebilir yedek dosyası da üretilmeli")
+    }
+
+    /// ORTAK OLUNAN PROJELER ALINMAZ.
+    ///
+    /// O projeler hesap silinince SİLİNMİYOR (kullanıcı yalnızca listeden
+    /// düşüyor) ve başkasının verisini indirmek bu akışın işi değil. Global
+    /// role bakılsaydı ortak olunan proje de yönetici kapsamıyla dışa aktarılır
+    /// ve alıcı adları (KVKK) dosyaya girerdi.
+    func testExportSkipsProjectsUserDoesNotOwn() {
+        let model = vm()
+        let baskasi = User(id: "baska-uid", name: "Başkası", role: .admin,
+                           phone: "+905550000003")
+        XCTAssertTrue(model.exportOwnedFiles(user: baskasi).isEmpty)
+    }
+
+    /// Oturum yoksa dosya üretilmez — sahiplik çözülemiyor.
+    func testExportNeedsAUser() {
+        XCTAssertTrue(vm().exportOwnedFiles(user: nil).isEmpty)
+    }
 }
