@@ -1457,7 +1457,7 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
 
 #### D — VERİ GÜVENLİĞİ VE İZLENEBİLİRLİK
 
-- [~] 75. **Yedekten geri dönüş yok.** `Yedek.json` üretiliyor ama okuyan tek
+- [x] 75. **Yedekten geri dönüş yok.** `Yedek.json` üretiliyor ama okuyan tek
       satır kod yok; "kapsam dışı" notu da yok, yani ERTELENMİŞ DEĞİL ATLANMIŞ.
       Telefon kaybolursa veri kaybolur. Hesap silmede de "önce verini dışa
       aktar" adımı sunulmuyor.
