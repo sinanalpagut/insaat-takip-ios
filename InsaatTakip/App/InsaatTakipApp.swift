@@ -23,12 +23,15 @@ struct InsaatTakipApp: App {
     @StateObject private var appState = AppState()
     /// Tüm proje verisi ve iş mantığı.
     @StateObject private var viewModel = ProjectViewModel()
+    /// Uygulama kilidi ve gizlilik örtüsü (madde 78).
+    @StateObject private var appLock = AppLock()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
                 .environmentObject(viewModel)
+                .environmentObject(appLock)
                 .preferredColorScheme(.light)   // Tasarım açık tema üzerine kurulu
                 .tint(Palette.accent)
                 // Arayüz tamamen Türkçe. Yerel ayar sabitlenmezse SwiftUI'nin

@@ -18,10 +18,37 @@ struct RootView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var viewModel: ProjectViewModel
+    @EnvironmentObject private var appLock: AppLock
 
     @State private var path = NavigationPath()
 
     var body: some View {
+        content
+            // KİLİT VE ÖRTÜ EN ÜSTTE, TEK YERDE. Tek tek ekranlara konsaydı
+            // biri unutulur ve tam o ekranda finansallar açıkta kalırdı —
+            // bekleyen yazma şeridiyle aynı gerekçe.
+            .overlay {
+                if appLock.isCovered { PrivacyCover() }
+                else if appLock.isLocked { LockScreen() }
+            }
+            // Yaşam döngüsünün İKİ farklı eşiği, İKİ farklı sebeple:
+            // örtü `.inactive`te (uygulama değiştirici görüntüsü tam orada
+            // alınıyor), kilit `.background`ta (fiş fotoğrafı çekmek sahneyi
+            // yalnızca `.inactive` yapıyor; kilidi oraya bağlamak en çok
+            // kullanılan eylemde her seferinde yüz taraması istemek olurdu).
+            // Gerekçenin tamamı `AppLock` içinde.
+            .onChange(of: scenePhase) { yeni in
+                guard appState.currentUser != nil else { return }
+                switch yeni {
+                case .inactive:   appLock.applicationWillResignActive()
+                case .background: appLock.applicationDidEnterBackground()
+                case .active:     appLock.applicationDidBecomeActive()
+                @unknown default: break
+                }
+            }
+    }
+
+    private var content: some View {
         Group {
             if appState.pendingNameSession != nil {
                 // Telefon doğrulandı, isim bekleniyor: bu adım atlanırsa ortak

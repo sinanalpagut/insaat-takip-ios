@@ -8,6 +8,7 @@ import SwiftUI
 struct AccountSheet: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ProjectViewModel
+    @EnvironmentObject private var appLock: AppLock
     @Environment(\.dismiss) private var dismiss
 
     @State private var showDeleteFlow = false
@@ -47,6 +48,18 @@ struct AccountSheet: View {
                     detail: "Salt okunur — ortakların gördüğü ekran")
                 .padding(.top, 9)
             #endif
+
+            // ─── Güvenlik: uygulama kilidi (madde 78) ───
+            //
+            // ROLDEN BAĞIMSIZ: ortağın gördüğü ekranlar da ciro, tahsilat ve
+            // taksit planı taşıyor. Kilidi yalnızca yöneticiye vermek,
+            // korumayı verinin yarısında bırakmak olurdu.
+            Text("Güvenlik")
+                .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                .padding(.top, 22)
+                .padding(.bottom, 10)
+
+            lockRow
 
             Button {
                 dismiss()
@@ -173,6 +186,49 @@ struct AccountSheet: View {
         appState.updateName(draftName)
         isEditingName = false
         nameFocused = false
+    }
+
+    /// Uygulama kilidi anahtarı.
+    ///
+    /// CİHAZDA EKRAN KİLİDİ YOKSA ANAHTAR KAPALI ve sebebi YAZILI. Açılabilir
+    /// bırakılsaydı kullanıcı, açamayacağı bir kilidin arkasında kalırdı —
+    /// üstelik bunu ancak uygulamayı bir kez arka plana attıktan sonra
+    /// öğrenirdi.
+    private var lockRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: Binding(get: { appLock.isEnabled },
+                                 set: { appLock.isEnabled = $0 })) {
+                HStack(spacing: 13) {
+                    Image(systemName: "faceid")
+                        .iconFont(15, weight: .medium)
+                        .foregroundColor(appLock.isEnabled ? Palette.accent : Palette.textMuted)
+                        .frame(width: 42, height: 42)
+                        .background(appLock.isEnabled ? Palette.accentTint : Palette.fillMuted)
+                        .cornerRadius(13)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Uygulama kilidi")
+                            .font(.manrope(13.5, .bold))
+                            .foregroundColor(Palette.ink)
+                        Text("Uygulamaya dönüşte kimlik doğrulanır · değiştiricide içerik gizlenir")
+                            .font(.manrope(11.5, .medium))
+                            .foregroundColor(Palette.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .disabled(!appLock.canAuthenticate)
+
+            if !appLock.canAuthenticate {
+                Text(appLock.unavailableReason)
+                    .font(.manrope(11.5, .semiBold))
+                    .foregroundColor(Palette.alertInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(13)
+        .background(Palette.surface)
+        .cornerRadius(15)
     }
 
     /// Seçilebilir rol satırı; aktif olan bakır tik ile işaretlenir.

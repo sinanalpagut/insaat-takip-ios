@@ -23,6 +23,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Fiş ve irsaliyeleri fotoğraflayarak malzeme hareketine eklemek için kamera kullanılır.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Uygulama kilidini açmak için Face ID kullanılır. Proje kayıtları, alıcı bilgileri ve dekontlar bu kilidin arkasında durur.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Sora-Regular.ttf</string>
