@@ -1465,7 +1465,7 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
       tanımlı ama View katmanında ÇAĞIRAN YOK; izi gösteren beş yerin beşi de
       yalnızca yöneticinin açabildiği düzenleme sheet'leri. Kural ortağa okuma
       izni veriyor — yani şeffaflık kuralda var, ekranda yok.
-- [ ] 77. **Zaman damgası ve "kim yaptı" tamamen istemciden.** `firestore.rules`
+- [~] 77. **Zaman damgası ve "kim yaptı" tamamen istemciden.** `firestore.rules`
       içinde tek bir `request.time` ya da alan doğrulaması yok. Cihaz saati
       yanlışsa ya da kasten değiştirilirse iz yanlış tarih taşıyor.
 - [ ] 78. **Uygulama kilidi / gizlilik ekranı yok.** `LAContext` sıfır, uygulama
@@ -1487,6 +1487,13 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
       · DENETİM İKİ GERÇEK EKSİK BULDU: (a) ekranın dayandığı `BuyerPrivacyTests` iddiasından DARDI — yalnızca `updateApartment` yolunu ve yalnızca denetim izini tarıyordu; `saveSale` (adın asıl girildiği yer) ve `cancelSale` kapsam dışıydı, hareket akışına hiç bakılmıyordu. Üç yolu ve iki defteri tarayacak biçimde genişletildi. (b) Maddenin tüm dayanağı olan `allow read: if isMember` kuralı HİÇ test edilmemişti — var olan üç test yalnızca sahiple koşuyordu. Üç kural testi eklendi.
       · 99 Swift + 126 kural testi geçiyor.
       · **AÇIK KALAN:** dolu satır görünümü cihazda görsel olarak doğrulanmadı (boş durum ve gezinme doğrulandı).
+      · **KURAL YAZILDI (25 Ağu 2026) · YAYINA ALINMADI.** `ownerWrite` artık `serverStamped()` de istiyor: `updatedAt == request.time && updatedBy == uid()`. İlk şart yalnızca `FieldValue.serverTimestamp()` ile sağlanıyor — istemci kendi saatinden Timestamp koyarsa yazma reddediliyor.
+      · NEDEN ŞİMDİ: madde 76 ile denetim izi ORTAĞIN gördüğü ekrana taşındı. "Kim ne zaman değiştirdi" cevabı cihaz saatinden geliyorsa iz kanıt değil İDDİADIR.
+      · KAPSAM ÖLÇÜLEREK SEÇİLDİ: şartı her yola koymak uygulamayı kendi kuralıyla kilitlerdi. `UserProfileStore` (`users/{uid}`) ve `FirebaseInviteService` (`invites/{KOD}` + proje belgesindeki davet aynası) damgalamadan yazıyor. Kuralı yazmadan ÖNCE tüm istemci yazma yolları sayıldı; koysaydım davet akışı sessizce kırılırdı.
+      · EKRANIN TARİHİ DE DÜZELDİ: kural sunucu damgasını doğru tutuyor ama `AuditEntry.date` cihaz saatindendi ve ekranda görünen oydu. `updatedAt` modele decode ediliyor, `trueDate` gösterimde, gün gruplamasında ve SIRALAMADA kullanılıyor — bozuk saatte düzeltmelerin sırası da yanlış görünüyordu.
+      · BİLİNEN SINIR: `AuditEntry.user` görünen ad, uid değil; kural onu `request.auth`a bağlayamaz. Pinlenen şey hesap kimliği ve an.
+      · 8 kural testi eklendi (cihaz saatinden tarih, ileri tarih, damgasız yazma, başkasının uid'i, eksik alan, güncellemede damga, kapsam). Var olan 14 yazma testi uygulamanın gerçek damgasını aynalıyor. 101 Swift + 184 emülatör testi geçiyor.
+      · **AÇIK KALAN:** kural YAYINA ALINMALI (`npm run rules:deploy`). Ayrıca profil ve davet yazmalarının damgalanması ayrı iş.
 
 #### E — PLANLANMAMIŞ ÜRÜN ALANLARI
 
