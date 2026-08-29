@@ -1468,7 +1468,7 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
 - [x] 77. **Zaman damgası ve "kim yaptı" tamamen istemciden.** `firestore.rules`
       içinde tek bir `request.time` ya da alan doğrulaması yok. Cihaz saati
       yanlışsa ya da kasten değiştirilirse iz yanlış tarih taşıyor.
-- [ ] 78. **Uygulama kilidi / gizlilik ekranı yok.** `LAContext` sıfır, uygulama
+- [x] 78. **Uygulama kilidi / gizlilik ekranı yok.** `LAContext` sıfır, uygulama
       değiştiricide örtü yok. Oysa uygulama alıcı kimliği, IBAN taşıyan
       dekontlar ve tüm proje finansallarını taşıyor.
 - [ ] 79. **Arama ve süzgeç yalnızca dairelerde.** Giderler, malzeme hareketleri,
@@ -1494,6 +1494,12 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
       · BİLİNEN SINIR: `AuditEntry.user` görünen ad, uid değil; kural onu `request.auth`a bağlayamaz. Pinlenen şey hesap kimliği ve an.
       · 8 kural testi eklendi (cihaz saatinden tarih, ileri tarih, damgasız yazma, başkasının uid'i, eksik alan, güncellemede damga, kapsam). Var olan 14 yazma testi uygulamanın gerçek damgasını aynalıyor. 101 Swift + 184 emülatör testi geçiyor.
       · **AÇIK KALAN:** kural YAYINA ALINMALI (`npm run rules:deploy`). Ayrıca profil ve davet yazmalarının damgalanması ayrı iş.
+      · **TAMAM (25 Ağu 2026).** Opsiyonel uygulama kilidi + uygulama değiştirici örtüsü. Ayar hesap ekranında, VARSAYILAN KAPALI ve ROLDEN BAĞIMSIZ (ortağın ekranları da ciro, tahsilat, taksit planı taşıyor).
+      · `deviceOwnerAuthentication` seçildi, `...WithBiometrics` DEĞİL — ve bu ölçülerek doğrulandı: sınama simülatöründe biyometri kayıtlı değil (LAError −7) ama parola yolu var. Biyometri-yalnız politika böyle bir cihazda özelliği tümden kullanılamaz yapar ve yüzü okunmayan kullanıcıyı KENDİ verisinden dışarıda bırakırdı.
+      · KİLİT `.background`TA, ÖRTÜ `.inactive`TE — aynı yaşam döngüsünün iki eşiği, iki ayrı sebeple. Fiş fotoğrafı çekmek sahneyi yalnızca `.inactive` yapıyor; kilidi oraya bağlamak en çok kullanılan eylemde her seferinde doğrulama istemek olurdu. Değiştirici anlık görüntüsü ise tam `.inactive` anında alınıyor.
+      · FAIL-OPEN: cihaz doğrulama yapamıyorsa kilit açılıyor, ayar da açılamıyor. Tersi uygulamayı kalıcı erişilemez yapardı — hiçbir şey kazandırmadan, çünkü parolasız telefonu eline alan zaten içeride.
+      · `NSFaceIDUsageDescription` eklendi; yokken uygulama doğrulama anında ÇÖKER.
+      · 10 test. Cihazda uçtan uca doğrulandı: aç → arka plana at → dön → sistem doğrulama istedi (yazılan gerekçe metniyle) → aç → içerik geri geldi. 111 Swift testi geçiyor.
 
 #### E — PLANLANMAMIŞ ÜRÜN ALANLARI
 
