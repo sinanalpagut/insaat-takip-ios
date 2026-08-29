@@ -19,8 +19,22 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   collection, deleteDoc, doc, getDoc, getDocs, query,
-  setDoc, updateDoc, where, writeBatch,
+  serverTimestamp, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
+
+/// Uygulamanın HER yazmaya eklediği sunucu damgası (madde 77).
+///
+/// `updatedAt` SUNUCU zaman damgası olmak zorunda: kural
+/// `updatedAt == request.time` diyor ve istemcinin kendi saatinden yazdığı bir
+/// `Timestamp` bu şartı SAĞLAMAZ. Testlerin bu yardımcıyı kullanması bir
+/// kolaylık değil, uygulamanın gerçek yazma biçimini aynalaması —
+/// `FirestoreProjectRepository.stamped()` ile birebir aynı üç alan.
+const stamped = (uid, fields) => ({
+  ...fields,
+  updatedAt: serverTimestamp(),
+  updatedBy: uid,
+  updatedFrom: 'test-session',
+});
 
 // AYRI proje kimliği — bilinçli. `functions.test.mjs` aynı emülatörde
 // `demo-insaattakip` ad alanını kullanıyor ve kendi zeminini kurarken
@@ -246,10 +260,11 @@ describe('projects/{pid}/apartments — yönetici yazar, ortak okur', () => {
   });
 
   it('sahip daire yazar', async () => {
-    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'apartments', 'apt-2'), {
-      id: 'apt-2', projectId: P1, apartmentNumber: 2, status: 'sold',
-      buyerName: 'Ayşe Tuna', price: 4200000_00,
-    }));
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'apartments', 'apt-2'),
+      stamped(OWNER, {
+        id: 'apt-2', projectId: P1, apartmentNumber: 2, status: 'sold',
+        buyerName: 'Ayşe Tuna', price: 4200000_00,
+      })));
   });
 
   it('ORTAK daire yazamaz', async () => {
@@ -367,9 +382,8 @@ describe('alt koleksiyonların tamamı aynı yetki kalıbına uyuyor', () => {
 
   for (const name of COLLECTIONS) {
     it(`${name}: sahip yazar`, async () => {
-      await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, name, 'x1'), {
-        id: 'x1', projectId: P1,
-      }));
+      await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, name, 'x1'),
+        stamped(OWNER, { id: 'x1', projectId: P1 })));
     });
 
     it(`${name}: üye okur`, async () => {
@@ -377,9 +391,9 @@ describe('alt koleksiyonların tamamı aynı yetki kalıbına uyuyor', () => {
     });
 
     it(`${name}: ORTAK yazamaz`, async () => {
-      await assertFails(setDoc(doc(memberDb, 'projects', P1, name, 'x2'), {
-        id: 'x2', projectId: P1,
-      }));
+      // Ortak damgayı da doğru koyuyor; reddin sebebi `isOwner`.
+      await assertFails(setDoc(doc(memberDb, 'projects', P1, name, 'x2'),
+        stamped(MEMBER, { id: 'x2', projectId: P1 })));
     });
 
     it(`${name}: ÜYE OLMAYAN okuyamaz`, async () => {
@@ -387,9 +401,11 @@ describe('alt koleksiyonların tamamı aynı yetki kalıbına uyuyor', () => {
     });
 
     it(`${name}: yanlış projectId ile yazılamaz`, async () => {
-      await assertFails(setDoc(doc(ownerDb, 'projects', P1, name, 'x3'), {
-        id: 'x3', projectId: P2,
-      }));
+      // Damga DOĞRU, yalnızca yol yanlış — reddin sebebi `pathBound`,
+      // damga eksikliği değil. Damgasız yazsaydık test doğru sebeple
+      // geçtiğini kanıtlamazdı.
+      await assertFails(setDoc(doc(ownerDb, 'projects', P1, name, 'x3'),
+        stamped(OWNER, { id: 'x3', projectId: P2 })));
     });
 
     it(`${name}: ortak silemez`, async () => {
@@ -435,9 +451,8 @@ describe('projects/{pid}/buyers — alıcı adı yalnızca yöneticide', () => {
   });
 
   it('sahip alıcı adı yazar', async () => {
-    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'buyers', 'apt-2'), {
-      apartmentId: 'apt-2', projectId: P1, name: 'Mehmet Demir',
-    }));
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'buyers', 'apt-2'),
+      stamped(OWNER, { apartmentId: 'apt-2', projectId: P1, name: 'Mehmet Demir' })));
   });
 
   it('ORTAK alıcı adı yazamaz', async () => {
@@ -501,9 +516,8 @@ describe('hareket akışı ve denetim defteri değiştirilemez', () => {
   before(seed);
 
   it('sahip hareket ekler', async () => {
-    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'activities', 'act-2'), {
-      id: 'act-2', projectId: P1, kind: 'materialIn', title: 'Demir · giriş',
-    }));
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'activities', 'act-2'),
+      stamped(OWNER, { id: 'act-2', projectId: P1, kind: 'materialIn', title: 'Demir · giriş' })));
   });
 
   it('sahip DAHİ geçmiş hareketi düzeltemez', async () => {
@@ -517,9 +531,8 @@ describe('hareket akışı ve denetim defteri değiştirilemez', () => {
   });
 
   it('sahip denetim kaydı ekler', async () => {
-    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'auditEntries', 'audit-2'), {
-      id: 'audit-2', projectId: P1, action: 'delete', subject: 'Fiş #4471',
-    }));
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'auditEntries', 'audit-2'),
+      stamped(OWNER, { id: 'audit-2', projectId: P1, action: 'delete', subject: 'Fiş #4471' })));
   });
 
   it('denetim kaydı DÜZELTİLEMEZ — şeffaflık iddiasının dayanağı', async () => {
@@ -593,11 +606,91 @@ describe('proje kurulumu tek partide YAPILAMAZ', () => {
     // 2. aşama — çok belgeli parti, atomiklik sözü korunuyor
     const batch = writeBatch(memberDb);
     for (let n = 1; n <= 3; n++) {
-      batch.set(doc(memberDb, 'projects', pid, 'apartments', `apt-${n}`), {
-        id: `apt-${n}`, projectId: pid, apartmentNumber: n, status: 'available',
-      });
+      batch.set(doc(memberDb, 'projects', pid, 'apartments', `apt-${n}`),
+        stamped(MEMBER, {
+          id: `apt-${n}`, projectId: pid, apartmentNumber: n, status: 'available',
+        }));
     }
     await assertSucceeds(batch.commit());
+  });
+});
+
+// ═══════════════════════ Sunucu damgası (madde 77) ═══════════════════════
+//
+// Denetim izinin tüm değeri tarihlerinde. "Kim ne zaman değiştirdi" sorusunun
+// cevabı CİHAZIN saatinden geliyorsa iz bir kanıt değil bir İDDİADIR — ve
+// madde 76 ile o iz artık ortağın gördüğü bir ekranda.
+//
+// Önceden `updatedAt`/`updatedBy` yazılıyordu ama kural HİÇ BAKMIYORDU:
+// dosyada tek bir `request.time` ya da alan doğrulaması yoktu. Aşağıdaki
+// testler kapının gerçekten kapandığını kanıtlıyor.
+
+describe('sunucu damgası — tarih ve yazan hesap kuralda doğrulanıyor', () => {
+  before(seed);
+
+  it('DOĞRU damgayla yazma geçer', async () => {
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'auditEntries', 'damga-1'),
+      stamped(OWNER, { id: 'damga-1', projectId: P1, action: 'update', subject: 'Fiş' })));
+  });
+
+  it('CİHAZ SAATİNDEN yazılan tarih REDDEDİLİR — maddenin çekirdeği', async () => {
+    // Kasten geri alınmış bir cihaz saati: kayıt bir yıl öncesine yazılmak
+    // isteniyor. `updatedAt == request.time` şartı bunu geçirmiyor.
+    await assertFails(setDoc(doc(ownerDb, 'projects', P1, 'auditEntries', 'damga-2'), {
+      id: 'damga-2', projectId: P1, action: 'update', subject: 'Fiş',
+      updatedAt: new Date('2025-01-01T00:00:00Z'),
+      updatedBy: OWNER,
+      updatedFrom: 'test-session',
+    }));
+  });
+
+  it('İLERİ tarihli damga da REDDEDİLİR', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'projects', P1, 'auditEntries', 'damga-3'), {
+      id: 'damga-3', projectId: P1, action: 'update', subject: 'Fiş',
+      updatedAt: new Date(Date.now() + 86_400_000),
+      updatedBy: OWNER,
+      updatedFrom: 'test-session',
+    }));
+  });
+
+  it('damgasız yazma REDDEDİLİR', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'projects', P1, 'auditEntries', 'damga-4'), {
+      id: 'damga-4', projectId: P1, action: 'update', subject: 'Fiş',
+    }));
+  });
+
+  it('BAŞKASININ uid’i ile damgalama REDDEDİLİR', async () => {
+    // Sahip, değişikliği ortağın üstüne yıkamaz.
+    await assertFails(setDoc(doc(ownerDb, 'projects', P1, 'auditEntries', 'damga-5'),
+      stamped(MEMBER, { id: 'damga-5', projectId: P1, action: 'update', subject: 'Fiş' })));
+  });
+
+  it('`updatedBy` eksikse REDDEDİLİR', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'projects', P1, 'auditEntries', 'damga-6'), {
+      id: 'damga-6', projectId: P1, action: 'update', subject: 'Fiş',
+      updatedAt: serverTimestamp(),
+      updatedFrom: 'test-session',
+    }));
+  });
+
+  it('şart TÜM alt koleksiyonlarda geçerli, yalnızca denetim izinde değil', async () => {
+    // `ownerWrite` tek yerde tanımlı; kapsam kaymasını burada sabitliyoruz.
+    for (const name of ['materialLogs', 'payments', 'expenses', 'apartments']) {
+      await assertFails(setDoc(doc(ownerDb, 'projects', P1, name, 'damgasiz'), {
+        id: 'damgasiz', projectId: P1,
+      }));
+    }
+  });
+
+  it('SONRADAN DÜZELTMEDE de damga şart — eski kayıt taze damgayla güncellenir', async () => {
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1, 'expenses', 'gider-damga'),
+      stamped(OWNER, { id: 'gider-damga', projectId: P1, amount: 100_00 })));
+    // Güncelleme damgasız gelirse reddedilmeli.
+    await assertFails(updateDoc(doc(ownerDb, 'projects', P1, 'expenses', 'gider-damga'), {
+      amount: 999_00,
+    }));
+    await assertSucceeds(updateDoc(doc(ownerDb, 'projects', P1, 'expenses', 'gider-damga'),
+      stamped(OWNER, { amount: 999_00 })));
   });
 });
 

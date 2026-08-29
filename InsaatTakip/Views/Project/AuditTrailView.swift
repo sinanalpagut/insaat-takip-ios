@@ -103,7 +103,7 @@ struct AuditTrailView: View {
         let sirali = entries      // `audit(forProject:)` zaten yeniden eskiye
         var sonuc: [Grup] = []
         for entry in sirali {
-            let baslik = Self.gunBasligi(entry.date)
+            let baslik = Self.gunBasligi(entry.trueDate)
             if let son = sonuc.last, son.baslik == baslik {
                 sonuc[sonuc.count - 1] = Grup(baslik: baslik,
                                               kayitlar: son.kayitlar + [entry])
@@ -219,7 +219,7 @@ private struct AuditRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text("\(entry.user) · \(Fmt.clock(entry.date))")
+                Text("\(entry.user) · \(Fmt.clock(entry.trueDate))")
                     .font(.manrope(11, .medium))
                     .foregroundColor(Palette.textFaded)
                     .padding(.top, 2)

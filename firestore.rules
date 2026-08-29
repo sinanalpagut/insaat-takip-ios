@@ -88,9 +88,43 @@ service cloud.firestore {
       return request.resource.data.projectId == pid;
     }
 
-    /// Yöneticinin alt koleksiyona yazma izni + yol tutarlılığı.
+    /// SUNUCU DAMGASI ZORUNLU — madde 77.
+    ///
+    /// Her yazma `updatedAt` (sunucu saati) ve `updatedBy` (yazan hesabın
+    /// uid'i) taşımak ZORUNDA ve ikisi de burada doğrulanıyor. Önceden bu
+    /// alanlar yazılıyordu ama KURAL HİÇ BAKMIYORDU: dosyada tek bir
+    /// `request.time` ya da alan doğrulaması yoktu.
+    ///
+    /// `updatedAt == request.time` şartı yalnızca `FieldValue.serverTimestamp()`
+    /// ile yazıldığında sağlanır. İstemci kendi saatinden bir `Timestamp`
+    /// koyarsa değer sunucununkiyle tutmaz ve yazma REDDEDİLİR. Yani cihaz
+    /// saati yanlışsa ya da kasten geri alınmışsa kayıt yazılamaz — yanlış
+    /// tarihle yazılmaz.
+    ///
+    /// NEDEN ÖNEMLİ: denetim izinin tüm değeri tarihlerinde. "Kim ne zaman
+    /// değiştirdi" sorusunun cevabı cihazın saatinden geliyorsa iz bir kanıt
+    /// değil bir İDDİADIR — ve madde 76 ile o iz artık ortağın gördüğü bir
+    /// ekranda.
+    ///
+    /// BİLİNEN SINIR: `AuditEntry.user` bir GÖRÜNEN AD, uid değil; kural onu
+    /// `request.auth`a bağlayamaz. Pinlenen şey hesap kimliği (`updatedBy`)
+    /// ve an (`updatedAt`). Tek sahipli projede zaten yazabilen tek kişi
+    /// sahiptir; damganın işi yetkiyi değil KAYDIN DOĞRULUĞUNU korumak.
+    function serverStamped() {
+      return request.resource.data.updatedAt == request.time
+          && request.resource.data.updatedBy == uid();
+    }
+
+    /// Yöneticinin alt koleksiyona yazma izni + yol tutarlılığı + sunucu damgası.
+    ///
+    /// KAPSAM alt koleksiyonlarla sınırlı ve bu ÖLÇÜLEREK karar verildi:
+    ///   · `users/{uid}` — `UserProfileStore` damgalamadan yazıyor,
+    ///   · `invites/{KOD}` ve proje belgesindeki davet aynası —
+    ///     `FirebaseInviteService` damgalamadan yazıyor.
+    /// Şartı oralara da koymak, davet akışını ve profil kaydını kuralla
+    /// kilitlerdi. İkisi ayrı iş olarak açık bırakıldı.
     function ownerWrite(pid) {
-      return isOwner(pid) && pathBound(pid);
+      return isOwner(pid) && pathBound(pid) && serverStamped();
     }
 
     // ─────────────────────────── Kullanıcı profili ───────────────────────────

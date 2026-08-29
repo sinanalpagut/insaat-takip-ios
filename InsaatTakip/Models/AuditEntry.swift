@@ -45,9 +45,35 @@ struct AuditEntry: Codable, Identifiable, Equatable {
     let action: Action
     let changes: [Change]       // silmede tek satır: kaydın özeti
     let user: String
+    /// İSTEMCİNİN yazdığı an — cihaz saatinden geliyor.
+    ///
+    /// Gösterimde ve sıralamada doğrudan KULLANILMIYOR; `trueDate` üzerinden
+    /// geçiliyor. Gerekçesi orada.
     let date: Date
 
-    var dateText: String { Fmt.shortDate(date) }
+    /// SUNUCUNUN yazdığı an (madde 77).
+    ///
+    /// `FirestoreProjectRepository.stamped()` her yazmaya
+    /// `FieldValue.serverTimestamp()` koyuyor ve güvenlik kuralı
+    /// `updatedAt == request.time` diye ŞART KOŞUYOR — yani bu alan varsa
+    /// doğrudur ve değiştirilemez. Yeni yazılan her kayıtta dolu; uygulama
+    /// içi (bellek) kayıtlarda ve kural gelmeden önce yazılmış eski
+    /// belgelerde nil.
+    var updatedAt: Date? = nil
+
+    /// GÖSTERİMDE VE SIRALAMADA KULLANILAN an.
+    ///
+    /// Sunucu damgası varsa o, yoksa istemcinin yazdığı. Denetim izinin tüm
+    /// değeri tarihlerinde: cihaz saati yanlışsa ya da kasten geri alınmışsa
+    /// `date` yalan söyler ve iz bir kanıt değil bir İDDİA olur. Madde 76 ile
+    /// bu tarihler artık ORTAĞIN gördüğü bir ekranda.
+    ///
+    /// Yedek olarak `date`in kalması bilinçli: sunucu damgası gelmeden önce
+    /// (yazma kuyruktayken) ekranın tarihsiz satır göstermesi, doğru olmayan
+    /// bir tarihten daha kötü bir deneyim olurdu.
+    var trueDate: Date { updatedAt ?? date }
+
+    var dateText: String { Fmt.shortDate(trueDate) }
 
     /// "Miktar: 12.500 kg → 1.250 kg · Birim fiyat: 28,50 ₺ → 31,00 ₺"
     var summary: String {

@@ -1537,12 +1537,12 @@ final class ProjectViewModel: ObservableObject {
 
     /// Bir kaydın değişiklik geçmişi (yeniden eskiye).
     func audit(for recordId: UUID) -> [AuditEntry] {
-        auditEntries.filter { $0.recordId == recordId }.sorted { $0.date > $1.date }
+        auditEntries.filter { $0.recordId == recordId }.sorted { $0.trueDate > $1.trueDate }
     }
 
     /// Bir projenin tüm değişiklik kayıtları — ortak da görebilir.
     func audit(forProject projectId: UUID) -> [AuditEntry] {
-        auditEntries.filter { $0.projectId == projectId }.sorted { $0.date > $1.date }
+        auditEntries.filter { $0.projectId == projectId }.sorted { $0.trueDate > $1.trueDate }
     }
 
     /// Değişikliği deftere yazar ve hareket akışına düşürür.

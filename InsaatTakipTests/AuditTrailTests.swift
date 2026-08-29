@@ -93,4 +93,55 @@ final class AuditTrailTests: XCTestCase {
         XCTAssertEqual(AuditTrailView.gunBasligi(eski), Fmt.shortDate(eski))
         XCTAssertNotEqual(AuditTrailView.gunBasligi(eski), "Bugün")
     }
+
+    // MARK: Sunucu damgası (madde 77)
+
+    /// SUNUCU DAMGASI VARSA O KULLANILIR — cihaz saati değil.
+    ///
+    /// Denetim izinin tüm değeri tarihlerinde. Cihaz saati yanlışsa ya da
+    /// kasten geri alınmışsa `date` yalan söyler ve iz bir kanıt değil bir
+    /// İDDİA olur — üstelik madde 76 ile o tarihler artık ORTAĞIN gördüğü bir
+    /// ekranda. Güvenlik kuralı `updatedAt == request.time` diye şart koştuğu
+    /// için sunucu damgası varsa doğrudur.
+    func testServerStampWinsOverDeviceClock() {
+        let sunucu = Date(timeIntervalSince1970: 1_750_000_000)
+        let bozukCihazSaati = Date(timeIntervalSince1970: 100)   // 1970
+
+        var kayit = AuditEntry(id: UUID(), recordId: UUID(), projectId: UUID(),
+                               subject: "Fiş", action: .update,
+                               changes: [.init(field: "Miktar", oldValue: "1", newValue: "2")],
+                               user: "Yönetici", date: bozukCihazSaati)
+        XCTAssertEqual(kayit.trueDate, bozukCihazSaati, "damga yokken istemcinin anı kullanılır")
+
+        kayit.updatedAt = sunucu
+        XCTAssertEqual(kayit.trueDate, sunucu)
+        XCTAssertEqual(kayit.dateText, Fmt.shortDate(sunucu),
+                       "ekranda görünen tarih de sunucudan gelmeli")
+    }
+
+    /// SIRALAMA da sunucu damgasına göre.
+    ///
+    /// Cihaz saati bozuksa istemci tarihine göre sıralanan bir liste,
+    /// düzeltmeleri yanlış SIRAYLA gösterir — "önce hangisi oldu" sorusu da
+    /// denetim izinin cevaplaması gereken sorulardan.
+    func testOrderingUsesServerStamp() throws {
+        let (vm, proje) = kur()
+        let eski = Date(timeIntervalSince1970: 1_700_000_000)
+        let yeni = Date(timeIntervalSince1970: 1_760_000_000)
+        let bozuk = Date(timeIntervalSince1970: 10)
+
+        // İstemci tarihleri TERS sırada; sunucu damgaları doğru sırada.
+        var a = AuditEntry(id: UUID(), recordId: UUID(), projectId: proje.id,
+                           subject: "Eski", action: .update, changes: [],
+                           user: "Y", date: yeni)
+        a.updatedAt = eski
+        var b = AuditEntry(id: UUID(), recordId: UUID(), projectId: proje.id,
+                           subject: "Yeni", action: .update, changes: [],
+                           user: "Y", date: bozuk)
+        b.updatedAt = yeni
+
+        vm.auditEntries.append(contentsOf: [a, b])
+        let iz = vm.audit(forProject: proje.id).filter { $0.updatedAt != nil }
+        XCTAssertEqual(iz.first?.subject, "Yeni", "sunucu damgasına göre en yeni başta olmalı")
+    }
 }
