@@ -1465,7 +1465,7 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
       tanımlı ama View katmanında ÇAĞIRAN YOK; izi gösteren beş yerin beşi de
       yalnızca yöneticinin açabildiği düzenleme sheet'leri. Kural ortağa okuma
       izni veriyor — yani şeffaflık kuralda var, ekranda yok.
-- [~] 77. **Zaman damgası ve "kim yaptı" tamamen istemciden.** `firestore.rules`
+- [x] 77. **Zaman damgası ve "kim yaptı" tamamen istemciden.** `firestore.rules`
       içinde tek bir `request.time` ya da alan doğrulaması yok. Cihaz saati
       yanlışsa ya da kasten değiştirilirse iz yanlış tarih taşıyor.
 - [ ] 78. **Uygulama kilidi / gizlilik ekranı yok.** `LAContext` sıfır, uygulama
