@@ -1381,7 +1381,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 - [ ] 70. **Release yapılandırması bir kez bile derlenip çalıştırılmadı.**
       Firestore'un varsayılan olduğu, launch argümanlarının kapalı olduğu,
       `aps-environment`ın production olduğu yol hiç sınanmadı.
-- [ ] 71. **App Check ve oran sınırı yok.** Telefon girişi herkese açık, her SMS
+- [~] 71. **App Check ve oran sınırı yok.** Telefon girişi herkese açık, her SMS
       ücretli, callable'larda deneme sayacı yok. Bütçe uyarısı harcamayı
       KESMİYOR — mağazada görünür olmak kötüye kullanıma açık demek.
 - [ ] 72. **Uygulama içinde destek/geri bildirim/sürüm/politika satırı yok.**
@@ -1412,6 +1412,13 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · ON DÖRDÜNCÜ KUSUR BENİM DÜZELTMEMDEYDİ: yerel temizlik `terminate()` çağırıyordu ve uygulama ömrü boyunca yaşayan deponun yakaladığı Firestore örneğini öldürüyordu — sil → tekrar gir dizisi `FIRIllegalStateException` ile ÇÖKÜYORDU. Firestore önbelleği artık bayrakla sonraki açılışa devrediliyor (Firebase'in belgelediği yol). Dört test eklendi, cihazda doğrulandı.
       · **KAPANDI (24 Ağu 2026).** Test numarası tanımlandı, giriş uçtan uca koştu ve demo hesap kuruldu: *145 Ada / 2 Parsel · Gebze, Kocaeli · 4 Kat / 12 Daire · 9 malzeme kalemi · 1 taksitli satış* (850.000 ₺ peşinat + 12 × 250.000 ₺). ALICI ADI UYDURMA — gözden geçirene gösterilen veride gerçek kişi yok.
       · **AÇIK KALAN (kullanıcının işi):** App Store Connect → App Review Information → Notes alanına `APP_REVIEW.md` bölüm 2'deki metnin yapıştırılması.
+      · **İSTEMCİ TARAFI TAMAM (25 Ağu 2026) · ZORLAMA AÇILMADI.** `FirebaseAppCheck` hedefe eklendi, sağlayıcı `FirebaseApp.configure()`dan ÖNCE kuruluyor (sonra kurulursa Firebase ilk jetonu varsayılan sağlayıcıyla alıp SESSİZCE düşer; sorun ancak üretimde görünür). Cihazda App Attest, DEBUG'da debug sağlayıcı — jeton basıldığı doğrulandı.
+      · ZORLAMA BİLİNÇLİ AÇILMADI: istemci jeton gönderiyor, sunucu istemiyor. Konsol ölçümlerinde gerçek trafiğin doğrulandığı görülmeden zorlama açmak, uygulamayı kendi kullanıcılarına kapatmak olur. Callable'lardaki `enforceAppCheck` de aynı sebeple kapalı.
+      · ORAN SINIRI (`redeemInvite`): uid başına 15 dakikada 10 BAŞARISIZ deneme. Uid başına çünkü callable'da istemci IP'si güvenilir değil ve uid sınırı saldırganı yeni hesap açmaya zorluyor — her hesap gerçek bir SMS, yani saldırının kendi maliyeti var. Başarı sayacı sıfırlıyor. Sayaç İŞLEMİN DIŞINDA yazılıyor: transaction içinde olsaydı her hata onu da geri alır ve sınır çalışıyor görünüp hiçbir şey yapmazdı.
+      · `rateLimits/{uid}` istemciye kapalı ve kural açıkça yazılı (yazma açık olsa kullanıcı sıfırlar, okuma açık olsa saldırgan kalan hakkını görürdü).
+      · 8 test. 121 Swift + 192 emülatör testi geçiyor.
+      · **AÇIK KALAN (kullanıcının işi):** (a) Firebase konsolunda App Check'e uygulamayı kaydetmek ve debug jetonunu eklemek (`APP_REVIEW.local.md`), (b) ölçümlere bakıp ZORLAMAYI açmak, (c) sonra callable'larda `enforceAppCheck`i açmak. Ayrıca bütçe uyarısı harcamayı KESMİYOR — bunu kodla çözmek mümkün değil, bilinen sınır olarak duruyor.
+      · İşlev ve kurallar HENÜZ DAĞITILMADI.
 
 #### C-EK — GERÇEK FİŞ TURU (24 Ağu 2026)
 
