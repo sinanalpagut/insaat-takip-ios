@@ -1418,7 +1418,13 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · `rateLimits/{uid}` istemciye kapalı ve kural açıkça yazılı (yazma açık olsa kullanıcı sıfırlar, okuma açık olsa saldırgan kalan hakkını görürdü).
       · 8 test. 121 Swift + 192 emülatör testi geçiyor.
       · **AÇIK KALAN (kullanıcının işi):** (a) Firebase konsolunda App Check'e uygulamayı kaydetmek ve debug jetonunu eklemek (`APP_REVIEW.local.md`), (b) ölçümlere bakıp ZORLAMAYI açmak, (c) sonra callable'larda `enforceAppCheck`i açmak. Ayrıca bütçe uyarısı harcamayı KESMİYOR — bunu kodla çözmek mümkün değil, bilinen sınır olarak duruyor.
-      · İşlev ve kurallar HENÜZ DAĞITILMADI.
+      · **DAĞITILDI VE DOĞRULANDI (25 Ağu 2026).** Kurallar ve iki callable
+      üretime çıkarıldı; ardından `redeemInvite` oturumsuz çağrıldı ve
+      beklenen `UNAUTHENTICATED · signed-in-required` döndü — yani yeniden
+      yapılandırılan işlev (transaction ayrı bir yardımcıya taşındı) üretimde
+      sağlıklı koşuyor. Oran sınırının kendisi kimlik kapısının ARKASINDA
+      olduğu için bu çağrıyla sınanmıyor; davranışı sekiz emülatör testiyle
+      sabit.
 
 #### C-EK — GERÇEK FİŞ TURU (24 Ağu 2026)
 
