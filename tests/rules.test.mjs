@@ -537,6 +537,29 @@ describe('hareket akışı ve denetim defteri değiştirilemez', () => {
       id: 'act-3', projectId: P1, kind: 'sale', title: 'uydurma satış',
     }));
   });
+
+  // ── Madde 76'nın dayandığı iki kural ───────────────────────────────────
+  //
+  // "Kayıt İzi" ekranı ORTAĞA açık ve bunun tek dayanağı `auditEntries`
+  // kuralındaki `allow read: if isMember(pid)`. O satır bugüne kadar HİÇ
+  // test edilmemişti: var olan üç denetim testi yalnızca `ownerDb`
+  // kullanıyordu (sahip ekler / düzeltemez / silemez). Yani ekranın
+  // meşruiyetini veren izin de, onu sınırlayan kapı da denetimsizdi —
+  // biri kuralı `signedIn()`e gevşetse hiçbir test düşmezdi.
+
+  it('ORTAK denetim izini OKUR — Kayıt İzi ekranının dayanağı', async () => {
+    await assertSucceeds(getDoc(doc(memberDb, 'projects', P1, 'auditEntries', 'audit-1')));
+  });
+
+  it('ÜYE OLMAYAN denetim izini OKUYAMAZ', async () => {
+    await assertFails(getDoc(doc(strangerDb, 'projects', P1, 'auditEntries', 'audit-1')));
+  });
+
+  it('ortak denetim kaydı EKLEYEMEZ — defteri yazan yalnızca sahip', async () => {
+    await assertFails(setDoc(doc(memberDb, 'projects', P1, 'auditEntries', 'audit-3'), {
+      id: 'audit-3', projectId: P1, action: 'update', subject: 'uydurma düzeltme',
+    }));
+  });
 });
 
 // ═══════════════ İki aşamalı proje kurulumu (repository sözleşmesi) ═══════════════

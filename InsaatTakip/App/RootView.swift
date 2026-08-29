@@ -10,6 +10,8 @@ enum Route: Hashable {
     case activity            // Hareketler / bildirimler
     case photos(UUID)      // Şantiye fotoğrafları
     case report(UUID)      // Dönem raporu
+    /// Kayıt izi (madde 76) — ORTAK DA açabilir; gerekçesi AuditTrailView'da.
+    case auditTrail(UUID)
 }
 
 struct RootView: View {
@@ -40,6 +42,7 @@ struct RootView: View {
                             case .activity:         ActivityFeedView()
                             case .photos(let id):   SitePhotosView(projectId: id)
                             case .report(let id):   ReportView(projectId: id)
+                            case .auditTrail(let id): AuditTrailView(projectId: id)
                             }
                         }
                 }

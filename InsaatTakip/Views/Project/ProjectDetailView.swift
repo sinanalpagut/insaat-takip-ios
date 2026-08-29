@@ -257,6 +257,13 @@ struct ProjectDetailView: View {
                     NavigationLink(value: Route.report(projectId)) {
                         Label("Dönem Raporu", systemImage: "chart.bar")
                     }
+                    // KAYIT İZİ ROLDEN BAĞIMSIZ (madde 76). Kural ortağa okuma
+                    // izni veriyor; `isAdmin` arkasına konsaydı şeffaflık
+                    // kuralda var ekranda yok durumu sürerdi — maddenin
+                    // tespitinin aynısı.
+                    NavigationLink(value: Route.auditTrail(projectId)) {
+                        Label("Kayıt İzi", systemImage: "clock.arrow.circlepath")
+                    }
                     if isAdmin {
                         Button {
                             activeSheet = .progress
