@@ -1461,7 +1461,7 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
       satır kod yok; "kapsam dışı" notu da yok, yani ERTELENMİŞ DEĞİL ATLANMIŞ.
       Telefon kaybolursa veri kaybolur. Hesap silmede de "önce verini dışa
       aktar" adımı sunulmuyor.
-- [ ] 76. **Denetim izi ortağın göreceği hiçbir ekranda yok.** `audit(forProject:)`
+- [~] 76. **Denetim izi ortağın göreceği hiçbir ekranda yok.** `audit(forProject:)`
       tanımlı ama View katmanında ÇAĞIRAN YOK; izi gösteren beş yerin beşi de
       yalnızca yöneticinin açabildiği düzenleme sheet'leri. Kural ortağa okuma
       izni veriyor — yani şeffaflık kuralda var, ekranda yok.
@@ -1481,6 +1481,12 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
       · ÖZET GELMEYENİ DE SÖYLÜYOR: belgeler geri gelmiyor (yedek kaydı taşır, dosyayı değil), sahipsiz kayıtlar sayılıyor, alıcı adı eksikse belirtiliyor, ortakların yeniden davet edilmesi yazılıyor.
       · 15 test (90 toplam).
       · **AÇIK KALAN:** hesap silmede "önce verini dışa aktar" adımı hâlâ sunulmuyor — silme ekranına eklenecek. Belgelerin ve fotoğrafların yedeğe girmesi ayrı bir iş (dosya boyutu kararı gerektiriyor).
+      · **EKRAN AÇILDI (25 Ağu 2026).** "Kayıt İzi" proje menüsünde ve girişi ROLDEN BAĞIMSIZ — `isAdmin` arkasına konsaydı maddenin tespit ettiği durum aynen sürerdi. Gün gruplu liste; her satır eski → yeni değeri, işlemi yapanı ve saati gösteriyor.
+      · AÇMADAN ÖNCE SIZINTI DENETİMİ KOŞTURULDU. Altı bulgunun altısı da çürütüldü ve çürütme gerekçesi belirleyici: `recordAudit` TEK çağrıda İKİ kayıt yazıyor — `AuditEntry` ve ÖZETİNİ `meta` alanında taşıyan bir `ActivityItem`. Hareket akışı ortağa zaten açık, yani izin içeriği bugüne kadar da ortağa ulaşıyordu. Kodda doğrulandı.
+      · GENİŞLEYEN TEK ŞEY ZAMAN PENCERESİ: akış sunucuda 200 kayıtla sınırlı, denetim izi sınırsız. Türü değil süresi genişliyor.
+      · DENETİM İKİ GERÇEK EKSİK BULDU: (a) ekranın dayandığı `BuyerPrivacyTests` iddiasından DARDI — yalnızca `updateApartment` yolunu ve yalnızca denetim izini tarıyordu; `saveSale` (adın asıl girildiği yer) ve `cancelSale` kapsam dışıydı, hareket akışına hiç bakılmıyordu. Üç yolu ve iki defteri tarayacak biçimde genişletildi. (b) Maddenin tüm dayanağı olan `allow read: if isMember` kuralı HİÇ test edilmemişti — var olan üç test yalnızca sahiple koşuyordu. Üç kural testi eklendi.
+      · 99 Swift + 126 kural testi geçiyor.
+      · **AÇIK KALAN:** dolu satır görünümü cihazda görsel olarak doğrulanmadı (boş durum ve gezinme doğrulandı).
 
 #### E — PLANLANMAMIŞ ÜRÜN ALANLARI
 
