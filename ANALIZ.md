@@ -1471,7 +1471,7 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
 - [x] 78. **Uygulama kilidi / gizlilik ekranı yok.** `LAContext` sıfır, uygulama
       değiştiricide örtü yok. Oysa uygulama alıcı kimliği, IBAN taşıyan
       dekontlar ve tüm proje finansallarını taşıyor.
-- [ ] 79. **Arama ve süzgeç yalnızca dairelerde.** Giderler, malzeme hareketleri,
+- [~] 79. **Arama ve süzgeç yalnızca dairelerde.** Giderler, malzeme hareketleri,
       tahsilatlar ve hareket akışında arama/tarih aralığı/sıralama yok.
       · **GERİ YÜKLEME TAMAM (25 Ağu 2026).** Dosya seçici → çözme → geri yükleme yolu kuruldu ve simülatörde uçtan uca doğrulandı.
       · KİMLİKLER KORUNUYOR, ÇAKIŞMA REDDEDİLİYOR. Yeni kimlik üretmek her referansı yeniden eşlemeyi gerektirirdi; tek hata parayı yanlış daireye yazar. Üzerine yazma ve birleştirme ikisi de reddedildi: yedekten YENİ olan veriyi yok etmek geri dönüşsüz, hangisinin doğru olduğunu ise kimse bilemez.
@@ -1500,6 +1500,14 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
       · FAIL-OPEN: cihaz doğrulama yapamıyorsa kilit açılıyor, ayar da açılamıyor. Tersi uygulamayı kalıcı erişilemez yapardı — hiçbir şey kazandırmadan, çünkü parolasız telefonu eline alan zaten içeride.
       · `NSFaceIDUsageDescription` eklendi; yokken uygulama doğrulama anında ÇÖKER.
       · 10 test. Cihazda uçtan uca doğrulandı: aç → arka plana at → dön → sistem doğrulama istedi (yazılan gerekçe metniyle) → aç → içerik geri geldi. 111 Swift testi geçiyor.
+      · **TAMAM (25 Ağu 2026) — üç listede.** Giderler ve malzeme hareketleri arama + dönem süzgeci aldı; hareket akışı arama aldı. Daireler de aynı ortak yardımcıya geçirildi.
+      · GEREKÇE: daire sayısı projede SABİT, gider ve fiş sayısı her gün artıyor. Arama en çok ihtiyaç duyulan yerde yoktu.
+      · TEK DAVRANIŞ: arama çubuğu ve eşleştirme kuralı ortak bileşende. Her ekranın kendi kuralını yazması, aynı sorgunun bir sekmede bulup diğerinde bulamaması demekti.
+      · TÜRKÇE TUZAĞI TESTLE YAKALANDI: aksan katlaması "İ"nin noktasını siliyor, Türkçe küçültme de "I"yı noktasız "ı" yapıyor — "İRSALİYE" → "ırsalıye" olup "irsaliye" ile eşleşmiyordu. i ailesi artık katlamadan ÖNCE elle tek harfe iniyor.
+      · "Son 3 ay" TAKVİM AYI, 90 gün değil. Çip sayıları süzülmemiş listeden; başlık sayısı GÖRÜNENİ sayıyor ("1 / 7 kayıt").
+      · AKIŞTA DÖNEM ÇİPİ YOK, bilinçli: akış zaten BUGÜN/DÜN/BU HAFTA gruplu, "ne zaman" sorusu ekranda cevaplı; eksik olan "ne"ydi.
+      · **KAPSAM DIŞI:** tahsilatlar. Liste daire başına birkaç satır ve proje geneli tahsilat ekranı YOK; olmayan bir listeye süzgeç eklemek yerine o ekran gerekirse ayrı madde olarak açılmalı.
+      · 10 test. 121 Swift testi geçiyor. Cihazda doğrulandı.
 
 #### E — PLANLANMAMIŞ ÜRÜN ALANLARI
 
