@@ -1,0 +1,17 @@
+/* Sistem izin diyaloglarının metinleri — madde 73.
+
+   NEDEN AYRI DOSYA: bu dizeler `Config/Info.plist` içinde de duruyor ve orada
+   TEK bir değer; yani cihazın dili ne olursa olsun Türkçe geliyorlardı. Eksik
+   olan onlar değildi — eksik olan uygulamanın KENDİNİ Türkçe İLAN ETMESİYDİ.
+
+   `.lproj` dizini olmayan bir uygulamayı iOS "yerelleştirilmemiş" sayıyor ve
+   uygulamanın SUNDUĞU sistem ekranlarını (fotoğraf seçici, paylaşım sayfası,
+   dosya seçici, izin diyalogları) CİHAZIN diliyle çiziyor. İngilizce bir
+   telefonda müteahhit, Türkçe bir uygulamanın içinde "Cancel / Choose"
+   düğmeleri görüyordu.
+
+   `tr.lproj` + `CFBundleDevelopmentRegion = tr` ikilisi uygulamayı Türkçe
+   ilan ediyor; cihaz dili desteklenmiyorsa iOS geliştirme diline düşüyor. */
+
+"NSCameraUsageDescription" = "Fiş ve irsaliyeleri fotoğraflayarak malzeme hareketine eklemek için kamera kullanılır.";
+"NSFaceIDUsageDescription" = "Uygulama kilidini açmak için Face ID kullanılır. Proje kayıtları, alıcı bilgileri ve dekontlar bu kilidin arkasında durur.";

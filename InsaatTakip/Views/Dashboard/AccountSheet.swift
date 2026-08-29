@@ -61,6 +61,18 @@ struct AccountSheet: View {
 
             lockRow
 
+            // ─── Destek ve sürüm (madde 72) ───
+            //
+            // Crashlytics bilinçli olarak ertelendi; o yüzden bu satırlar
+            // sahadaki bir hatanın görünebildiği TEK kanal. İkisi de yokken
+            // kullanıcı bildiremiyor, geliştirici ölçemiyordu.
+            Text("Destek")
+                .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                .padding(.top, 22)
+                .padding(.bottom, 10)
+
+            supportRows
+
             Button {
                 dismiss()
                 appState.signOut()
@@ -186,6 +198,82 @@ struct AccountSheet: View {
         appState.updateName(draftName)
         isEditingName = false
         nameFocused = false
+    }
+
+    private var supportRows: some View {
+        VStack(spacing: 0) {
+            // GERİ BİLDİRİM — tanı bilgisi e-postaya ÖNCEDEN yazılı
+            // (gerekçesi `AppInfo.supportMailURL` içinde).
+            if let mail = AppInfo.supportMailURL {
+                Link(destination: mail) {
+                    infoRow(icon: "envelope",
+                            title: "Geri bildirim gönder",
+                            detail: "Hata bildir ya da öneride bulun",
+                            trailing: nil)
+                }
+                .buttonStyle(.plain)
+                Divider().overlay(Palette.divider).padding(.leading, 68)
+            }
+
+            // GİZLİLİK POLİTİKASI — adres yokken satır HİÇ çizilmiyor
+            // (madde 27). Çalışmayan bir bağlantı, hiç bağlantı olmamasından
+            // kötü.
+            if let policy = AppInfo.privacyPolicyURL {
+                Link(destination: policy) {
+                    infoRow(icon: "hand.raised",
+                            title: "Gizlilik politikası",
+                            detail: "Verilerin nasıl saklandığı",
+                            trailing: nil)
+                }
+                .buttonStyle(.plain)
+                Divider().overlay(Palette.divider).padding(.leading, 68)
+            }
+
+            // SÜRÜM — dokununca panoya kopyalanıyor. Destek e-postasına elle
+            // yazdırmak, yanlış yazılmasına ve yanlış derlemede hata
+            // aranmasına yol açardı.
+            Button {
+                UIPasteboard.general.string = AppInfo.versionText
+                viewModel.flash("Sürüm kopyalandı · \(AppInfo.versionText)")
+            } label: {
+                infoRow(icon: "info.circle",
+                        title: "Sürüm",
+                        detail: "Dokun ve kopyala",
+                        trailing: AppInfo.versionText)
+            }
+            .buttonStyle(.plain)
+        }
+        .background(Palette.surface)
+        .cornerRadius(15)
+    }
+
+    private func infoRow(icon: String, title: String,
+                         detail: String, trailing: String?) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon)
+                .iconFont(15, weight: .medium)
+                .foregroundColor(Palette.textMuted)
+                .frame(width: 42, height: 42)
+                .background(Palette.fillMuted)
+                .cornerRadius(13)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.manrope(13.5, .bold))
+                    .foregroundColor(Palette.ink)
+                Text(detail)
+                    .font(.manrope(11.5, .medium))
+                    .foregroundColor(Palette.textSecondary)
+            }
+            Spacer()
+            if let trailing {
+                Text(trailing)
+                    .font(.manrope(12.5, .semiBold))
+                    .foregroundColor(Palette.textSecondary)
+            }
+        }
+        .padding(13)
+        .contentShape(Rectangle())
     }
 
     /// Uygulama kilidi anahtarı.

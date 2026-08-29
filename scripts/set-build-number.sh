@@ -15,7 +15,20 @@
 # ve elle takip gerektirmiyor. App Store aynı build numarasını iki kez kabul
 # etmiyor; unutulan bir artırım gönderim gününde fark ediliyor.
 #
-# Kullanım — ARŞİVLEMEDEN ÖNCE:
+# ARTIK ELLE ÇAĞRILMASI GEREKMİYOR (madde 74): şemanın Archive ön-eylemi
+# bu betiği kendisi çalıştırıyor. Ön-eylem kum havuzunun DIŞINDA koşuyor,
+# dolayısıyla `.git`i okuyabiliyor — derleme fazının okuyamadığı şeyi.
+#
+# DERLEME FAZI DENENDİ VE OLMADI; iki engel de ölçülerek görüldü:
+#   1. `git -C "$SRCROOT" rev-list --count HEAD` kum havuzunda
+#      "fatal: not a git repository" veriyor — `.git` gizli.
+#   2. `plutil -replace CFBundleVersion` ile ÜRETİLEN plist'e yazmak da
+#      engelleniyor ve betik hata verip DERLEMEYİ DÜŞÜRÜYOR. Üstelik
+#      `ProcessInfoPlistFile` betik fazlarından SONRA koştuğu için, yazma
+#      başarılı olsa bile üzerine yazılıyordu.
+# Yani numara derlemenin içinde üretilemez; ön-eylem tek doğru yer.
+#
+# Elle de çalıştırılabilir:
 #   sh scripts/set-build-number.sh
 set -e
 
