@@ -1378,19 +1378,19 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 - [x] 69. **App Review giriş YAPAMAZ.** Uygulamaya girmenin tek yolu Türkiye
       numarasına gelen SMS. Review notlarına Firebase test telefon numarası +
       sabit kod konmazsa ilk ekran geçilemez → 2.1 reddi.
-- [ ] 70. **Release yapılandırması bir kez bile derlenip çalıştırılmadı.**
+- [x] 70. **Release yapılandırması bir kez bile derlenip çalıştırılmadı.**
       Firestore'un varsayılan olduğu, launch argümanlarının kapalı olduğu,
       `aps-environment`ın production olduğu yol hiç sınanmadı.
 - [~] 71. **App Check ve oran sınırı yok.** Telefon girişi herkese açık, her SMS
       ücretli, callable'larda deneme sayacı yok. Bütçe uyarısı harcamayı
       KESMİYOR — mağazada görünür olmak kötüye kullanıma açık demek.
-- [ ] 72. **Uygulama içinde destek/geri bildirim/sürüm/politika satırı yok.**
+- [x] 72. **Uygulama içinde destek/geri bildirim/sürüm/politika satırı yok.**
       `AccountSheet`te yok, `CFBundleShortVersionString` okuyan kod yok.
       Crashlytics bilinçli ertelendi; ikisi birleşince sahadaki hata İKİ
       KANALDAN DA görünmez.
-- [ ] 73. **Yerelleştirme paketi yok** (`.lproj` yok): kamera, galeri, paylaşım
+- [~] 73. **Yerelleştirme paketi yok** (`.lproj` yok): kamera, galeri, paylaşım
       ve dosya seçici ekranlarının Türkçe geldiği hiç ölçülmedi.
-- [ ] 74. **Build numarası otomasyonu derleme dışında** — arşivden önce ELLE
+- [x] 74. **Build numarası otomasyonu derleme dışında** — arşivden önce ELLE
       çalıştırılması gerekiyor, unutulursa "redundant binary" reddi.
       · **KOD TAMAM (24 Ağu 2026) · GERÇEK TUR AÇIK.** Maddenin tespiti doğruydu ve tahmin edilenden ağırdı: koşmamış yol ON ÜÇ kusur taşıyordu.
       · SUNUCU (6): (a) `getStorage().bucket()` varsayılanı `<proje>.appspot.com` çözüyor, bu projenin kovası ise `.firebasestorage.app` — doğrudan sınandı, eski ad HTTP 404, yeni ad 403. Yanlış kova silme döngüsünün ORTASINDA patlar. Çözücü artık adayları sırayla DENİYOR ve cevabı işin kendisinden alıyor; `bucket.exists()` ile yoklayan sürüm yazıldı ve TERK EDİLDİ, çünkü Storage emülatörü dolu kova için bile false diyor ve o sürüm hiçbir dosyayı silmeden 'silindi' dedi. (b) Sıra tersti: Firestore önce silinince Storage hatası dosyaları KURTARILAMAZ biçimde öksüz bırakıyordu — tekrar çağrı projeyi artık bulamıyor. (c) `recursiveDelete` silme sırasını garanti etmiyor; üst belge artık `listCollections()` sonrası EN SONDA. (d) `invites/{KOD}` üst düzey ve kural `delete: if false` diyor — silinen her hesap, içinde gerçek ad yazan ÖLÜMSÜZ belgeler bırakıyordu. (e) Ayrılan ortağın adı davet belgesinde ve katılma hareketinde kalıyordu; ortak kaydı zaten aynı gerekçeyle siliniyordu. (f) Süre/bellek varsayılandaydı (60 sn).
@@ -1425,6 +1425,18 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       sağlıklı koşuyor. Oran sınırının kendisi kimlik kapısının ARKASINDA
       olduğu için bu çağrıyla sınanmıyor; davranışı sekiz emülatör testiyle
       sabit.
+      · **KOŞTURULDU (25 Ağu 2026).** Release derlenip simülatöre kuruldu ve `-role admin -backend firestore -screen project` argümanlarıyla başlatıldı: ÜÇÜ DE YOK SAYILDI. DEBUG olsaydı doğrudan sahte oturumla demo panoya düşerdi; Release gerçek karşılama ekranını ve gerçek kimlik yolunu gösterdi. Pakette `tr.lproj`, sürüm 1.0 (169).
+      · `aps-environment`ın production olduğu yol hâlâ sınanmadı — imzalı arşiv gerektiriyor, simülatörde doğrulanamaz.
+      · **TAMAM (25 Ağu 2026).** Hesap ekranına "Destek" bölümü: geri bildirim, sürüm ve (adres gelince) gizlilik politikası.
+      · E-POSTA GÖVDESİ TANI BİLGİSİNİ ÖNCEDEN TAŞIYOR (sürüm, iOS, cihaz modeli). Crashlytics ertelendiği için bu tek kanal; "uygulama açılmıyor" diye gelen bir mesajla çalışılamaz ve bunları kullanıcıdan sormak cevabı günlerce geciktirir. `UIDevice.model` yalnızca "iPhone" dediği için donanım kimliği `uname` ile alınıyor.
+      · Sürüm "1.0 (169)" — ikisi birden, çünkü aynı sürümle onlarca build gönderiliyor. Dokununca kopyalanıyor.
+      · GİZLİLİK POLİTİKASI SATIRI HİÇ ÇİZİLMİYOR: adres madde 27'ye bağlı ve çalışmayan bağlantı, hiç bağlantı olmamasından kötü. Bir test adres eklendiği gün düşüp satırı doğrulamayı hatırlatıyor. 5 test.
+      · **ÖLÇÜLDÜ (25 Ağu 2026) — maddenin şikâyeti zaten buydu.** `tr.lproj` eklendi, `CFBundleDevelopmentRegion = tr` yapıldı ve simülatör İngilizceye alınıp bakıldı.
+      · SONUÇ: uygulamanın KENDİ ekranları ve kendi diyalogları ("Görsel kaynağı · Fotoğraf Çek · Galeriden Seç") İngilizce cihazda da TÜRKÇE geliyor. Ama `PHPickerViewController` AYRI SÜREÇTE koşuyor ve CİHAZIN dilini izliyor: İngilizce telefonda "Photos / Collections / Learn More…" görünüyor ve bu uygulamadan değiştirilemiyor.
+      · **BİLİNEN SINIR:** hedef kitle Türkçe telefon kullandığı için pratikte sorun değil; ama "uygulama tamamen Türkçe" demek yanlış olur. Paylaşım sayfası ve dosya seçici de aynı kurala tabi.
+      · **TAMAM (25 Ağu 2026).** Betik şemanın Archive ÖN-EYLEMİNDE; ön-eylem kum havuzunun DIŞINDA koştuğu için `.git`i okuyabiliyor.
+      · DERLEME FAZI DENENDİ VE OLMADI, iki engel de ölçüldü: (a) `git rev-list` kum havuzunda "fatal: not a git repository" veriyor — eski yorumdaki varsayım doğrulandı; (b) üretilen Info.plist'e `plutil -replace` ile yazmak da engelleniyor ve betik hata verip DERLEMEYİ DÜŞÜRÜYOR. Üstelik `ProcessInfoPlistFile` betik fazlarından SONRA koşuyor, yani yazma başarılı olsa bile üzerine yazılırdı (girdi bildirerek sıralama da denendi, yetmedi). Numara derlemenin içinde üretilemez.
+      · **DOĞRULANAMAYAN:** ön-eylemin AYNI arşivde etkili olup olmadığı imzalı arşiv gerektirdiği için sınanmadı; en kötü durumda numara bir sonraki arşive yansır ve depoda değişiklik görünür.
 
 #### C-EK — GERÇEK FİŞ TURU (24 Ağu 2026)
 
