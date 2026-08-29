@@ -1536,29 +1536,327 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
 
 #### E — PLANLANMAMIŞ ÜRÜN ALANLARI
 
+**KAPSAM KARARLARI VERİLDİ (25 Ağu 2026).** Dört bağımsız mercek + sentez.
+Çizilen sınır: uygulama SAHADA OLANIN DEFTERİ ve ortaklar arası şeffaflık
+yüzeyi — tek bir tutar tutar, kaydeder ve neyi kapsamadığını YAZAR, ama
+HESAPLAMAZ. Dışarıda kalan üçü (vergi hesabı, tedarikçi cari, yasal takvim)
+aynı sebeple dışarıda: üçünde de canlı ve hukuken bağlayıcı bir alternatif
+var (müşavir + e-fatura · çek defteri + 320 hesabı · belediye tebligatı) ve
+uygulamanın üreteceği ikinci rakam, o alternatifle çeliştiği gün yanlış olan
+taraf uygulama olur.
+
+
 Bunlar "ertelendi" değil: yol haritasında maddeleri hiç açılmadı. Kapsam kararı
 verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam dışı".
 
-- [ ] 80. **KDV / vergi ayrımı** (İş Mantığı#9). "BİRİM FİYAT (₺)" ve gider
+- [~] 80. **KDV / vergi ayrımı** (İş Mantığı#9). "BİRİM FİYAT (₺)" ve gider
       "TUTAR (₺)" alanlarının KDV dahil mi hariç mi olduğu hiçbir ekranda
       yazmıyor; rapor bu belirsizliğin üzerine kuruluyor.
-- [ ] 81. **Tedarikçi / cari hesap, ödendi–vadeli ayrımı** (İş Mantığı#5).
+- [~] 81. **Tedarikçi / cari hesap, ödendi–vadeli ayrımı** (İş Mantığı#5).
       Uygulama kapsam dışı olduğunu ortağa YAZIYOR ama maddesi yok.
-- [ ] 82. **Ortak cari hesabı** — sermaye, avans, dağıtım (Farklılaştırıcı#2,
+- [~] 82. **Ortak cari hesabı** — sermaye, avans, dağıtım (Farklılaştırıcı#2,
       🔴 Kritik). `PartnersTabView:174` kullanıcıya "henüz tutulmuyor" diyor.
-- [ ] 83. **Blok / etap kavramı** (Gözden Kaçanlar#6). Kanıtı demo verisinin
+- [~] 83. **Blok / etap kavramı** (Gözden Kaçanlar#6). Kanıtı demo verisinin
       içinde: "SF-1 Blok 1" ve "GB Blok 1" iki AYRI proje olarak, uydurma
       ada/parsel numaralarıyla modellenmiş.
-- [ ] 84. **Ortak ↔ yönetici iletişimi** (Gözden Kaçanlar#7). Ortağın yüzeyi
+- [~] 84. **Ortak ↔ yönetici iletişimi** (Gözden Kaçanlar#7). Ortağın yüzeyi
       salt okunur bir vitrin: gideri sorgulayamıyor, raporu "gördüm" diye
       işaretleyemiyor. Bildirim de gitmediği için ilişki tek yönlü.
-- [ ] 85. **Yasal takvim** — ruhsat, iskân, yapı denetim, sözleşme süreleri.
+- [x] 85. **Yasal takvim** — ruhsat, iskân, yapı denetim, sözleşme süreleri.
       Tek hatırlatıcı yüzeyi taksit vadesi.
-- [ ] 86. **Kalan stoğun değeri ve projeyi bitirmenin maliyeti** hiçbir ekranda
+- [~] 86. **Kalan stoğun değeri ve projeyi bitirmenin maliyeti** hiçbir ekranda
       yok; "satılan ciro + kalan stok değeri = beklenen hasılat" gösterilmiyor.
-- [ ] 87. **Gelir modeli kararı yazılı değil.** StoreKit/abonelik/sınır sıfır;
+- [~] 87. **Gelir modeli kararı yazılı değil.** StoreKit/abonelik/sınır sıfır;
       her kullanıcı ücretli SMS ve Avrupa Storage maliyeti üretiyor. "Önce
       ücretsiz" gibi bilinçli bir karar da kayıtlı değil.
+      · **KAPSAM KARARI (25 Ağu 2026): MADDE** — Tutarın KDV tabanı beyan edilsin (hesaplanmasın)
+      · Dört mercek de aynı çelişkiyi bağımsız buldu ve kodda doğruladım:
+        ReceiptScanner bilerek fişteki 'Ödenecek KDV Dahil Tutar'ı seçip birim
+        fiyat alanına taşıyor (ReceiptScanner.swift:106-118), buna karşılık
+        seed'deki daire bedelleri açıkça 'KDV hariç'
+        (InMemoryProjectRepository+Seed.swift:288). Yani netAmount = satış −
+        maliyet, KDV HARİÇ bir gelirden KDV DAHİL bir maliyeti çıkarıyor ve o
+        rakam ortağa PDF olarak dağıtılıyor. Konut satışında oran %1-10,
+        malzemede %20 olduğu için sapma tek yönlü değil: maliyet şişik, ciro
+        düşük. Kararın alındığı an haftada 20-30 kez (her fiş girişi), yani
+        listedeki en sık karşılaşılan eksik. Belirleyici olan maliyet
+        merceğinin ikiye bölmesi: (a) tabanı KAYDETMEK bugün neredeyse bedava,
+        yarın imkânsız — bugün girilen 100.000 ₺'lik fişin hangisi olduğu
+        kayıt dışı kalıyor ve hiçbir kod bunu geri getiremiyor; bu, madde
+        10c'de 'Firestore'dan ÖNCE yapıldı' denilen sınıfın aynısı. (b)
+        İndirilecek/hesaplanan KDV defteri ise unitPrice'ın 77, amount'ın 51
+        referansını, ReportSummary'nin 4 para satırını ve yedek şemasını
+        katlar. Kapsam (a): proje düzeyinde 'tutarları KDV dahil/hariç
+        giriyorum' işareti, alan etiketlerine yazılması, mevcut kayıtlar için
+        'belirtilmedi' durumu ve rapor kapsam notuna 'uygulama vergi
+        HESAPLAMAZ' cümlesi. Madde metnine 'bu bir defter DEĞİL, kayıt
+        sözleşmesidir' açıkça yazılmalı; ayrıca ReportView.scopeNote'taki
+        'vergi dahil değildir' cümlesi taban dahilse yanlış yönde okunuyor, o
+        da düzelmeli.
+      · AYRIŞMA: Ayrışma karar değil MALİYET tahmininde:
+        gün/maliyet/alternatif 'küçük', vaat 'orta' dedi. Vaat merceği haklı
+        bir uyarı ekliyor — mevcut kayıtların tabanı yok, dolayısıyla
+        'belirtilmedi' durumu ve yedek şema sürümü (madde 56 bilinmeyen sürümü
+        reddediyor) işin parçası. Bu yüzden kapsamı maliyet merceğinin (a)/(b)
+        ayrımıyla sabitledim: (a) yapılır, (b) bu maddenin işi değil.
+      · **KAPSAM KARARI (25 Ağu 2026): ERTELENMİŞ** — Tedarikçi cari / ödendi-vadeli ayrımı
+      · Listenin en çok ayrışan maddesi: gün 'madde', vaat 'kapsam dışı',
+        maliyet ve alternatif 'ertelenmiş' dedi. Kararı belirleyen soru şu:
+        uygulamanın GÖSTERDİĞİ bir rakam bozuluyor mu? Hayır. Vaat merceğinin
+        analizi burada en güçlüsü — uygulama hiçbir yerde kasa bakiyesi iddia
+        etmiyor; ortağın KASA satırları 'Tahsil edilen' ve 'Kalan alacak',
+        ikisi de alacak tarafı. Tahakkuk esaslı bir maliyet, fatura 4 ay
+        vadeli çeke bağlanmış olsa da DOĞRUDUR; eksik ama yalan değil ve
+        PartnersTabView.swift:206 bu eksiği ortağa yazıyor. Buna karşılık gün
+        merceğinin 'ay sonu hangi çek var' itirazı da gerçek. Ancak bu bir
+        alan değil DEFTER: 14. koleksiyon + tedarikçi kaydı + vade + kısmi
+        ödeme mahsubu, ve asıl bedeli raporun ekseninin tahakkuk/nakit diye
+        ikiye bölünmesi. Kapsam dışı yapmamamın sebebi: iki mercek birbirinden
+        bağımsız olarak AYNI ucuzlama koşulunu buldu — madde 82'nin cari
+        defter mekaniği (kayıt tipi + yürüyen bakiye + rules + kural testi +
+        yedek şeması + restore + CSV + denetim izi) bir kez kurulduğunda 81
+        yeniden icat değil kopyalama olur. 'Sonra bakarız' değil, fiyatı
+        ölçülebilir biçimde düşen bir iş. Ertelemenin bir bedeli ŞİMDİ
+        ödenmeli: Expense.swift:51-52'deki yorumlar 'Ödenen tutar' ve 'Ödeme /
+        hakediş tarihi' diyor — modelin garanti etmediği bir ödeme iddiası;
+        'gider / hakediş tutarı' olarak düzeltilmezse kod yanlış bir şey
+        söylemeye devam eder. Aynı şekilde ProjectExporter.expensesCSV
+        başlığında 'Tutar' ile yan yana duran 'Ödenen' sütununa payee (kişi)
+        yazılıyor.
+      · TETİK: Madde 82'nin ortak cari defteri yayına girip mekaniği (kayıt
+        tipi + yürüyen bakiye + firestore.rules bloğu + kural testi + yedek
+        sürüm + restore) kanıtlandığında yeniden değerlendirilir. İkinci ve
+        daha erken tetik: gerçek bir kullanıcının 'raporda gider yazıyordu ama
+        çek daha ödenmemişti' demesi.
+      · **KAPSAM KARARI (25 Ağu 2026): MADDE** — Ortak cari hesabı — sermaye, avans, dağıtım
+      · Dört mercekte de 'madde'; sekizinin içinde vaadin (ortaklarla
+        şeffaflık) tam merkezinde duran tek iş. İki bulgu kararı kilitliyor.
+        Birincisi: share(of:) hesap TUTMUYOR, proje toplamlarını yüzdeyle
+        DİLİMLİYOR (ProjectViewModel.swift:2908) — 8 M ₺ koyan ortakla 0 koyan
+        ortak birebir aynı 'Payın %50' kartını görüyor ve bakabileceği başka
+        yer yok. İkincisi ve daha ağırı: bugün bir dağıtımı kaydetmenin TEK
+        yolu .diger kategorisinde bir gider ve netAmount = satış − (malzeme +
+        diğer gider); yani ortağa para ödemek inşaat maliyeti gibi görünüp
+        dağıtımın dayandığı rakamı, üstelik BÜTÜN ortaklar için aynı anda
+        düşürüyor. Uygulamanın ürettiği rakam, kendi sebep olduğu ortaklık
+        ihtilafının dayanağı oluyor. Kaybedilen şey ayrıca VERİ: adi
+        ortaklıkta sermaye ve avans çekimlerinin çoğu elden dönüyor —
+        müşavirin defterinde yok, Excel'de yok; 18 ay sonra banka
+        dekontlarından geriye kurmak madde 83'ten sonra geri dönüşü en zor
+        ikinci iş. PartnersTabView.swift:207'deki 'HENÜZ tutulmuyor' cümlesi
+        de 81'dekinin aksine okuyucuyu bir davranışa götürmüyor; eksik olan
+        şey ortağın uygulamayı açma sebebinin ta kendisi. Kapsam:
+        PartnerLedgerEntry (tarih, ortak, tür ∈ {sermaye, çekilen/avans,
+        dağıtım}, tutar, not) + yürüyen bakiye; Payment desenini birebir
+        izler.
+      · AYRIŞMA: Verdict'te ayrışma yok, KORKULUKTA var ve üçü birleştirildi:
+        (1) gün ve vaat — sermaye ve çekiş NAKİT/FİNANSMAN hareketidir, inşaat
+        maliyeti değil; 'Dönem net'in ve malzeme/diğer gider toplamlarının
+        DIŞINDA kalmalı, yoksa madde 35 sınıfı bir sapma geri açılır. (2)
+        alternatif — dağıtılabilir kâr HESAPLANMAMALI; defter açılır açılmaz
+        'ne dağıtabilirim' sorulacak ve o soru madde 86'nın kalan maliyetini
+        ister. (3) maliyet — yeni bir gizlilik kararı doğuyor: A ortağı B'nin
+        çektiği parayı görecek mi? Bu, buyers/{apartmentId} ile aynı sınıfta
+        bir karar ve EKRANDA değil KURALDA alınmalı. Ayrıca scopeText bu
+        maddeyle kısalmamalı, sertleşmeli: kart bir mutabakat belgesi gibi
+        görünmeye başlarken kalan inşaat maliyeti hâlâ düşülmüyor.
+      · **KAPSAM KARARI (25 Ağu 2026): MADDE** — Blok / etap — dar dilim: etiket + tek proje yönlendirmesi
+      · Önce maddenin kendi kanıtını düzeltmek gerekiyor: ada/parsel
+        numaraları UYDURMA DEĞİL, iki Kars projesi gerçek ve FARKLI TOKİ
+        verisi taşıyor (1224/1 ve 1139/3 — Seed.swift:41-51). Ama model sorunu
+        aynen duruyor ve daha net: veride 'blok' diye bir alan yok, 'SF-1 Blok
+        1' ve 'GB Blok 1' yalnızca yorum satırında yaşıyor;
+        Project.swift:18'deki blockNumber ADA demek ve title = '{ada} Ada /
+        {parsel} Parsel', yani aynı parseldeki iki blok panoda birebir aynı
+        kartı üretir. Üstelik addApartment daire numarasını proje genelinde
+        max+1 veriyor (ProjectViewModel.swift:2075) ve apartment(in:number:)
+        daireyi numarasından buluyor — tek projede iki blok bugün kapı
+        numarası çakışması demek. Kararı belirleyen maliyet merceğinin geri
+        dönülemezlik argümanı: bu, listedeki tek FAİZİYLE BÜYÜYEN madde.
+        Kullanıcı 3 bloğu 3 ayrı proje olarak kurduktan sonra birleştirmek,
+        projects/{pid} altındaki her daire, malzeme, fiş, gider, tahsilat,
+        taksit ve DENETİM İZİ belgesini yeni yola kopyalayıp silmek demek —
+        madde 77'nin 'iz sonradan yazılamaz' kuralını uygulamanın kendi eliyle
+        ihlal etmesi, ve madde 79'un 'birleştirme reddedildi' kararıyla da
+        çelişir. Beklemek doğrudan gelecekteki göç faturası. Bu yüzden dar
+        dilim BUGÜN girmeli: daire üzerinde serbest metin 'Blok / Etap'
+        etiketi + daire listesinde gruplama + raporda blok süzgeci + proje
+        kurulumunda 'aynı ada/parselde birden çok blok varsa TEK proje aç'
+        yönlendirmesi. Belge ve ortak tek kez girilir, parsel toplamı bugünkü
+        proje toplamı olarak bedava gelir.
+      · AYRIŞMA: Gün merceği tek başına 'ertelenmiş' dedi (tetik: aynı
+        ada/parselle ikinci proje açılması) — ama kendi gerekçesinde 'bugünkü
+        tek somut semptomun ucuz karşılığı ayrı bir iş: blok/etap etiketi'
+        diyor, yani dört mercek de ilk dilimde AYNI ucuz işte buluşuyor;
+        ayrışma o dilimin bu maddeye mi ayrı bir maddeye mi yazılacağıydı.
+        Etiketi bu maddeye aldım çünkü maliyet merceğinin göç faturası
+        argümanı bekleme süresini fiyatlandırıyor. İkinci ayrışma etiketin
+        NEREYE konacağıydı: gün/vaat projeye (çift kart sorunu),
+        maliyet/alternatif daireye. DAİREYİ seçtim — yönlendirme zaten 'parsel
+        başına tek proje' olduğu için etiket dairede olmazsa veri her gün
+        yanlış birikmeye devam eder; projeye konsa çift kartı kapatır ama asıl
+        sorunu kapatmaz. Gerçek Proje → Blok → Daire hiyerarşisi ve blok bazlı
+        maliyet dağıtımı BU MADDENİN DIŞINDA: dört mercek de blok bazında
+        malzeme dağıtımının sahte hassasiyet olduğunda hemfikir (beton bütün
+        şantiyeye dökülür) ve hiyerarşi memberUids, Firestore yolları,
+        kurallar, yedek biçimi ve ~20 toplayıcıyı açar. O parça ancak aynı
+        sahip aynı ada/parsel/ilçe ile ikinci projeyi açmaya devam ederse
+        (addProject içinde tespit edilebilir bir sinyal) yeniden açılır. Daire
+        numaralandırmasının denetim izinde numaraya sabitlendiği de korkuluk
+        olarak yazılmalı.
+      · **KAPSAM KARARI (25 Ağu 2026): ERTELENMİŞ** — Ortak → yönetici iletişimi / mutabakat
+      · Dört mercek de 'ertelenmiş, büyük' dedi — listedeki tek tam mutabakat.
+        Üç bağımsız sebep: (1) Yetki: firestore.rules'taki 13 alt koleksiyonun
+        13'ü de ownerWrite(pid) + serverStamped() kullanıyor; ortağın tek bir
+        soru yazması sistemdeki İLK sahip-olmayan yazma ve 'ortak SALT OKUR'
+        değişmezindeki ilk çatlak olur — ayrı koleksiyon, ayrı kural, ayrı
+        kural testleri, yeni kötüye kullanım yüzeyi (spam, çıkarılmış ortağın
+        artıkları) şart; asla mevcut belgeye alan olarak eklenemez, yoksa aynı
+        belgedeki finansal alanlar da yazmaya açılır. (2) Bildirim:
+        ReminderScheduler'ın başlığı sunucu push'unu ÖLÇEREK reddetmiş
+        ('kapsamı ikiye katlardı' — zamanlanmış Function + FCM jetonu +
+        koleksiyon + kural + emülatör testi). Bildirimsiz bir soru kutusu,
+        ortağın sorup yöneticinin hiç görmediği bir kuyruk üretir: vaat edilip
+        tutulmayan davet linki sınıfına yeni bir üye. (3) Kanıt yok: davet
+        akışı üretimde hiç koşmadı, yani bugüne kadar tek bir gerçek ortak
+        katılmadı — henüz gözlenmemiş bir kullanıcının varsayılan sorularına
+        göre yüzey tasarlanacak. Ertelemenin bedeli düşük ve maliyet
+        merceğinin tespiti belirleyici: sonradan eklemek GÖÇ GEREKTİRMEZ
+        (yorumlar mevcut kayıt kimliklerine referansla eklenir, hiçbir belge
+        taşınmaz) — sekiz madde içinde 'sonra eklemek şimdi eklemekle aynı
+        fiyat' olan tek madde. Ayrıca doğrulama yarısı zaten teslim edildi:
+        madde 76 denetim izini ortağın rolden bağımsız açabildiği ekrana
+        taşıdı, yani 'yönetici sessizce değiştirdi' sorusu artık uygulamada
+        cevaplanıyor. Kalan boşluk: ortak 400 bin ₺'lik bir 'Diğer' giderin NE
+        ZAMAN girildiğini görebiliyor ama NE OLDUĞUNU soramıyor. İlk dilim tüm
+        mesajlaşma DEĞİL, tek boolean + sunucu damgası olmalı: dönem raporuna
+        ortağın 'gördüm / mutabıkım' işareti — ilişkiye değeri en yüksek,
+        yazma yüzeyi en dar parça.
+      · TETİK: İkisinden biri: (a) davet akışıyla katılan İLK gerçek ortağın
+        salt okunur yüzeyi kullanması ve paylaşılan raporun hâlâ WhatsApp'ta
+        tartışıldığının gözlenmesi; (b) web ortak portalının başlaması — ortak
+        orada birinci sınıf kullanıcı olur, e-posta bildirimi ve yazma yolu
+        ikisi de ucuzlar. FCM/sunucu push'unun başka bir sebeple hayata
+        girmesi de tetiği açar.
+      · **KAPSAM KARARI (25 Ağu 2026): KAPSAM DIŞI** — Yasal takvim (ruhsat, iskân, yapı denetim süreleri)
+      · Merceklerin verdiği kararlar dağıldı (2 kapsam dışı, 1 madde, 1
+        ertelenmiş) ama GEREKÇELERİ tek noktada birleşiyor: dördü de
+        uygulamanın yasal süreleri HESAPLAMASINI reddediyor. Mevzuata gömülü
+        bir süre tablosu değiştiği gün uygulama sessizce yanlış tarih
+        hatırlatır ve kaçırılan ruhsat yenilemesinin sebebi uygulama olur —
+        müteahhit kendi takvimini bıraktığı için zarar, uygulamanın hiç
+        olmamasından büyüktür. Maddenin BAŞLIĞI ('yasal takvim') tam olarak bu
+        reddedilen şey, o yüzden madde bu haliyle kapanmalı. Kapatmayı
+        destekleyen ikinci ayak alternatif merceğinde: dört ayrı takvimin
+        dördü de BAŞKASININ yasal yükümlülüğü ve kendi yaptırımı var — yapı
+        denetim firması seviye tespit tutanaklarını tutmak zorunda, ruhsat
+        süresini belediye izler ve resmî tebligat yolu var, iskân proje
+        sonunda bir kerelik süreç. Kalan tek gerçek boşluk kat karşılığı
+        sözleşmesindeki teslim tarihi; onu da müteahhit telefonunun kendi
+        Takvim/Hatırlatıcılar uygulamasında tutuyor ve o alternatif SAĞLIKLI:
+        senkronize oluyor, widget'ı var, paylaşılabiliyor. Sıklık da listenin
+        en altında: proje ömrü boyunca 3-5 tarih, buna karşılık haftada 20-30
+        fiş. Kaybolan veri yok — tarihler ruhsat belgesinin üzerinde ve o
+        belge Belgeler sekmesinde zaten yüklü (ProjectDocument'in .ruhsat ve
+        .sozlesme grupları mevcut). Açık bırakılan kapı yazıya geçmeli ki bu
+        'atlanmış' değil 'kapatılmış' olsun: kullanıcının KENDİ girdiği tek
+        bir tarih için tek seferlik hatırlatma (ProjectDocument'e dueDate +
+        hatırlatma bayrağı, mevcut ReminderScheduler'a ikinci kaynak) ayrı ve
+        küçük bir madde olarak gelebilir — mevzuat tablosu OLMADAN. O da
+        yapılırsa ReminderScheduler.reschedule'ın
+        removeAllPendingNotificationRequests ile her şeyi silip yeniden
+        kurduğu ve iki kaynağın aynı 30 gün / 64 bildirim bütçesini
+        paylaşacağı gözden kaçmamalı.
+      · AYRIŞMA: Vaat merceği tek başına 'madde, küçük' dedi ve teknik olarak
+        haklı: altyapı hazır, gereken tek şey ProjectDocument üzerine dueDate.
+        Ama alternatif merceğinin sorusu efor değil KULLANIM: hiç kimse ikinci
+        bir takvimi güncel tutmaz ve güncel tutulmayan bir hatırlatıcı ekranı
+        uygulamayı bakımsız gösterir; müteahhit inşaat yazılımını hatırlatıcı
+        için seçmiyor, para takibi için seçiyor. Maliyet merceğinin ertelemesi
+        de 'yalnızca kullanıcı tanımlı tarih listesi olarak açılabilir' diyor
+        — yani o da maddenin kendisini değil, dar kapıyı onaylıyor. Ucuz
+        olması bir işi doğru yapmıyor; bu yüzden maddeyi kapattım ve dar
+        kapıyı yazılı bıraktım.
+      · **KAPSAM KARARI (25 Ağu 2026): MADDE** — Kalan stok değeri ve beklenen hasılat
+      · Dört mercekte de 'madde' ve üçünde 'küçük' — maliyetine göre listenin
+        en yüksek getirili işi, çünkü VERİ ZATEN YAZILIYOR:
+        ApartmentEditSheet.swift:102 boş/rezerve daire için 'LİSTE FİYATI (₺)'
+        alanını gösteriyor, updateApartment bunu apartment.price'a kaydediyor
+        ve SaleFormSheet.prefillListPrice onu ön dolumda okuyor. Kodda bu
+        rakamı yalnızca DIŞLAMAYI bilen bir yer var:
+        ProjectExporter.apartmentsCSV yorumu, boş dairenin price alanında
+        liste fiyatı taşıması yüzünden 'Kalan' sütununun ekrandaki 'Kalan
+        alacak'tan %40'a varan oranda şişik çıktığını ve sütunun bu yüzden
+        ayrıştırıldığını yazıyor. Toplayan tek satır yok; kodda yalnızca
+        availableCount var (ProjectViewModel.swift:1252). 'Satılan ciro +
+        kalan stok değeri = beklenen hasılat' bir reduce ve bir rapor satırı:
+        yeni koleksiyon yok, göç yok, kural değişikliği yok, dikiş bedeli
+        sıfır. Değeri ise ürünün eksik olan tek yönü: bugün uygulama tamamen
+        geçmişe bakıyor, müteahhidin her gün ve ortağın her açılışta sorduğu
+        'elimde ne kaldı, ne eder' sorusu ekranda cevapsız — üstelik cevabın
+        verisi diskte duruyor. Daha ağırı: uygulama bu boşluğu ortağın okuduğu
+        İKİ yerde birden itiraf ediyor (ReportView.scopeNote ve
+        PartnersTabView.scopeText: kalan inşaat maliyeti 'henüz düşülmedi —
+        aradaki fark kâr değildir'), yani ortağa gördüğü rakamın sandığı şey
+        olmadığı söyleniyor ve istediği şey için bakacak yer verilmiyor. Madde
+        82 ile AYNI SÜRÜMDE gitmeli: ortak defteri ancak bu rakamla 'payıma ne
+        düşTÜ' yerine 'payıma ne düşECEK' cevabını verebiliyor.
+      · AYRIŞMA: Maddenin İKİNCİ yarısında ('projeyi bitirmenin maliyeti')
+        ayrıştılar: gün 'kapsam dışı', vaat/maliyet/alternatif 'elle girilen
+        tek bir alan, girilmemişse hiçbir şey gösterme'. İkincisini seçtim ama
+        gün merceğinin yasağını korkuluk olarak aldım: elde yalnızca
+        ProgressSheet'te elle sürülen yüzde var ve 'harcanan ÷ %ilerleme' ile
+        toplam maliyet türetmek, bu kod tabanının areaCost'ta nil döndürerek
+        ve areaM2'de 0 ile 'girilmedi'yi ayırarak defalarca reddettiği uydurma
+        rakam sınıfına girer. İkinci korkuluk üç mercekten geliyor: fiyatı
+        girilmemiş boş daireler ve kat karşılığı (bedelsiz) daireler toplamı
+        SESSİZCE küçültür — ReportView'daki missingCount deseni birebir
+        tekrarlanmalı ('N dairenin fiyatı henüz girilmedi'). Üçüncüsü anlam:
+        'beklenen hasılat' bir CİRO rakamı, kâr değil; 'Dönem net'in yanına
+        konduğu anda ortak ikisini çıkarıp kâr sanar, o yüzden scopeNote ve
+        scopeText bu satırla BİRLİKTE genişlemeli (liste fiyatı satış fiyatı
+        değildir; kalan inşaat maliyeti hâlâ düşülmemiştir).
+      · **KAPSAM KARARI (25 Ağu 2026): MADDE** — Gelir modeli kararının yazılması + maliyet tavanı
+      · Dört mercek de 'madde' ve dördü de aynı sınırı çiziyor: bu madde
+        StoreKit DEĞİL, KARARIN YAZILMASI. Grep ile doğruladım — kod tabanında
+        StoreKit, abonelik, proje sınırı ve kota SIFIR. Buna karşılık her yeni
+        kullanıcı en az bir ücretli SMS doğrulaması (Firebase telefon girişi)
+        ve süresiz Storage/Functions maliyeti (europe-west1) üretiyor;
+        storage.rules dosya BAŞINA 4 MB / 50 MB sınırı koyuyor ama SAYI sınırı
+        yok, yani tek proje sınırsız belge ve fotoğraf tutabilir. Sızıntı
+        ayrıca açık uçlu: AppCheckSetup zorlamanın bilerek AÇILMADIĞINI
+        yazıyor ve callable'larda enforceAppCheck kapalı, rateLimits
+        koleksiyonu callable'ları koruyor ama Auth'u korumuyor — sökülebilir
+        API anahtarıyla ücretli SMS yakılabilir ve bütçe uyarısı harcamayı
+        KESMİYOR. Kararı öne alan asıl argüman maliyet merceğinden: geri
+        dönüşü olmayan şey kod değil YAYIN. StoreKit'i sonra yazabilirsin, ilk
+        yayının sınırsızlığını geri alamazsın — 12 proje açmış kullanıcıyı
+        sonradan 3 proje sınırına sokmak ya sonsuza kadar muafiyet ya da güven
+        kaybı demek. Yön zaten belirlenmiş (proje sayısına göre abonelik;
+        ortaklar sınırsız ve ÜCRETSİZ — ortak başına ücret almak ürünü ayıran
+        cümlenin kendisini vergilendirmek olurdu; kalıcı 1 proje ücretsiz
+        katman) ama oturum notlarında yaşıyor, depoda yok: ANALIZ.md ya da
+        README okuyan biri hiçbir şey görmüyor. Bu, madde 75'in dersinin
+        ("kapsam dışı notu da yok, yani ERTELENMİŞ DEĞİL ATLANMIŞ") aynısı.
+        Kapsam üç parça: (a) kararı elenen seçeneklerin gerekçesiyle birlikte
+        ANALIZ.md'ye yaz — bir saatlik iş; (b) proje/belge/fotoğraf
+        sayaçlarını ve kotanın DURACAĞI yeri şimdi aç + App Check zorlamasını
+        yayından ÖNCE kapat (madde 71); (c) StoreKit ayrı ve sonraya.
+      · AYRIŞMA: Ayrışma kapsamın (b) parçasında: vaat ve alternatif 'küçük —
+        sadece yazılı karar', gün ve maliyet 'orta — asgari sınır ve sayaçlar
+        da şimdi'. Sayaçları içeri aldım çünkü maliyet merceğinin geri
+        dönülemezlik argümanı yalnızca yazıyla kapanmıyor; sınırın nerede
+        duracağı yayından önce belli olmalı. İki korkuluk yazılı olmalı: (1)
+        proje sayısı sınırını KURALDA uygulamak her yazmada bir get() demek
+        (yazma başına ek okuma, ek ücret) ve yeni bir kırılma yolu — hak
+        belgesi okunamazsa TÜM yazmalar reddedilir; (2) 'abonelik bitti'
+        kararı uygulama kilidindeki fail-open kararıyla sınanmalı — müteahhidi
+        kendi mali kaydından dışarıda bırakmak kabul edilemez, kilitlenecekse
+        YAZMA kilitlenir OKUMA değil. Doğrulanacak tek dış bilinmeyen duruyor
+        ve ondan önce tek satır kod yazılmamalı: Apple'ın uygulama içi satın
+        alma zorunluluğu ve dış ödeme bağlantısı kuralı (bölgeye göre
+        değişiyor). (c) parçasının kendi tetiği: ilk ücretli yayından önce, ya
+        da Firebase harcaması yazılı bir eşiği geçtiğinde.
 
 #### Bu turun yöntem dersi
 
