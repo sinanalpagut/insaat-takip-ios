@@ -413,6 +413,92 @@ describe('redeemInvite — ad sunucudan çözülür', () => {
 // projesini götürürdü.
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════ Oran sınırı (madde 71) ═══════════════════════
+//
+// Callable uçları düz HTTPS uçları: bu dosyanın kendisi uygulamayı hiç
+// açmadan curl benzeri bir POST ile çağırıyor. Her çağrı bir işlev
+// çalıştırması, yani PARA — ve bütçe uyarısı harcamayı kesmiyor.
+
+describe('redeemInvite — oran sınırı', () => {
+
+  it('ONUNCU başarısız denemeden sonra REDDEDİLİYOR', async () => {
+    const u = await newUser();
+    // Var olmayan kod: her deneme 404 döner ama sayaç artar.
+    for (let i = 0; i < 10; i++) {
+      const { status } = await redeem(u.idToken, 'YOKKOD');
+      assert.equal(status, 404, `${i + 1}. deneme beklenmedik biçimde ${status} döndü`);
+    }
+    const { status, error } = await redeem(u.idToken, 'YOKKOD');
+    assert.equal(status, 429);
+    assert.equal(error?.message, 'too-many-attempts');
+  });
+
+  it('SINIRA ÇARPAN kullanıcı GEÇERLİ kodu da kullanamıyor', async () => {
+    // Sınır, kaba kuvvetin doğru kodu bulduğu anı da kapsamalı; aksi hâlde
+    // sayaç yalnızca yanlış denemeleri yavaşlatır, doğruyu ödüllendirirdi.
+    const owner = await newUser();
+    const pid = `oran-${owner.uid}`;
+    await putDoc(`projects/${pid}`, {
+      id: str(pid), ownerUid: str(owner.uid), memberUids: arr([owner.uid]),
+      blockNumber: str('910'), parcelNumber: str('1'), createdAt: ts(new Date()),
+    });
+    await seedInvite('ORAN11', { projectId: pid });
+
+    const u = await newUser();
+    for (let i = 0; i < 10; i++) await redeem(u.idToken, 'YOKKOD');
+    const { status } = await redeem(u.idToken, 'ORAN11');
+    assert.equal(status, 429, 'sınır geçerli kodu da kapsamalı');
+  });
+
+  it('BAŞARILI katılım sayacı SIFIRLIYOR', async () => {
+    // Beş projeye davet edilen bir ortak, kimseyi zorlamadığı hâlde sınıra
+    // çarpmamalı.
+    const owner = await newUser();
+    const pid = `oran2-${owner.uid}`;
+    await putDoc(`projects/${pid}`, {
+      id: str(pid), ownerUid: str(owner.uid), memberUids: arr([owner.uid]),
+      blockNumber: str('911'), parcelNumber: str('2'), createdAt: ts(new Date()),
+    });
+    await seedInvite('ORAN22', { projectId: pid });
+
+    const u = await newUser();
+    for (let i = 0; i < 9; i++) await redeem(u.idToken, 'YOKKOD');
+
+    const basarili = await redeem(u.idToken, 'ORAN22');
+    assert.equal(basarili.status, 200);
+
+    // Sayaç sıfırlandığı için yeniden 10 hak var.
+    for (let i = 0; i < 10; i++) {
+      const { status } = await redeem(u.idToken, 'YOKKOD');
+      assert.notEqual(status, 429, `${i + 1}. denemede sayaç sıfırlanmamış`);
+    }
+  });
+
+  it('PENCERE DOLUNCA yeniden hak veriliyor', async () => {
+    const u = await newUser();
+    for (let i = 0; i < 10; i++) await redeem(u.idToken, 'YOKKOD');
+    assert.equal((await redeem(u.idToken, 'YOKKOD')).status, 429);
+
+    // Pencere başlangıcını geriye alarak zamanı ileri sarıyoruz: 15 dakikalık
+    // pencere dolmuş sayılıyor. Gerçek beklemeyi test etmek testi 15 dakika
+    // uzatırdı.
+    await putDoc(`rateLimits/${u.uid}`, {
+      failedAttempts: { integerValue: '10' },
+      windowStart: ts(new Date(Date.now() - 20 * 60 * 1000)),
+    });
+    const { status } = await redeem(u.idToken, 'YOKKOD');
+    assert.equal(status, 404, 'pencere dolduktan sonra tekrar denenebilmeli');
+  });
+
+  it('sayaç KULLANICI BAŞINA — biri sınıra çarpınca diğeri etkilenmiyor', async () => {
+    const a = await newUser();
+    const b = await newUser();
+    for (let i = 0; i < 11; i++) await redeem(a.idToken, 'YOKKOD');
+    assert.equal((await redeem(a.idToken, 'YOKKOD')).status, 429);
+    assert.equal((await redeem(b.idToken, 'YOKKOD')).status, 404);
+  });
+});
+
 describe('deleteAccount — hesap silme', () => {
 
   it('oturum yoksa reddedilir', async () => {

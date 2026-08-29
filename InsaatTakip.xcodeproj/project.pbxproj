@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		541C1D413033415400955BA2 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 541C1D403033415400955BA2 /* FirebaseFunctions */; };
+		54AC0000000000000000AC02 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 54AC0000000000000000AC01 /* FirebaseAppCheck */; };
 		5436F0DC302DDE21001A6F27 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 5436F0DB302DDE21001A6F27 /* FirebaseAuth */; };
 		5436F0DE302DDE21001A6F27 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 5436F0DD302DDE21001A6F27 /* FirebaseFirestore */; };
 		5436F0E1302DDF66001A6F27 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5436F0E0302DDF66001A6F27 /* FirebaseCore */; };
@@ -37,6 +38,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				54AC0000000000000000AC02 /* FirebaseAppCheck in Frameworks */,
 				5436F0DC302DDE21001A6F27 /* FirebaseAuth in Frameworks */,
 				5436F0E1302DDF66001A6F27 /* FirebaseCore in Frameworks */,
 				5436F0DE302DDE21001A6F27 /* FirebaseFirestore in Frameworks */,
@@ -101,6 +103,7 @@
 			);
 			name = InsaatTakip;
 			packageProductDependencies = (
+				54AC0000000000000000AC01 /* FirebaseAppCheck */,
 				5436F0DB302DDE21001A6F27 /* FirebaseAuth */,
 				5436F0DD302DDE21001A6F27 /* FirebaseFirestore */,
 				5436F0E0302DDF66001A6F27 /* FirebaseCore */,
@@ -494,6 +497,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5436F0DA302DDE21001A6F27 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFunctions;
+		};
+		54AC0000000000000000AC01 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5436F0DA302DDE21001A6F27 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
 		};
 		5436F0DB302DDE21001A6F27 /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;

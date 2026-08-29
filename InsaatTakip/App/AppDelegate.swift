@@ -38,6 +38,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions:
                         [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // APP CHECK SAĞLAYICISI CONFIGURE'DAN ÖNCE (madde 71). Sonra
+        // kurulursa Firebase ilk jetonu varsayılan sağlayıcıyla almaya
+        // çalışır ve sessizce başarısız olur — sorun ancak zorlama
+        // açıldığında, yani üretimde görünür.
+        AppCheckSetup.install()
         FirebaseApp.configure()
         Self.connectEmulatorIfRequested()
         // Hesap silindiyse Firestore'un disk önbelleği (alıcı adları dahil)

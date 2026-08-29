@@ -163,6 +163,21 @@ service cloud.firestore {
     // Kod çakışması: `create` yalnızca belge YOKKEN geçerli. Aynı kod ikinci kez
     // üretilirse yazma reddedilir ve istemci yeni kod dener — sessizce üzerine
     // yazıp başkasının davetini çalmak mümkün değil.
+    // ─────────────────────── Oran sınırı sayacı (madde 71) ───────────────
+    //
+    // `rateLimits/{uid}` YALNIZCA Cloud Function tarafından yazılıyor (Admin
+    // SDK kuralları atlıyor). İstemciye tamamen kapalı ve iki yönü de önemli:
+    //   · YAZMA açık olsaydı, sınıra çarpan kullanıcı sayacı sıfırlayıp
+    //     korumayı anlamsız kılardı.
+    //   · OKUMA açık olsaydı, saldırgan kaç deneme hakkı kaldığını görüp
+    //     sınırın hemen altında kalmayı öğrenirdi.
+    // Varsayılan red zaten kapatıyor; kural AÇIKÇA yazılı çünkü sessiz bir
+    // varsayılana dayanan koruma, bir gün varsayılan değişince sessizce
+    // kaybolur.
+    match /rateLimits/{uid} {
+      allow read, write: if false;
+    }
+
     match /invites/{code} {
       allow read: if false;
       allow create: if signedIn()

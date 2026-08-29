@@ -615,6 +615,29 @@ describe('proje kurulumu tek partide YAPILAMAZ', () => {
   });
 });
 
+// ═══════════════════════ Oran sınırı sayacı (madde 71) ═══════════════════
+
+describe('oran sınırı sayacı istemciye kapalı', () => {
+  before(seed);
+
+  // Sayaç yalnızca Cloud Function tarafından yazılıyor. İki yön de önemli:
+  // yazma açık olsa kullanıcı sayacı sıfırlar, okuma açık olsa saldırgan
+  // kaç hakkı kaldığını görüp sınırın altında kalmayı öğrenirdi.
+
+  it('kullanıcı KENDİ sayacını okuyamaz', async () => {
+    await assertFails(getDoc(doc(ownerDb, 'rateLimits', OWNER)));
+  });
+
+  it('kullanıcı sayacı SIFIRLAYAMAZ', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'rateLimits', OWNER), { failedAttempts: 0 }));
+  });
+
+  it('başkasının sayacına da erişilemez', async () => {
+    await assertFails(getDoc(doc(memberDb, 'rateLimits', OWNER)));
+    await assertFails(setDoc(doc(memberDb, 'rateLimits', OWNER), { failedAttempts: 0 }));
+  });
+});
+
 // ═══════════════════════ Sunucu damgası (madde 77) ═══════════════════════
 //
 // Denetim izinin tüm değeri tarihlerinde. "Kim ne zaman değiştirdi" sorusunun

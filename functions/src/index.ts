@@ -81,6 +81,64 @@ interface RedeemResult {
   alreadyMember: boolean;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ORAN SINIRI (madde 71)
+//
+// Callable uçları düz HTTPS uçlarıdır: uygulamayı hiç açmadan, bir ID jetonu
+// ve curl ile çağrılabiliyorlar — bu, testlerin kendisinde kanıtlı
+// (`tests/functions.test.mjs` tam olarak böyle çağırıyor). `redeemInvite`
+// için bunun iki maliyeti var:
+//   1. Her çağrı bir işlev çalıştırması, yani PARA. Bütçe uyarısı harcamayı
+//      KESMİYOR, yalnızca haber veriyor.
+//   2. Kod 6 karakter ve 31 harflik bir alfabeden; kaba kuvvet pratikte
+//      imkânsıza yakın ama ücretsiz de değil.
+//
+// SAYAÇ UID BAŞINA. IP başına olamazdı: `request.auth` var ama istemci IP'si
+// callable bağlamında güvenilir değil. Uid başına sınır, saldırganı her
+// pencerede yeni bir hesap açmaya zorluyor — ve her hesap GERÇEK bir SMS
+// demek, yani saldırının kendi maliyeti var.
+//
+// YALNIZCA BAŞARISIZ DENEMELER SAYILIYOR. Başarılı katılım sayacı sıfırlıyor:
+// beş projeye davet edilen bir ortak, kimseyi zorlamadığı hâlde sınıra
+// çarpmamalı.
+//
+// PENCERE KAYAN DEĞİL SABİT: ilk başarısız denemeden itibaren 15 dakika.
+// Kayan pencere her denemede yazma gerektirirdi; sabit pencere aynı korumayı
+// tek yazmayla veriyor ve en kötü durumda saldırgan 15 dakikada 10 deneme
+// yapıyor — kaba kuvvet için anlamsız bir hız.
+const REDEEM_MAX_ATTEMPTS = 10;
+const REDEEM_WINDOW_MS = 15 * 60 * 1000;
+
+/// Sınıra çarpıldıysa fırlatır.
+async function assertNotRateLimited(uid: string): Promise<void> {
+  const snap = await db.collection("rateLimits").doc(uid).get();
+  if (!snap.exists) return;
+  const basladi = (snap.get("windowStart") as Timestamp | undefined)?.toMillis() ?? 0;
+  const sayac = (snap.get("failedAttempts") as number | undefined) ?? 0;
+  const pencereIcinde = Date.now() - basladi < REDEEM_WINDOW_MS;
+  if (pencereIcinde && sayac >= REDEEM_MAX_ATTEMPTS) {
+    throw new HttpsError("resource-exhausted", "too-many-attempts");
+  }
+}
+
+/// Başarısız denemeyi sayar; pencere dolmuşsa yeniden başlatır.
+async function noteFailedAttempt(uid: string): Promise<void> {
+  const ref = db.collection("rateLimits").doc(uid);
+  const snap = await ref.get();
+  const basladi = (snap.get("windowStart") as Timestamp | undefined)?.toMillis() ?? 0;
+  const pencereIcinde = Date.now() - basladi < REDEEM_WINDOW_MS;
+  if (pencereIcinde) {
+    await ref.update({ failedAttempts: FieldValue.increment(1) });
+  } else {
+    await ref.set({ failedAttempts: 1, windowStart: FieldValue.serverTimestamp() });
+  }
+}
+
+/// Başarılı katılım sayacı sıfırlar.
+async function clearFailedAttempts(uid: string): Promise<void> {
+  await db.collection("rateLimits").doc(uid).delete().catch(() => undefined);
+}
+
 export const redeemInvite = onCall<{ code?: string }, Promise<RedeemResult>>(
   async (request) => {
     const uid = request.auth?.uid;
@@ -93,11 +151,33 @@ export const redeemInvite = onCall<{ code?: string }, Promise<RedeemResult>>(
       throw new HttpsError("invalid-argument", "code-format");
     }
 
+    await assertNotRateLimited(uid);
+
     const phone = request.auth?.token?.phone_number as string | undefined;
     const name = await displayName(uid, phone);
 
     const inviteRef = db.collection("invites").doc(code);
 
+    // SAYAÇ İŞLEMİN DIŞINDA. Transaction içinde yazsaydık, atılan her hata
+    // transaction'ı geri alır ve sayaç da geri alınırdı — yani başarısız
+    // denemeler hiç sayılmazdı. Sınırın işe yaraması için sayacın işlemden
+    // BAĞIMSIZ yazılması şart.
+    try {
+      const sonuc = await redeemTransaction(inviteRef, uid, name);
+      await clearFailedAttempts(uid);
+      return sonuc;
+    } catch (error) {
+      await noteFailedAttempt(uid);
+      throw error;
+    }
+  },
+);
+
+async function redeemTransaction(
+  inviteRef: FirebaseFirestore.DocumentReference,
+  uid: string,
+  name: string,
+): Promise<RedeemResult> {
     return db.runTransaction(async (tx) => {
       const invite = await tx.get(inviteRef);
       if (!invite.exists) {
@@ -188,8 +268,7 @@ export const redeemInvite = onCall<{ code?: string }, Promise<RedeemResult>>(
 
       return { projectId, projectTitle: title, alreadyMember: false };
     });
-  }
-);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HESAP SİLME (madde 28) — App Store Guideline 5.1.1(v)
