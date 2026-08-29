@@ -13,6 +13,8 @@ struct MaterialLogSheet: View {
 
     /// Dokunulan fiş fotoğrafının tam ekran önizlemesi.
     @State private var previewedReceipt: SharePayloadImage?
+    @State private var searchText = ""
+    @State private var period: ListPeriod = .tumu
     /// Düzenlenmek üzere açılan hareket.
     @State private var showOpening = false
     @State private var editingLog: MaterialLog?
@@ -122,13 +124,42 @@ struct MaterialLogSheet: View {
                 .padding(.top, 22)
                 .padding(.bottom, 4)
 
+                // ARAMA VE DÖNEM (madde 79). Hareket geçmişi malzeme başına
+                // sınırsız büyüyor: iki yıllık bir projede demir kaleminin
+                // altında yüzlerce satır oluyor ve "4471 numaralı irsaliye
+                // hangi tarihteydi" sorusunun cevabı gözle taramaktan
+                // geçiyordu.
+                ListSearchBar(placeholder: "İrsaliye, tedarikçi veya açıklama",
+                              text: $searchText)
+                    .padding(.top, 12)
+
+                ListPeriodChips(selection: $period) { donem in
+                    viewModel.logs(for: materialId).filter { donem.contains($0.date) }.count
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
                 // Giriş / çıkış kayıtları
                 ScrollView(showsIndicators: false) {
                     // TEMBEL LİSTE: hücreler göründükçe çiziliyor. Düz `VStack` bütün
                     // listeyi baştan kuruyor — hareket geçmişi her yeni kayıtla uzuyor ve ilk
                     // çizimin maliyeti listeyle birlikte büyüyor.
                     LazyVStack(spacing: 0) {
-                        let entries = viewModel.logs(for: materialId)
+                        // ARAMA ALANLARI: açıklama (irsaliye no ve tedarikçi
+                        // orada), giriş/çıkış etiketi ve tarih metni. Miktar
+                        // ve tutar aranmıyor — "1.500" yazan biri 21.500'ü de
+                        // bulur ve liste açıklanamaz görünürdü.
+                        let entries = viewModel.logs(for: materialId).filter { log in
+                            guard period.contains(log.date) else { return false }
+                            return ListSearch.matches(searchText, in: [
+                                log.note,
+                                log.type == .entry ? "Giriş" : "Çıkış",
+                                Fmt.shortDate(log.date),
+                            ])
+                        }
+                        if entries.isEmpty {
+                            ListNoMatchState(query: searchText, singular: "hareket")
+                        }
                         ForEach(Array(entries.enumerated()), id: \.element.id) { index, log in
                             logRow(log, unit: material.unit)
                             if index < entries.count - 1 {

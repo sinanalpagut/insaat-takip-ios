@@ -12,10 +12,36 @@ struct ExpensesTabView: View {
     @State private var editingExpense: Expense?
     @State private var pendingExpenseDelete: Expense?
     @State private var previewedReceipt: SharePayloadImage?
+    @State private var searchText = ""
+    @State private var period: ListPeriod = .tumu
 
     let projectId: UUID
 
     private var expenses: [Expense] { viewModel.expenses(for: projectId) }
+
+    /// Aramadan ve dönemden geçen giderler (madde 79).
+    ///
+    /// GİDER LİSTESİ SINIRSIZ BÜYÜYOR — daire sayısı projede sabit, gider
+    /// sayısı her gün artıyor. Dairelerde arama vardı, burada yoktu; iki yıl
+    /// süren bir projede "şubat SGK'yı ne zaman ödedim" sorusunun cevabı
+    /// yüzlerce satırı gözle taramaktan geçiyordu.
+    ///
+    /// ARAMA ALANLARI: kategori, kime ödendi, açıklama VE tarih metni.
+    /// Tarihin de aranabilir olması bilinçli: müteahhit "12 Ağu" yazıp o
+    /// günün kayıtlarını buluyor ve bunun için dönem çipine gitmesi
+    /// gerekmiyor. Tutar aranmıyor — "1.500" yazan biri 1.500 ₺'yi değil
+    /// 21.500 ₺'yi de bulur ve liste açıklanamaz görünürdü.
+    private var visibleExpenses: [Expense] {
+        expenses.filter { expense in
+            guard period.contains(expense.date) else { return false }
+            return ListSearch.matches(searchText, in: [
+                expense.category.rawValue,
+                expense.payee,
+                expense.note,
+                expense.dateText,
+            ])
+        }
+    }
     /// Proje bazlı rol (bkz. Project.role(for:)).
     private var isAdmin: Bool {
         viewModel.projects.first { $0.id == projectId }?
@@ -33,17 +59,34 @@ struct ExpensesTabView: View {
                 } else {
                     summaryCard.padding(.top, 16)
 
+                    ListSearchBar(placeholder: "Kategori, kime ödendi veya açıklama",
+                                  text: $searchText)
+                        .padding(.top, 6)
+
+                    ListPeriodChips(selection: $period) { donem in
+                        expenses.filter { donem.contains($0.date) }.count
+                    }
+
                     HStack {
                         Text("Gider Kayıtları")
                             .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
                         Spacer()
-                        Text("\(expenses.count) kayıt")
+                        // SAYI GÖSTERİLENİ SAYIYOR, listenin tamamını değil.
+                        // Süzgeç açıkken toplam kayıt sayısını yazmak, ekranda
+                        // görünenle başlıktaki rakamın ayrışması demekti.
+                        Text(visibleExpenses.count == expenses.count
+                             ? "\(expenses.count) kayıt"
+                             : "\(visibleExpenses.count) / \(expenses.count) kayıt")
                             .font(.manrope(12, .semiBold))
                             .foregroundColor(Palette.textSecondary)
                     }
                     .padding(.top, 4)
 
-                    ForEach(expenses) { expense in
+                    if visibleExpenses.isEmpty {
+                        ListNoMatchState(query: searchText, singular: "gider")
+                    }
+
+                    ForEach(visibleExpenses) { expense in
                         ExpenseRowView(
                             expense: expense,
                             hasReceipt: expense.receiptPath != nil,

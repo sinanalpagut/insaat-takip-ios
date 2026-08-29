@@ -42,12 +42,8 @@ struct ApartmentsTabView: View {
     /// kâhin hâline gelirdi — eşleşen tek bir daire, gizlenen kimliği ele
     /// verirdi.
     private var visibleApartments: [Apartment] {
-        let query = searchText
-            .trimmingCharacters(in: .whitespaces)
-            .lowercased(with: Fmt.locale)
-        return apartments.filter { apartment in
+        apartments.filter { apartment in
             if let statusFilter, apartment.status != statusFilter { return false }
-            guard !query.isEmpty else { return true }
 
             var haystack = [
                 "\(apartment.apartmentNumber)",
@@ -57,7 +53,11 @@ struct ApartmentsTabView: View {
                 apartment.status.label,
             ]
             if isAdmin, let buyer = apartment.buyerName { haystack.append(buyer) }
-            return haystack.contains { $0.lowercased(with: Fmt.locale).contains(query) }
+            // EŞLEŞTİRME ORTAK YARDIMCIDA (madde 79). Burada kendi kuralını
+            // yazan bir arama, giderlerdekiyle ayrışırdı: "cimento" bir
+            // sekmede bulur, diğerinde bulmazdı ve kullanıcı farkı ancak iki
+            // sekmede aynı şeyi arayınca görürdü.
+            return ListSearch.matches(searchText, in: haystack)
         }
     }
 
@@ -148,42 +148,15 @@ struct ApartmentsTabView: View {
     /// 22 daire gözle taranıyordu. Arama daire numarası, tip, alan, kat ve
     /// durum metninde geçiyor; alıcı adı YALNIZCA yöneticide (bkz.
     /// `visibleApartments`).
+    /// Arama çubuğu ORTAK BİLEŞENDEN (madde 79). Buradaki kopya çıkarıldı;
+    /// 44pt dokunma hedefi gerekçesi de bileşenle birlikte taşındı.
+    ///
+    /// Arama daire numarası, tip, alan, kat ve durum metninde geçiyor; alıcı
+    /// adı YALNIZCA yöneticide (bkz. `visibleApartments`).
     private var searchBar: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "magnifyingglass")
-                .iconFont(13, weight: .medium)
-                .foregroundColor(Palette.textTertiary)
-
-            TextField(isAdmin ? "Daire no, tip, kat veya alıcı" : "Daire no, tip veya kat",
+        ListSearchBar(placeholder: isAdmin ? "Daire no, tip, kat veya alıcı"
+                                           : "Daire no, tip veya kat",
                       text: $searchText)
-                .font(.manrope(13, .medium))
-                .foregroundColor(Palette.ink)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .iconFont(14, weight: .regular)
-                        .foregroundColor(Palette.textTertiary)
-                        // Glif 14pt (tasarım değişmiyor) ama dokunma hedefi
-                        // 44pt: sembolün gerçek kutusu 16×16'ydı, yani
-                        // Apple'ın asgarisinin %13'ü — uygulamanın en küçük
-                        // hedefi. Çubuk 46pt yüksek olduğu için görsel hiçbir
-                        // şey kaymıyor.
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel("Aramayı temizle")
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 46)
-        .background(Palette.surface)
-        .cornerRadius(13)
-        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
     }
 
     /// Durum çipleri. Sayılar SÜZÜLMEMİŞ listeden: çipe basmadan önce kaç

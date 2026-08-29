@@ -10,6 +10,7 @@ struct ActivityFeedView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var filter: ProjectViewModel.ActivityFilter = .tumu
+    @State private var searchText = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,9 +21,20 @@ struct ActivityFeedView: View {
                 // listeyi baştan kuruyordu — 200 hareketle bile ilk çizim
                 // gereksiz yere pahalı.
                 LazyVStack(alignment: .leading, spacing: 0) {
+                    // ARAMA VAR, DÖNEM ÇİPİ YOK (madde 79) — ve bu bilinçli.
+                    // Akış zaten BUGÜN / DÜN / BU HAFTA / DAHA ESKİ diye
+                    // gruplu, yani "ne zaman" sorusunun cevabı ekranda. Üstüne
+                    // bir dönem süzgeci koymak aynı soruyu iki kez sormak
+                    // olurdu. Eksik olan "ne" sorusuydu: "İrsaliye #4471 hangi
+                    // gün girildi" diye bakan biri listeyi gözle tarıyordu.
+                    ListSearchBar(placeholder: "Kayıt, malzeme veya proje ara",
+                                  text: $searchText)
+                        .padding(.top, 14)
+
                     ForEach(ActivityItem.Section.allCases, id: \.self) { section in
                         let items = viewModel.activities(filter: filter, for: appState.currentUser)
                             .filter { $0.section == section }
+                            .filter { ListSearch.matches(searchText, in: [$0.title, $0.meta]) }
                         if !items.isEmpty {
                             Text(section.rawValue)
                                 .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
