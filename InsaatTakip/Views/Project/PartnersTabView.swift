@@ -154,7 +154,8 @@ struct PartnersTabView: View {
                 // dairenin tam bedelini bugün yazıyor, gider tarafı yalnızca
                 // bugüne kadar girileni. Kalan inşaat maliyeti henüz düşülmedi.
                 Text(scopeText(progress: project?.progress ?? 0,
-                               deposits: viewModel.depositAmount(for: projectId)))
+                               deposits: viewModel.depositAmount(for: projectId),
+                               remainingCost: project?.remainingCostEstimate))
                     .font(.manrope(11, .medium))
                     .foregroundColor(Palette.textTertiary)
                     .lineSpacing(3)
@@ -193,10 +194,19 @@ struct PartnersTabView: View {
 
     /// Neyin dahil OLMADIĞI. Madde 1'in dersi: eksik kapsamlı bir rakam,
     /// kapsamı yazılmadığında yanıltıcıdır.
-    private func scopeText(progress: Int, deposits: Kurus) -> String {
+    private func scopeText(progress: Int, deposits: Kurus,
+                           remainingCost: Kurus?) -> String {
         var parts = ["Bu tutarlar uygulamaya girilen kayıtlardan hesaplanır."]
         if progress < 100 {
-            parts.append("İnşaatın kalan maliyeti (%\(progress) tamamlandı) HENÜZ DÜŞÜLMEDİ — \"aradaki fark\" kâr değildir.")
+            // Kalan maliyet GİRİLDİYSE bile bu paylardan DÜŞÜLMÜYOR — cümle
+            // bunu söylemeye devam ediyor, yalnızca rakamı da veriyor.
+            // Düşseydik payı bugün dağıtılabilir bir tutar olmaktan çıkarır,
+            // üstelik elle girilmiş bir tahmini ortağın hissesine karıştırırdık.
+            if let remainingCost {
+                parts.append("Yöneticinin girdiği kalan inşaat maliyeti \(Fmt.money(remainingCost)) (%\(progress) tamamlandı) bu paylardan DÜŞÜLMEDİ — \"aradaki fark\" kâr değildir.")
+            } else {
+                parts.append("İnşaatın kalan maliyeti (%\(progress) tamamlandı) HENÜZ DÜŞÜLMEDİ — \"aradaki fark\" kâr değildir.")
+            }
         }
         // Kapora kasadadır ama DAĞITILABİLİR DEĞİLDİR: satış bozulursa geri
         // gider. Rakama girmiyor; girmediğini söylemek de kapsamın parçası.

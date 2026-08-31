@@ -38,8 +38,13 @@ extension InMemoryProjectRepository {
         // GERÇEK TAKVİM: Karacaören konutlarının teslimatı 5-30 Mayıs 2025'te başladı
         // (toki.gov.tr haberi) — iki blok da Teslim fazında, ilerleme %100.
         projects = [
+            // Kalan maliyet tahmini YALNIZCA bu projede dolu (madde 86): rapor
+            // kartının hem "girilmiş" hem "girilmemiş" hâli demo veride
+            // görülebilsin. Devam eden bir kaba inşaatta rakamın anlamlı
+            // olduğu, teslim aşamasındaki projede olmadığı da böyle görünüyor.
             Project(id: DemoID.cayirova, blockNumber: "145", parcelNumber: "2", district: "Çayırova", city: "Kocaeli",
-                    floors: 5, totalApartments: 20, phase: .kabaInsaat, progress: 68, ownerUid: User.admin.id, memberUids: [User.admin.id], createdAt: Fmt.daysAgo(400), invite: nil, photoCount: 48),
+                    floors: 5, totalApartments: 20, phase: .kabaInsaat, progress: 68, ownerUid: User.admin.id, memberUids: [User.admin.id], createdAt: Fmt.daysAgo(400), invite: nil, photoCount: 48,
+                    remainingCostEstimate: Kurus.lira(14_500_000)),
             Project(id: DemoID.nilufer, blockNumber: "1287", parcelNumber: "14", district: "Nilüfer", city: "Bursa",
                     floors: 4, totalApartments: 12, phase: .temel, progress: 34, ownerUid: User.admin.id, memberUids: [User.admin.id], createdAt: Fmt.daysAgo(400), invite: nil, photoCount: 12),
             Project(id: DemoID.kepez, blockNumber: "908", parcelNumber: "7", district: "Kepez", city: "Antalya",

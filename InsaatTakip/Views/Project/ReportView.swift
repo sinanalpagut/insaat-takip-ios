@@ -321,20 +321,52 @@ struct ReportView: View {
                 .padding(.top, 12)
             }
 
-            // KALAN İNŞAAT MALİYETİ BURADA YOK ve olmaması bilinçli: uygulama
-            // onu bilmiyor. "Harcanan ÷ %ilerleme" ile türetmek, bu kod
-            // tabanının `areaCost`ta nil döndürerek reddettiği tahmini
-            // yapmak olurdu. Bu yüzden kart "hasılat" diyor, "kâr" demiyor.
-            HStack(alignment: .top, spacing: 7) {
-                Image(systemName: "info.circle")
-                    .iconFont(11, weight: .medium)
-                    .padding(.top, 1)
-                Text("Bu bir HASILAT tahminidir, kâr değildir: kalan inşaat maliyeti düşülmemiştir.")
-                    .font(.manrope(11, .medium))
-                    .lineSpacing(2)
+            // SONUÇ SATIRI YALNIZCA KALAN MALİYET GİRİLDİYSE.
+            //
+            // Uygulama kalan maliyeti BİLMİYOR ve "harcanan ÷ %ilerleme" ile
+            // türetmek, bu kod tabanının `areaCost`ta nil döndürerek reddettiği
+            // tahmini yapmak olurdu: yüzde elle sürülüyor ve maliyet doğrusal
+            // ilerlemiyor. Rakamı yalnızca kullanıcı verebilir; vermediyse kart
+            // eskisi gibi "bu hasılattır, kâr değildir" demeye devam ediyor.
+            if let kalan = o.remainingCost, let sonuc = o.projectedResult {
+                Divider().overlay(Palette.divider)
+                summaryRow("Bugüne kadar harcanan", "− " + Fmt.exactMoney(o.spentToDate))
+                Divider().overlay(Palette.divider)
+                summaryRow("Bitirmek için kalan (senin tahminin)",
+                           "− " + Fmt.exactMoney(kalan))
+                Divider().overlay(Palette.divider)
+                summaryRow("Beklenen sonuç", Fmt.exactMoney(sonuc),
+                           valueColor: sonuc >= .zero ? Palette.success : Palette.alertInk)
+
+                // Kapsam yazılı: bu kart ortaklara PDF olarak dağıtılıyor ve
+                // "beklenen sonuç" satırı bir kâr taahhüdü gibi okunabilir.
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "info.circle")
+                        .iconFont(11, weight: .medium)
+                        .padding(.top, 1)
+                    Text("Kalan maliyet senin girdiğin tahmindir. Harcanan yalnızca "
+                         + "uygulamaya girilen giderleri kapsar; vergi ve finansman dahil değildir.")
+                        .font(.manrope(11, .medium))
+                        .lineSpacing(2)
+                }
+                .foregroundColor(Palette.textTertiary)
+                .padding(.top, 12)
+            } else {
+                // Kalan maliyet GİRİLMEDİ. Sıfır sayıp sonucu yine de
+                // göstermek, temeli yeni atılmış projede kocaman bir kâr
+                // uydurmak olurdu.
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "info.circle")
+                        .iconFont(11, weight: .medium)
+                        .padding(.top, 1)
+                    Text("Bu bir HASILAT tahminidir, kâr değildir: kalan inşaat maliyeti "
+                         + "düşülmemiştir. İlerleme ekranından girersen sonuç burada görünür.")
+                        .font(.manrope(11, .medium))
+                        .lineSpacing(2)
+                }
+                .foregroundColor(Palette.textTertiary)
+                .padding(.top, 12)
             }
-            .foregroundColor(Palette.textTertiary)
-            .padding(.top, 12)
         }
         .padding(16)
         .background(Palette.surface)

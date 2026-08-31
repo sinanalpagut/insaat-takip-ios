@@ -54,6 +54,21 @@ struct Project: Codable, Identifiable, Equatable {
     /// duruyor olmalı. Arşiv geri alınabilir; silme ayrı bir iş.
     var archivedAt: Date? = nil
 
+    /// Projeyi bitirmenin KALAN maliyeti — ELLE girilir (madde 86).
+    ///
+    /// UYGULAMA BUNU HESAPLAMIYOR ve hesaplamamalı. Elde yalnızca `progress`
+    /// var ve "harcanan ÷ %ilerleme" ile toplam maliyet türetmek, bu kod
+    /// tabanının `areaCost`ta nil döndürerek açıkça reddettiği tahmini
+    /// yapmak olurdu: yüzde elle sürülüyor, maliyet doğrusal ilerlemiyor
+    /// (kaba inşaat ile ince işlerin eğrisi aynı değil) ve çıkan rakam
+    /// ortağa dağıtılan bir PDF'e giriyor.
+    ///
+    /// `nil` = "girilmedi". Sıfırdan AYRI: sıfır "bitti, masraf kalmadı"
+    /// demek, nil "bilmiyorum" demek — ve ekran nil'de hiçbir şey
+    /// göstermiyor. İkisini tek değere katlamak, girilmemiş bir tahmini
+    /// "masraf kalmadı" diye okutmak olurdu.
+    var remainingCostEstimate: Kurus? = nil
+
     var isArchived: Bool { archivedAt != nil }
 
     /// Kart başlığı: "145 Ada / 2 Parsel"

@@ -1564,8 +1564,51 @@ verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam
       işaretleyemiyor. Bildirim de gitmediği için ilişki tek yönlü.
 - [x] 85. **Yasal takvim** — ruhsat, iskân, yapı denetim, sözleşme süreleri.
       Tek hatırlatıcı yüzeyi taksit vadesi.
-- [~] 86. **Kalan stoğun değeri ve projeyi bitirmenin maliyeti** hiçbir ekranda
+- [x] 86. **Kalan stoğun değeri ve projeyi bitirmenin maliyeti** hiçbir ekranda
       yok; "satılan ciro + kalan stok değeri = beklenen hasılat" gösterilmiyor.
+      → **YAPILDI (31 Ağu 2026, iki yarı).**
+      **Birinci yarı — beklenen hasılat.** `StockOutlook` +
+      `stockOutlook(for:)` (ProjectViewModel.swift) ve ReportView'da
+      `outlookCard`. Rakam ÜÇ KOVA hâlinde ayrı duruyor (satılan / rezerve /
+      boş stok) çünkü güven düzeyleri farklı: satılan gerçekleşti, rezerve
+      sözleşmesi kesinleşmedi, boş dairenin liste fiyatı bir HEDEF. Tek
+      rakama katlamak, uygulamanın `countsAsRevenue` / `isSellable` ayrımıyla
+      alt katta çözdüğü hatayı üst katta tekrarlamak olurdu. Kat karşılığı
+      daire hiçbir kovaya girmiyor; test kalan tüm daireleri 999.999 ₺'lik
+      `landOwner` yapıyor, böylece bir sızıntı toplamı patlatarak kendini
+      söyler. Liste fiyatı GİRİLMEMİŞ boş daireler sayılıyor ama
+      TOPLANMIYOR ve ekran bunu yazıyor (`pricelessCount`) — madde 25'teki
+      `missingCount` deseninin aynısı: eksik rakamın sessiz kalması bu kod
+      tabanının defalarca düzelttiği hata. Demo veride uyarı gerçekten
+      ateşlendi (3 boş daire, 0 ₺).
+      **İkinci yarı — bitirmenin maliyeti: ELLE GİRİLİR.** `Project`e
+      `remainingCostEstimate: Kurus?`, ProgressSheet'e tek bir alan.
+      Uygulama bu rakamı HESAPLAMIYOR: elde yalnızca elle sürülen yüzde var
+      ve "harcanan ÷ %ilerleme" ile toplam maliyet türetmek, bu kod tabanının
+      `areaCost`ta nil döndürerek reddettiği uydurma rakam sınıfına girerdi
+      (maliyet doğrusal ilerlemiyor; kaba inşaatla ince işlerin eğrisi aynı
+      değil) — üstelik çıkan rakam ortağa PDF olarak dağıtılıyor.
+      Alan ProgressSheet'te, gider ekranında DEĞİL: gider defteri OLMUŞ
+      harcamayı yazıyor, bu ise OLACAK olanın tahmini; aynı listeye girseydi
+      "harcanan" toplamını şişirirdi. Soru ise ilerleme yüzdesiyle birebir
+      aynı soru — proje şu an nerede, bitirmeye ne kalıyor?
+      `nil` ile SIFIR ayrı tutuldu: `parseMoney("")` sıfır döndürüyor ama
+      burada sıfır "masraf kalmadı" iddiası, nil ise "bilmiyorum". Boş metin
+      tahmini SİLİYOR, sıfırlamıyor; `updateProgress`'in parametresi
+      opsiyonel, böylece kalan maliyeti taşımayan çağrılar girilmiş tahmini
+      sessizce silmiyor. Girilmemişse "Beklenen sonuç" satırı HİÇ
+      görünmüyor — nil'i sıfır saymak, temeli yeni atılmış projede kocaman
+      bir kâr uydurmak olurdu.
+      `PartnersTabView.scopeText` ve ReportView'ın kapsam cümlesi de
+      güncellendi: tahmin girildiğinde rakam yazılıyor ama paylardan hâlâ
+      DÜŞÜLMÜYOR ve cümle bunu söylüyor — elle girilmiş bir tahmini ortağın
+      hissesine karıştırmak, dağıtılabilir tutarı bir tahminin arkasına
+      saklamak olurdu.
+      Testler: StockOutlookTests 13 test (6 hasılat + 7 maliyet). Test kurulumu
+      tohum verisine yaslanmıyor — demo veride ilk projenin tahmini artık DOLU
+      (kartın dolu hâli demo'da da görülsün diye), o yüzden `kur()` başlangıç
+      durumunu kendisi kuruyor. Simülatörde iki hâl de doğrulandı:
+      46.050.000 − 24.397.500 − 14.500.000 = 7.152.500 ₺.
 - [~] 87. **Gelir modeli kararı yazılı değil.** StoreKit/abonelik/sınır sıfır;
       her kullanıcı ücretli SMS ve Avrupa Storage maliyeti üretiyor. "Önce
       ücretsiz" gibi bilinçli bir karar da kayıtlı değil.

@@ -13,6 +13,7 @@ struct ProgressSheet: View {
 
     @State private var progress: Double = 0
     @State private var phase: ProjectPhase = .temel
+    @State private var remainingCostText = ""
     @State private var didLoad = false
 
     private var project: Project? {
@@ -28,6 +29,10 @@ struct ProgressSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             SheetHeader(title: "İnşaat İlerlemesi",
                         subtitle: project?.title) { dismiss() }
+
+            // Klavye decimalPad'i açtığında alan kapanmasın diye kaydırılabilir.
+            ScrollView(showsIndicators: false) {
+              VStack(alignment: .leading, spacing: 0) {
 
             // Canlı önizleme — dashboard kartındaki satırın aynısı
             VStack(alignment: .leading, spacing: 0) {
@@ -72,25 +77,54 @@ struct ProgressSheet: View {
             }
             .padding(.top, 10)
 
+            // KALAN MALİYET — yüzdenin yanına konuldu, gider ekranına DEĞİL.
+            //
+            // Gider ekranı OLMUŞ harcamaları yazıyor; bu ise OLACAK olanın
+            // tahmini. Aynı listeye girseydi fiş toplamına karışır, "harcanan"
+            // rakamını şişirirdi. Buradaki soru ise ilerleme yüzdesiyle
+            // birebir aynı soru: proje şu an nerede, bitirmeye ne kalıyor?
+            // Kullanıcı yüzdeyi sürerken kalanı da güncellemesi doğal.
+            VStack(alignment: .leading, spacing: 8) {
+                Text("BİTİRMEK İÇİN KALAN MALİYET (₺)")
+                    .smallCapsLabel(size: 10, color: Palette.textControl, tracking: 0.9)
+                TextField("Boş bırakılabilir", text: $remainingCostText)
+                    .keyboardType(.decimalPad)
+                    .font(.manrope(14, .bold))
+                    .foregroundColor(Palette.ink)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 52)
+                    .background(Palette.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.border, lineWidth: 1))
+                Text("Senin tahminin. Uygulama bunu hesaplamaz; boş bırakılırsa "
+                     + "rapordaki beklenen sonuç satırı hiç görünmez.")
+                    .font(.manrope(11, .medium))
+                    .foregroundColor(Palette.textTertiary)
+                    .lineSpacing(2)
+            }
+            .padding(.top, 20)
+
             PrimaryButton(title: "Kaydet") {
                 viewModel.updateProgress(role: viewModel.role(inProject: projectId, for: appState.currentUser),
                                          projectId: projectId,
-                                         progress: Int(progress), phase: phase)
+                                         progress: Int(progress), phase: phase,
+                                         remainingCostText: remainingCostText)
                 dismiss()
             }
             .padding(.top, 22)
 
-            Text("Bu bilgi ortakların gördüğü proje kartında görünür.")
+            Text("İlerleme ve aşama ortakların gördüğü proje kartında görünür.")
                 .font(.manrope(11, .medium))
                 .foregroundColor(Palette.textTertiary)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 12)
 
-            Spacer(minLength: 0)
+              Spacer(minLength: 24)
+              }
+            }
         }
         .padding(.horizontal, 20)
         .background(Palette.surface)
-        .sheetHeight(0.62)
+        .sheetHeight(0.78)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
         .onAppear {
@@ -98,6 +132,11 @@ struct ProgressSheet: View {
             didLoad = true
             progress = Double(project.progress)
             phase = project.phase
+            // nil ise BOŞ kalır — "0" yazsaydık, hiç tahmin girmemiş
+            // kullanıcının kaydettiği anda tahmini sıfıra sabitlenirdi.
+            if let kalan = project.remainingCostEstimate {
+                remainingCostText = Fmt.moneyText(kalan)
+            }
         }
     }
 

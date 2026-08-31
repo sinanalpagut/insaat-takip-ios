@@ -1615,11 +1615,26 @@ final class ProjectViewModel: ObservableObject {
     /// Projenin inşaat ilerlemesini ve yapım aşamasını günceller.
     /// Bu iki alan dashboard kartının en büyük görsel öğesi; düzenlenemediği için
     /// kullanıcının açtığı her proje sonsuza dek "%0 · Temel" görünüyordu.
-    func updateProgress(role: UserRole, projectId: UUID, progress: Int, phase: ProjectPhase) {
+    func updateProgress(role: UserRole, projectId: UUID, progress: Int,
+                        phase: ProjectPhase,
+                        remainingCostText: String? = nil) {
         guard role == .admin,
               let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
         projects[index].progress = min(100, max(0, progress))
         projects[index].phase = phase
+
+        // KALAN MALİYET: boş metin `nil` demek, "0" değil.
+        //
+        // `parseMoney("")` sıfır döndürüyor ve bu doğru — para alanı boşken
+        // toplam sıfırdır. Ama BURADA sıfır "masraf kalmadı" anlamına gelir ve
+        // bu, "bilmiyorum"dan bambaşka bir iddia. Alanı boşaltan kullanıcı
+        // tahminini SİLİYOR, sıfırlamıyor.
+        if let remainingCostText {
+            let temiz = remainingCostText.trimmingCharacters(in: .whitespaces)
+            projects[index].remainingCostEstimate = temiz.isEmpty ? nil
+                                                                 : Self.parseMoney(temiz)
+        }
+
         persist([.project(projects[index])], failureNote: "İlerleme")
         flash("İlerleme güncellendi")
     }
@@ -3457,8 +3472,28 @@ final class ProjectViewModel: ObservableObject {
         /// hiçbir şey bunu söylemez. Ekran bu sayıyı YAZMAK zorunda.
         var pricelessCount: Int = 0
 
+        /// Bugüne kadar uygulamaya GİRİLEN gider (malzeme + diğer).
+        /// Dönem çipinden bağımsız: proje geneli.
+        var spentToDate: Kurus = .zero
+
+        /// Bitirmek için kalan maliyet — kullanıcının ELLE girdiği tahmin.
+        /// nil = girilmedi; ekran o zaman sonuç satırını hiç göstermiyor.
+        var remainingCost: Kurus? = nil
+
         /// Satılan + rezerve + boş stok.
         var expected: Kurus { soldTotal + reservedTotal + availableTotal }
+
+        /// Beklenen sonuç = beklenen hasılat − harcanan − kalan tahmini.
+        ///
+        /// KALAN TAHMİNİ YOKSA nil DÖNER — "hasılat − harcanan" rakamını
+        /// sonuç diye göstermek, kalan maliyeti sıfır saymak olurdu ve temeli
+        /// yeni atılmış bir projede bu rakam kocaman bir kâr gibi görünürdü.
+        /// Bilinmeyen bir terimi sıfır kabul etmek, hesabı yanlış yönde
+        /// bozmanın en sessiz yolu.
+        var projectedResult: Kurus? {
+            guard let remainingCost else { return nil }
+            return expected - spentToDate - remainingCost
+        }
 
         /// Rakam tam mı? Fiyatsız daire varsa DEĞİL.
         var isComplete: Bool { pricelessCount == 0 }
@@ -3488,6 +3523,8 @@ final class ProjectViewModel: ObservableObject {
                 continue
             }
         }
+        sonuc.spentToDate = totalCost(for: projectId)
+        sonuc.remainingCost = projects.first { $0.id == projectId }?.remainingCostEstimate
         return sonuc
     }
 
