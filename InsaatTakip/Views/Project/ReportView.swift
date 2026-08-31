@@ -213,6 +213,7 @@ struct ReportView: View {
                 Text(scopeNote)
                     .font(.manrope(11, .medium))
                     .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundColor(Palette.textTertiary)
             .padding(.top, 12)
@@ -356,6 +357,13 @@ struct ReportView: View {
                     Text("\(o.pricelessCount) boş dairenin liste fiyatı girilmemiş; bu tutar o daireleri İÇERMİYOR.")
                         .font(.manrope(11, .semiBold))
                         .lineSpacing(2)
+                        // PDF'TE KESİLİYORDU. `ImageRenderer` yüksekliği
+                        // önermediği için bu cümle tek satıra sığdırılıp
+                        // "…" ile kırpılıyordu: ortağa giden belgede tam da
+                        // KAPSAMI anlatan cümle yarım kalıyordu. Ekranda
+                        // görünmüyordu çünkü ScrollView yüksekliği serbest
+                        // bırakıyor.
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .foregroundColor(Palette.alertInk)
                 .padding(.top, 12)
@@ -388,6 +396,13 @@ struct ReportView: View {
                          + "uygulamaya girilen giderleri kapsar; vergi ve finansman dahil değildir.")
                         .font(.manrope(11, .medium))
                         .lineSpacing(2)
+                        // PDF'TE KESİLİYORDU. `ImageRenderer` yüksekliği
+                        // önermediği için bu cümle tek satıra sığdırılıp
+                        // "…" ile kırpılıyordu: ortağa giden belgede tam da
+                        // KAPSAMI anlatan cümle yarım kalıyordu. Ekranda
+                        // görünmüyordu çünkü ScrollView yüksekliği serbest
+                        // bırakıyor.
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .foregroundColor(Palette.textTertiary)
                 .padding(.top, 12)
@@ -403,6 +418,13 @@ struct ReportView: View {
                          + "düşülmemiştir. İlerleme ekranından girersen sonuç burada görünür.")
                         .font(.manrope(11, .medium))
                         .lineSpacing(2)
+                        // PDF'TE KESİLİYORDU. `ImageRenderer` yüksekliği
+                        // önermediği için bu cümle tek satıra sığdırılıp
+                        // "…" ile kırpılıyordu: ortağa giden belgede tam da
+                        // KAPSAMI anlatan cümle yarım kalıyordu. Ekranda
+                        // görünmüyordu çünkü ScrollView yüksekliği serbest
+                        // bırakıyor.
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .foregroundColor(Palette.textTertiary)
                 .padding(.top, 12)
@@ -466,6 +488,13 @@ struct ReportView: View {
                          + "ayrılmıyor: beton, vinç ve harç bütün parsele ait.")
                         .font(.manrope(11, .medium))
                         .lineSpacing(2)
+                        // PDF'TE KESİLİYORDU. `ImageRenderer` yüksekliği
+                        // önermediği için bu cümle tek satıra sığdırılıp
+                        // "…" ile kırpılıyordu: ortağa giden belgede tam da
+                        // KAPSAMI anlatan cümle yarım kalıyordu. Ekranda
+                        // görünmüyordu çünkü ScrollView yüksekliği serbest
+                        // bırakıyor.
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .foregroundColor(Palette.textTertiary)
                 .padding(.top, 12)
@@ -548,6 +577,17 @@ struct ReportView: View {
                     .foregroundColor(Palette.textSecondary)
             }
             summaryCard
+            // EKRANDA NE VARSA BELGEDE DE VAR (31 Ağu 2026). PDF ortağa
+            // gönderilen ASIL belge; ekranda beklenen hasılat ve blok
+            // kırılımı dururken belgede durmaması, aynı projeye dair iki
+            // farklı hikâye demekti — üstelik eksik olan taraf, ortağın
+            // gerçekten merak ettiği ileriye bakan rakamdı.
+            //
+            // İkisi de DÖNEM ÇİPİNDEN BAĞIMSIZ ve etiketleri bunu söylüyor
+            // ("proje geneli"): rapor bir döneme ait, bu iki kart projenin
+            // bugünkü hâline.
+            outlookCard
+            blockCard
             chartCard
             Text("Bu rapor İnşaat Takip uygulamasından oluşturulmuştur. Ortaklar salt okunur erişime sahiptir.")
                 .font(.manrope(10.5, .medium))

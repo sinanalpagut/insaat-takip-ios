@@ -1445,7 +1445,29 @@ uygulamayı kapatıp açar ve hepsi yok olurdu — üstelik kırılım yalnızca
 simülatör turu da bunu göstermedi.
 
 Ders yine aynı: **koşmamış kod okunarak doğrulanamaz** — bu sefer kod
-"koşuyordu" ama YANLIŞ DEPOYA karşı. Testler artık şunları da kilitliyor:
+"koşuyordu" ama YANLIŞ DEPOYA karşı.
+
+### PDF ekranla ayrışmıştı — ve kapsam cümlesi kesiliyordu (31 Ağu 2026)
+
+Aynı sorunun üçüncü biçimi: bugün eklenen `outlookCard` (beklenen hasılat +
+beklenen sonuç) ve `blockCard` ekranda vardı, **PDF'te yoktu**. Oysa ortağa
+gönderilen ASIL belge PDF: yönetici onu "rapor" diye paylaşınca ortağın
+gerçekten merak ettiği ileriye bakan rakamlar belgede hiç görünmüyordu. İki
+kart da eklendi (ikisi de dönem çipinden bağımsız ve etiketleri "proje geneli"
+diyor).
+
+PDF üretilip **açılarak** denetlendi (simülatörden çekilip görüntüye
+dönüştürüldü) ve orada ikinci bir kusur çıktı: kapsam cümleleri tek satıra
+sıkıştırılıp "…" ile KESİLİYORDU. `ImageRenderer` yüksekliği önermediği için
+çok satırlı `Text` kırpılıyor; ekranda görünmüyordu çünkü `ScrollView`
+yüksekliği serbest bırakıyor. Yani "kapsam yazılı olmalı" ilkesi tam da
+ilkenin en çok gerektiği yerde — dağıtılan belgede — bozuluyordu.
+`fixedSize(horizontal: false, vertical: true)` dört kapsam cümlesine de
+eklendi ve PDF yeniden üretilip cümlelerin tamamlandığı görüldü.
+
+Yöntem notu: PDF'i ÜRETMEK yetmiyor, AÇMAK gerekiyor. "Dosya oluştu" ile
+"dosya doğru" arasındaki fark, bu turda bulunan üç kusurdan ikisiydi.
+ Testler artık şunları da kilitliyor:
 alıcı adının daire belgesine yazılmadığı (madde 18'in kodlama sınırındaki
 kanıtı), malzemenin türetilen toplamlarının kodlanmadığı ("türetilen rakam
 saklanmaz" kararının koruyucusu), cari hareketin üç türünün ham değerleriyle
