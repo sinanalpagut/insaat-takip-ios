@@ -1468,6 +1468,28 @@ eklendi ve PDF yeniden üretilip cümlelerin tamamlandığı görüldü.
 Yöntem notu: PDF'i ÜRETMEK yetmiyor, AÇMAK gerekiyor. "Dosya oluştu" ile
 "dosya doğru" arasındaki fark, bu turda bulunan üç kusurdan ikisiydi.
 
+### Büyük metin turu: kesilen parça yine anlam taşıyordu (31 Ağu 2026)
+
+Hedef kullanıcı 50 yaşında bir müteahhit; iOS'ta yazıyı büyütmesi olağan.
+Simülatör en büyük erişilebilirlik boyutuna (AX5) alınıp ekranlar tek tek
+açıldı. İyi haber: `financeTile` ve portföy kartı zaten uyum sağlıyor
+(dikey diziliyor) ve PARA RAKAMLARI sarılıyor, kesilmiyor — yani daha önce
+öğrenilen ders tutmuş.
+
+İki yeni kusur çıktı, ikisi de aynı sınıftan ("kesilen parça anlam taşıyor"):
+· **Dönem çipleri** AX5'te "Bu…", "Çeyr…", "Tü…" oluyordu — rapordaki BÜTÜN
+  rakamlar bu seçime bağlıyken hangisinin seçili olduğu okunamıyordu. `HStack`
+  yerine `FlowLayout`: çipler alt satıra taşıyor, etiket tam kalıyor. Metni
+  küçültmek (`minimumScaleFactor`) çözüm değil — kullanıcının açıkça istediği
+  büyük yazıyı düzen sığsın diye geri küçültmek olurdu.
+· **Proje başlığının alt satırı NORMAL BOYUTTA BİLE kesiliyordu:**
+  "Tahsilat 26,88 M ₺ · Kalan alacak 1…" — kesilen parça yine BÜYÜKLÜK EKİ,
+  yani 1 milyon ile 15 milyon ayırt edilemiyordu (gerçek değer 15,77 M ₺).
+  `financeTile`ın yorumunda yazılı olan hatanın aynısı, iki ekran ötede.
+  Başlık da kimlik taşıyor: "145…" parseli yutuyor ve madde 83'ten sonra
+  önerilen kurulum tam olarak "parsel başına tek proje" — aynı adada iki
+  proje gerçekten olabilir. İkisi de iki satıra çıkabiliyor artık.
+
 ### CSV'ler de açıldı: "Ödenen" sütununda kişi adı vardı
 
 Aynı yöntem dosyalara uygulandı — beş CSV ve yedek JSON simülatörden çekilip

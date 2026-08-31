@@ -237,16 +237,28 @@ struct ProjectDetailView: View {
                 DarkHeaderButton(systemName: "chevron.left", label: "Geri") { dismiss() }
 
                 VStack(alignment: .leading, spacing: 3) {
+                    // TEK SATIR KIRPMASI KALDIRILDI (31 Ağu 2026) — aynı ders
+                    // `financeTile`da yazılı: kesilen parça büyüklük eki
+                    // olduğunda 1 milyon ile 15 milyon ayırt edilemiyor.
+                    // Alt satır PARA taşıyor ("Tahsilat 26,88 M ₺ · Kalan
+                    // alacak 1…") ve normal boyutta bile kesiliyordu.
+                    //
+                    // Başlık ise projenin KİMLİĞİ: "145…" ada/parselin
+                    // parselini yutuyor ve madde 83'ten sonra önerilen kurulum
+                    // tam olarak "parsel başına tek proje" — yani aynı adada
+                    // iki proje gerçekten olabiliyor.
                     Text(project.title)
                         .font(.sora(17, .bold))
                         .foregroundColor(.white)
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.85)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(headerSubtitle(project))
                         .font(.manrope(11.5, .medium))
                         .foregroundColor(.white.opacity(0.55))
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.85)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer(minLength: 8)

@@ -120,6 +120,8 @@ struct ReportView: View {
             Text("Dönem Raporu")
                 .font(.sora(26, .bold))
                 .foregroundColor(.white)
+                // Büyük metinde "Dönem…" diye kesiliyordu.
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
 
             Text(project?.title ?? "")
@@ -127,7 +129,18 @@ struct ReportView: View {
                 .foregroundColor(.white.opacity(0.55))
                 .padding(.top, 5)
 
-            HStack(spacing: 8) {
+            // BÜYÜK METİNDE SARILIYOR, KESİLMİYOR (31 Ağu 2026).
+            //
+            // `HStack` üç çipi tek satıra sıkıştırınca en büyük erişilebilirlik
+            // boyutunda etiketler "Bu…", "Çeyr…", "Tü…" oluyordu: rapordaki
+            // BÜTÜN rakamlar bu seçime bağlıyken hangisinin seçili olduğu
+            // okunamıyordu. `FlowLayout` çipleri alt satıra taşıyor ve etiket
+            // tam kalıyor.
+            //
+            // Metni küçültmek (`minimumScaleFactor`) çözüm DEĞİL: kullanıcının
+            // açıkça istediği büyük yazıyı, uygulamanın düzeni sığsın diye
+            // geri küçültmek olurdu.
+            FlowLayout(spacing: 8) {
                 ForEach(ProjectViewModel.ReportPeriod.allCases, id: \.self) { option in
                     Button {
                         period = option
