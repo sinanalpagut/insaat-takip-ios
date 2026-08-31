@@ -776,3 +776,41 @@ describe('tanımsız yollar kapalı', () => {
     }));
   });
 });
+
+// ═══════════ Kural kapsamı KODLA eşleşiyor mu (yapısal denetim) ═══════════
+//
+// NEDEN BU TEST VAR: 31 Ağu 2026'da `partnerLedger` koleksiyonu eklendi ve
+// kurala yazılmasaydı uygulama üretimde sessizce reddedilecekti — kural
+// dosyasındaki varsayılan "tanımsız yol kapalı" doğru davranış ama hatayı
+// KULLANICI bulurdu, geliştirici değil. O gün gözle yakalandı; bir dahakini
+// bu test yakalasın.
+//
+// Emülatör GEREKTİRMEZ: iki dosyayı okuyup karşılaştırıyor. Yine de bu
+// dosyada duruyor, çünkü sorduğu soru bir kural sorusu ve ayrı bir koşu
+// düzeni kurmak testin unutulmasının en kolay yolu olurdu.
+describe('kural kapsamı: kodun yazdığı her koleksiyonun bir kuralı var', () => {
+  const oku = (yol) => readFileSync(new URL(yol, import.meta.url), 'utf8');
+
+  it('FirestoreProjectRepository.Coll ile firestore.rules birebir aynı', () => {
+    const swift = oku('../InsaatTakip/Data/FirestoreProjectRepository.swift');
+    const govde = swift.split('private enum Coll: String {')[1].split('}')[0];
+    const kodda = [...govde.matchAll(/^\s*case\s+(\w+)/gm)].map((m) => m[1]).sort();
+
+    const rules = oku('../firestore.rules');
+    // Proje ALTINDAKİ bloklar altı boşlukla girintili; üst düzey yollar
+    // (users, invites, rateLimits) bu karşılaştırmanın dışında.
+    const kuralda = [...rules.matchAll(/^ {6}match \/(\w+)\/\{/gm)]
+      .map((m) => m[1]).sort();
+
+    const eksik = kodda.filter((c) => !kuralda.includes(c));
+    const fazla = kuralda.filter((c) => !kodda.includes(c));
+
+    if (eksik.length || fazla.length) {
+      throw new Error(
+        `Kural kapsamı kodla ayrıştı.\n` +
+        `  Kodun yazdığı ama kuralda OLMAYAN (üretimde sessizce reddedilir): ${eksik.join(', ') || '—'}\n` +
+        `  Kuralda olup kodun yazmadığı (ölü kural ya da eksik kod): ${fazla.join(', ') || '—'}`);
+    }
+    if (kodda.length === 0) throw new Error('Coll enum okunamadı — testin kendisi bozulmuş');
+  });
+});

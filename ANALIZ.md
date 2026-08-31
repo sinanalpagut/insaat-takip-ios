@@ -1406,6 +1406,27 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
       · Kod tarafında yapılacak bir şey YOK ve bu bilinçli: istemciye ikinci
         bir denetim eklemek, saldırganın hiç uğramadığı bir kapıya ikinci kilit
         takmak olurdu. Doğru yer sunucu politikası.
+
+### Yöntem: "iddia yazılı, uygulayan yok" taraması (31 Ağu 2026)
+
+Davet ömrü bulgusundan sonra aynı sınıfı sistematik aradım: arayüzdeki her
+KISIT CÜMLESİNİ toplayıp uygulayıcısını aradım. Onu bulan on bir cümleden
+dokuzu gerçekten uygulanıyordu — alıcı adı (ayrı belge + kural), ortak salt
+okur (14 koleksiyonda `ownerWrite`), satılmış daire durumu (`isCommitted`
+kapısı), "yalnızca tip ve alan kopyalanır", "payın sessizce değiştirilemez"
+(denetim izi), "kapora paya girmez" (`collectedAmount` yalnızca
+`countsAsRevenue` sayıyor), "bedelin tamamı tahsil edilince otomatik
+Tamamlandı" (`recalculateCollected`), belge görünürlüğü, "uygulama vergi
+hesaplamaz" (test). İkisi uygulanmıyordu: davet ömrü (düzeltildi) ve SMS
+bölgesi (konsol işi, yukarıda).
+
+**YAPISAL KORUMA EKLENDİ.** `partnerLedger` bugün kurala yazılmasaydı
+üretimde sessizce reddedilecekti ve hatayı KULLANICI bulurdu. Artık
+`tests/rules.test.mjs` içinde emülatör gerektirmeyen bir test, kodun yazdığı
+koleksiyon listesini (`FirestoreProjectRepository.Coll`) kural dosyasındaki
+proje altı `match` bloklarıyla karşılaştırıyor ve ayrışmayı adıyla söylüyor.
+Testin kendisi UYDURMA BİR KOLEKSİYON eklenerek doğrulandı: kırmızıya döndü,
+sonra geri alındı — koşmamış test kanıt değildir.
 - [x] 72. **Uygulama içinde destek/geri bildirim/sürüm/politika satırı yok.**
       `AccountSheet`te yok, `CFBundleShortVersionString` okuyan kod yok.
       Crashlytics bilinçli ertelendi; ikisi birleşince sahadaki hata İKİ
