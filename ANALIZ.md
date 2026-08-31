@@ -1754,9 +1754,96 @@ verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam
       (kartın dolu hâli demo'da da görülsün diye), o yüzden `kur()` başlangıç
       durumunu kendisi kuruyor. Simülatörde iki hâl de doğrulandı:
       46.050.000 − 24.397.500 − 14.500.000 = 7.152.500 ₺.
-- [~] 87. **Gelir modeli kararı yazılı değil.** StoreKit/abonelik/sınır sıfır;
+- [x] 87. **Gelir modeli kararı yazılı değil.** StoreKit/abonelik/sınır sıfır;
       her kullanıcı ücretli SMS ve Avrupa Storage maliyeti üretiyor. "Önce
       ücretsiz" gibi bilinçli bir karar da kayıtlı değil.
+      → **YAPILDI (31 Ağu 2026) — (a) karar yazıldı, (b) kotanın duracağı yer
+      açıldı. (c) StoreKit AYRI ve sonraya.**
+
+      ### GELİR MODELİ KARARI
+
+      **PROJE SAYISINA GÖRE ABONELİK. ORTAKLAR SINIRSIZ VE ÜCRETSİZ.**
+
+      *Neden proje sayısı:* değerle DE maliyetle DE aynı yönde büyüyen tek
+      eksen o. Beş şantiyesi olan müteahhit hem daha çok değer alıyor hem
+      daha çok Storage, Firestore ve SMS tüketiyor. Kullanıcı sayısı ikisini
+      de ölçmüyor. `Projeyi Arşivle` zaten var (madde 60), yani biten proje
+      saymıyor ve abonelik doğal olarak projenin ömrüne bağlanıyor.
+
+      *Neden ortak başına ücret ALINMIYOR:* ortak SALT OKUR ve parayı ödeyen
+      o değil. Ortak başına ücret, müteahhidi daha az ortak davet etmeye
+      iter — yani ürünü ayıran özelliği (ortakla şeffaflık) vergilendirir.
+      Üstelik uygulamayı gören her ortak potansiyel müşteri: büyüme
+      döngüsünün kendisine ücret koymak olurdu. Kod karşılığı yazıldı ve
+      testle kilitlendi: `quotaSnapshot` yalnızca SAHİBİ olunan projeleri
+      sayıyor, ortak olarak katılınanları saymıyor.
+
+      *Ücretsiz katman TRIAL DEĞİL, KALICI:* 1 aktif proje + sınırsız ortak.
+      Bu uygulama veri girildikten SONRA değer üretiyor; 14 günlük deneme
+      dolduğunda kullanıcının elinde henüz yarım girilmiş bir şantiye kaydı
+      oluyor ve güven kurulmamış oluyor.
+
+      *Fiyat çapası:* karşılaştırma başka uygulamalar değil — muhasebeci,
+      Excel ve "bir daire yanlış hesaplanırsa". Tek dairenin marjı yanında
+      aylık ücret önemsiz kalmalı. Yıllık seçenek önemli: hem Firebase
+      maliyetini önden karşılar hem müteahhidin proje döngüsüne uyar.
+
+      **ELENENLER VE GEREKÇELERİ**
+      · *Mağazadan ücretli indirme:* en kötüsü. Sunucu maliyeti SÜREKLİ (SMS
+        başına ücret, fotoğraf depolama), gelir TEK SEFERLİK. Ayrıca
+        denemeden satın alma, veri girmeden değer görmeyen bir üründe yanlış.
+      · *Tek seferlik kilit açma:* aynı maliyet sorunu.
+      · *Proje başına tek seferlik ("proje aç = X TL"):* TÜMDEN ELENMEDİ,
+        ikinci aday — müteahhidin iş başına maliyet düşünme alışkanlığına
+        uyuyor ve abonelik direncini aşıyor. Sakıncası veriyi bozması:
+        kullanıcıyı her şeyi tek projeye tıkmaya iter (madde 83'ün tam
+        tersi yönde bir baskı).
+      · *Ortak başına ücret:* yukarıda.
+
+      **YAYIN ÖNCESİ KORKULUKLAR (kodda yazılı — Quota.swift)**
+      1. *Abonelik YAZMAYI kilitler, OKUMAYI asla.* Aboneliği biten
+         müteahhidi kendi mali kaydından dışarıda bırakmak kabul edilemez:
+         veri onun, uygulama yalnızca tutuyor. Ölçüt `AppLock`ın fail-open
+         kararıyla aynı — kullanıcıyı kendi verisinden ayıran hata,
+         koruduğu şeyden pahalı.
+      2. *Sınır KURALDA değil İSTEMCİDE.* Firestore kuralında proje sayısı
+         denetlemek her yazmada bir `get()` demek: yazma başına ek okuma, ek
+         ücret ve yeni bir kırılma yolu — hak belgesi okunamadığı an TÜM
+         yazmalar reddedilirdi. Kuralın işi yetki, kotanın işi ticaret;
+         ikisini aynı yere koymak ticari bir hatayı veri kaybı gibi
+         gösterir.
+      3. *Arşiv sayılmıyor.* İnşaat yıllarca sürüyor; arşivi saymak
+         kullanıcıyı yeni proje açabilmek için geçmişini silmeye iterdi.
+
+      **(b) KOTANIN DURACAĞI YER BUGÜN AÇILDI.** `Quota.swift`: `Entitlement`
+      (free / subscribed / preLaunchUnlimited), `QuotaSnapshot` (aktif +
+      arşiv proje, belge, fotoğraf sayaçları) ve TEK boğaz noktası
+      `canCreateProject`. `addProject` bugün de bu boğazdan geçiyor; bugün
+      hiçbir şeyi durdurmuyor çünkü hak `preLaunchUnlimited`. Yayında
+      değişecek TEK satır `ProjectViewModel.entitlement`.
+      Gerekçe geri dönülemezlik: StoreKit sonra yazılabilir, ilk yayının
+      SINIRSIZLIĞI geri alınamaz — 12 proje açmış kullanıcıyı sonradan 3
+      proje sınırına sokmak ya sonsuza kadar muafiyet ya da güven kaybı.
+      Testler sınırı ENJEKTE EDEREK yayın gününün provasını yapıyor
+      (QuotaTests, 7 test): açık olmayan bir mekanizmanın çalıştığı iddia
+      edilemez.
+      Belge ve fotoğraf sayaçları ölçülüyor ama SINIR UYGULAMIYOR:
+      `storage.rules` dosya başına 4 MB / 50 MB koyuyor, SAYI sınırı yok.
+      Sınırın nereye konacağı gerçek kullanım görülmeden bilinemez; ölçmeden
+      konan bir sayı kullanıcıyı maliyet gerekçesi olmadan durdururdu.
+
+      **YAYINDAN ÖNCE KAPATILACAK (madde 71'in kalan yarısı):** App Check
+      ZORLAMASI. Bugün `AppCheckSetup` zorlamanın bilerek açılmadığını
+      yazıyor, callable'larda `enforceAppCheck` kapalı ve `rateLimits`
+      callable'ları koruyor ama Auth'u KORUMUYOR — sökülebilir API
+      anahtarıyla ücretli SMS yakılabilir ve Firebase bütçe uyarısı harcamayı
+      KESMEZ. Konsol işi kullanıcıda; ardından `enforceAppCheck` açılacak.
+
+      **DOĞRULANACAK TEK DIŞ BİLİNMEYEN — bundan önce StoreKit'e tek satır
+      kod yazılmamalı:** Apple'ın uygulama içi satın alma zorunluluğu ve dış
+      ödeme bağlantısı kuralı bölgeye göre değişiyor ve son yıllarda değişti.
+      (c) parçasının tetiği: ilk ücretli yayından önce ya da Firebase
+      harcaması yazılı bir eşiği geçtiğinde.
       · **KAPSAM KARARI (25 Ağu 2026): MADDE** — Tutarın KDV tabanı beyan edilsin (hesaplanmasın)
       · Dört mercek de aynı çelişkiyi bağımsız buldu ve kodda doğruladım:
         ReceiptScanner bilerek fişteki 'Ödenecek KDV Dahil Tutar'ı seçip birim

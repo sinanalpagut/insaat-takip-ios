@@ -2983,6 +2983,17 @@ final class ProjectViewModel: ObservableObject {
             return nil
         }
 
+        // KOTA BOĞAZI (madde 87). Bugün `preLaunchUnlimited` olduğu için
+        // hiçbir şeyi durdurmuyor; yayında `entitlement` değiştiği an sınır
+        // TEK yerden yürürlüğe giriyor. Çağrının bugün burada olmasının
+        // sebebi, yarın eklenecek bir koşulun proje açan başka bir yolu
+        // atlaması ihtimalini bugün kapatmak.
+        if case .wouldExceedProjects(let limit) = Quota.canCreateProject(quotaSnapshot(for: user),
+                                                                        entitlement: entitlement) {
+            flash(Quota.limitMessage(limit: limit))
+            return nil
+        }
+
         let project = Project(id: UUID(),
                               blockNumber: trimmedBlock, parcelNumber: trimmedParcel,
                               district: district.isEmpty ? "—" : district,
@@ -3194,6 +3205,37 @@ final class ProjectViewModel: ObservableObject {
         persist(writes, failureNote: "Cari hareket silme")
         flash("Cari hareket silindi")
         return true
+    }
+
+    // MARK: - Kota (madde 87)
+
+    /// Kullanıcının hakkı.
+    ///
+    /// YAYINDAN ÖNCE DEĞİŞECEK TEK SATIR BU. Bugün sınırsız, çünkü ödeme
+    /// alacak bir yol yok ve olmayan bir aboneliğin yokluğunu cezalandırmak
+    /// kullanıcıyı ürünü hiç kullanamayacağı bir kapıya çarptırmak olurdu.
+    /// Değişken (`var`) olmasının tek sebebi test: sınırın gerçekten
+    /// uygulandığı, sınır açılmadan da kanıtlanabilsin.
+    var entitlement: Entitlement = .preLaunchUnlimited
+
+    /// Kotanın ölçtüğü sayılar — YALNIZCA kullanıcının SAHİBİ olduğu
+    /// projelerden.
+    ///
+    /// Ortak olarak katıldığı projeler sayılmıyor: onların maliyeti davet
+    /// eden müteahhidin hanesinde ve ortak başına ücret alınmayacağı kararı
+    /// (madde 87) tam olarak bunu söylüyor — ortakla şeffaflığı
+    /// vergilendirmek, ürünü ayıran cümlenin kendisini vergilendirmek olurdu.
+    func quotaSnapshot(for user: User?) -> QuotaSnapshot {
+        guard let uid = user?.id else { return QuotaSnapshot() }
+        let mine = projects.filter { $0.ownerUid == uid }
+        var snapshot = QuotaSnapshot()
+        snapshot.activeProjects = mine.filter { !$0.isArchived }.count
+        snapshot.archivedProjects = mine.count - snapshot.activeProjects
+        let ids = Set(mine.map(\.id))
+        snapshot.documents = documents.filter { ids.contains($0.projectId) }.count
+        snapshot.photos = sitePhotos.filter { ids.contains($0.projectId) }.count
+            + apartmentPhotos.filter { ids.contains($0.projectId) }.count
+        return snapshot
     }
 
     /// Oturumu açan kişinin BU PROJEDEKİ ortak kaydı. Bağ `userUid` üzerinden:
