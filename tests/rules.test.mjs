@@ -303,25 +303,60 @@ describe('invites/{KOD}', () => {
 
   it('sahip kendi projesi için davet üretir', async () => {
     await assertSucceeds(setDoc(doc(ownerDb, 'invites', 'X7B9Q2'), {
+      projectId: P1, createdAt: serverTimestamp(), expiresAt: future(), usedAt: null,
+    }));
+  });
+
+  // ÖMÜR SUNUCU SAATİYLE SINIRLI (31 Ağu 2026).
+  //
+  // `redeemInvite` süreyi belgedeki `expiresAt`e bakarak ölçüyor. O değer
+  // istemciden geldiği ve denetlenmediği sürece "kod 48 saat geçerli"
+  // cümlesini uygulayan kimse yoktu: saati ileri alınmış bir cihaz kodu
+  // yıllarca geçerli yapabilirdi.
+  it('CİHAZ SAATİYLE yazılmış createdAt reddedilir', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'invites', 'EEEEEE'), {
       projectId: P1, createdAt: new Date(), expiresAt: future(), usedAt: null,
+    }));
+  });
+
+  it('48 saati AŞAN ömür reddedilir — kod sonsuza kadar yaşayamaz', async () => {
+    const birYilSonra = new Date(Date.now() + 365 * 24 * 3600 * 1000);
+    await assertFails(setDoc(doc(ownerDb, 'invites', 'FFFFFF'), {
+      projectId: P1, createdAt: serverTimestamp(), expiresAt: birYilSonra, usedAt: null,
+    }));
+  });
+
+  it('expiresAt zaman damgası değilse reddedilir', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'invites', 'GGGGGG'), {
+      projectId: P1, createdAt: serverTimestamp(), expiresAt: 'yarın', usedAt: null,
+    }));
+  });
+
+  // ALT SINIR YOK ve bilerek: saati GERİ alınmış cihaz kendi kodunu kısa
+  // ömürlü yapar — sinir bozucu ama tehlikeli değil. Alt sınır konsaydı saati
+  // bozuk kullanıcı davet üretemez hâle gelirdi.
+  it('GEÇMİŞ tarihli expiresAt kabul ediliyor — alt sınır bilerek yok', async () => {
+    await assertSucceeds(setDoc(doc(ownerDb, 'invites', 'HHHHHH'), {
+      projectId: P1, createdAt: serverTimestamp(),
+      expiresAt: new Date(Date.now() - 3600 * 1000), usedAt: null,
     }));
   });
 
   it('YABANCI başkasının projesi için davet üretemez', async () => {
     await assertFails(setDoc(doc(strangerDb, 'invites', 'AAAAAA'), {
-      projectId: P1, createdAt: new Date(), expiresAt: future(), usedAt: null,
+      projectId: P1, createdAt: serverTimestamp(), expiresAt: future(), usedAt: null,
     }));
   });
 
   it('ORTAK davet üretemez — davet etmek yönetici yetkisi', async () => {
     await assertFails(setDoc(doc(memberDb, 'invites', 'BBBBBB'), {
-      projectId: P1, createdAt: new Date(), expiresAt: future(), usedAt: null,
+      projectId: P1, createdAt: serverTimestamp(), expiresAt: future(), usedAt: null,
     }));
   });
 
   it('oturum açmamış kullanıcı davet üretemez', async () => {
     await assertFails(setDoc(doc(anonDb, 'invites', 'CCCCCC'), {
-      projectId: P1, createdAt: new Date(), expiresAt: future(), usedAt: null,
+      projectId: P1, createdAt: serverTimestamp(), expiresAt: future(), usedAt: null,
     }));
   });
 
@@ -350,13 +385,13 @@ describe('invites/{KOD}', () => {
   it('aynı kod ikinci kez üretilemez — başkasının daveti çalınamaz', async () => {
     // `create` yalnızca belge yokken geçerli; ikincisi `update` sayılır ve kapalı.
     await assertFails(setDoc(doc(strangerDb, 'invites', 'X7B9Q2'), {
-      projectId: P2, createdAt: new Date(), expiresAt: future(), usedAt: null,
+      projectId: P2, createdAt: serverTimestamp(), expiresAt: future(), usedAt: null,
     }));
   });
 
   it('projectId olmadan davet üretilemez', async () => {
     await assertFails(setDoc(doc(ownerDb, 'invites', 'DDDDDD'), {
-      createdAt: new Date(), expiresAt: future(), usedAt: null,
+      createdAt: serverTimestamp(), expiresAt: future(), usedAt: null,
     }));
   });
 });

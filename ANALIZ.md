@@ -1505,20 +1505,52 @@ FIFO tahsilat doğru (850.000 + 250.000 = 1,10 M ₺, kalan 2,75 M ₺).
       · BİLİNMEYEN SÜRÜM REDDEDİLİYOR (madde 56'nın dosya karşılığı): yarım okuma, kullanıcının eksiği aylar sonra fark etmesi demekti.
       · ÖZET GELMEYENİ DE SÖYLÜYOR: belgeler geri gelmiyor (yedek kaydı taşır, dosyayı değil), sahipsiz kayıtlar sayılıyor, alıcı adı eksikse belirtiliyor, ortakların yeniden davet edilmesi yazılıyor.
       · 15 test (90 toplam).
-      · **AÇIK KALAN:** hesap silmede "önce verini dışa aktar" adımı hâlâ sunulmuyor — silme ekranına eklenecek. Belgelerin ve fotoğrafların yedeğe girmesi ayrı bir iş (dosya boyutu kararı gerektiriyor).
+      · ~~AÇIK KALAN: hesap silmede "önce verini dışa aktar" adımı~~ → **KAPANDI (madde 75).** `DeleteAccountView` onay adımında "Önce verilerini indir" düğmesi var ve yalnızca SAHİBİ olunan projeleri indiriyor; bağlantı değil DÜĞME, çünkü "her projenin rapor ekranına tek tek git" demek silmenin hemen öncesinde atlanacak bir yönlendirme olurdu. Belgelerin ve fotoğrafların yedeğe girmesi ayrı bir iş (dosya boyutu kararı gerektiriyor).
       · **EKRAN AÇILDI (25 Ağu 2026).** "Kayıt İzi" proje menüsünde ve girişi ROLDEN BAĞIMSIZ — `isAdmin` arkasına konsaydı maddenin tespit ettiği durum aynen sürerdi. Gün gruplu liste; her satır eski → yeni değeri, işlemi yapanı ve saati gösteriyor.
       · AÇMADAN ÖNCE SIZINTI DENETİMİ KOŞTURULDU. Altı bulgunun altısı da çürütüldü ve çürütme gerekçesi belirleyici: `recordAudit` TEK çağrıda İKİ kayıt yazıyor — `AuditEntry` ve ÖZETİNİ `meta` alanında taşıyan bir `ActivityItem`. Hareket akışı ortağa zaten açık, yani izin içeriği bugüne kadar da ortağa ulaşıyordu. Kodda doğrulandı.
       · GENİŞLEYEN TEK ŞEY ZAMAN PENCERESİ: akış sunucuda 200 kayıtla sınırlı, denetim izi sınırsız. Türü değil süresi genişliyor.
       · DENETİM İKİ GERÇEK EKSİK BULDU: (a) ekranın dayandığı `BuyerPrivacyTests` iddiasından DARDI — yalnızca `updateApartment` yolunu ve yalnızca denetim izini tarıyordu; `saveSale` (adın asıl girildiği yer) ve `cancelSale` kapsam dışıydı, hareket akışına hiç bakılmıyordu. Üç yolu ve iki defteri tarayacak biçimde genişletildi. (b) Maddenin tüm dayanağı olan `allow read: if isMember` kuralı HİÇ test edilmemişti — var olan üç test yalnızca sahiple koşuyordu. Üç kural testi eklendi.
       · 99 Swift + 126 kural testi geçiyor.
-      · **AÇIK KALAN:** dolu satır görünümü cihazda görsel olarak doğrulanmadı (boş durum ve gezinme doğrulandı).
+      · ~~AÇIK KALAN: dolu satır görünümü doğrulanmadı~~ → **DOĞRULANDI (31 Ağu 2026, simülatör).** İki KDV beyanı kaydı üretilip bakıldı: "BUGÜN" gün başlığı, kayıt başına kart, ÇOK DEĞİŞİKLİKLİ satırın alt alta dizilişi ("Gider KDV tabanı: Belirtilmedi → KDV dahil" + "Satış KDV tabanı: …"), kim/saat ve başlıktaki "2 değişiklik" sayacı doğru. Gerçek CİHAZ turu ayrı iş olarak duruyor.
       · **KURAL YAZILDI (25 Ağu 2026) · YAYINA ALINMADI.** `ownerWrite` artık `serverStamped()` de istiyor: `updatedAt == request.time && updatedBy == uid()`. İlk şart yalnızca `FieldValue.serverTimestamp()` ile sağlanıyor — istemci kendi saatinden Timestamp koyarsa yazma reddediliyor.
       · NEDEN ŞİMDİ: madde 76 ile denetim izi ORTAĞIN gördüğü ekrana taşındı. "Kim ne zaman değiştirdi" cevabı cihaz saatinden geliyorsa iz kanıt değil İDDİADIR.
       · KAPSAM ÖLÇÜLEREK SEÇİLDİ: şartı her yola koymak uygulamayı kendi kuralıyla kilitlerdi. `UserProfileStore` (`users/{uid}`) ve `FirebaseInviteService` (`invites/{KOD}` + proje belgesindeki davet aynası) damgalamadan yazıyor. Kuralı yazmadan ÖNCE tüm istemci yazma yolları sayıldı; koysaydım davet akışı sessizce kırılırdı.
       · EKRANIN TARİHİ DE DÜZELDİ: kural sunucu damgasını doğru tutuyor ama `AuditEntry.date` cihaz saatindendi ve ekranda görünen oydu. `updatedAt` modele decode ediliyor, `trueDate` gösterimde, gün gruplamasında ve SIRALAMADA kullanılıyor — bozuk saatte düzeltmelerin sırası da yanlış görünüyordu.
       · BİLİNEN SINIR: `AuditEntry.user` görünen ad, uid değil; kural onu `request.auth`a bağlayamaz. Pinlenen şey hesap kimliği ve an.
       · 8 kural testi eklendi (cihaz saatinden tarih, ileri tarih, damgasız yazma, başkasının uid'i, eksik alan, güncellemede damga, kapsam). Var olan 14 yazma testi uygulamanın gerçek damgasını aynalıyor. 101 Swift + 184 emülatör testi geçiyor.
-      · **AÇIK KALAN:** kural YAYINA ALINMALI (`npm run rules:deploy`). Ayrıca profil ve davet yazmalarının damgalanması ayrı iş.
+      · ~~AÇIK KALAN: kural YAYINA ALINMALI~~ → **YAYINDA (31 Ağu 2026).** `npm run rules:deploy` koşturuldu; `serverStamped` ve madde 82'nin `partnerLedger` bloğu birlikte gitti. **DAVET DAMGASI TAMAM (31 Ağu 2026) ve altından GERÇEK BİR AÇIK çıktı.**
+        `invites/{code}` yazmasında `createdAt` ve `expiresAt` CİHAZ SAATİNDEN
+        geliyordu ve hiçbir kural onları denetlemiyordu. `redeemInvite` süreyi
+        belgedeki `expiresAt`e bakarak ölçüyor (functions/src/index.ts:227),
+        yani "kod 48 saat geçerli" cümlesi ekranda yazılıydı ama UYGULAYAN
+        KİMSE YOKTU: saati ileri alınmış bir cihaz — ya da değiştirilmiş bir
+        istemci — kodu yıllarca geçerli yapabilirdi ve sızan bir kod sonsuza
+        kadar açık bir kapı olurdu. Bu, projede yedi kez tekrarlanan desenin
+        sekizincisi ("iddia yazılı, uygulayan yok").
+        Düzeltme: `createdAt == request.time` (istemci `serverTimestamp()`
+        gönderiyor) + `expiresAt <= request.time + 49h`. ÜST SINIR VAR, ALT
+        SINIR YOK ve bu bilinçli: saati GERİ alınmış cihaz kendi kodunu kısa
+        ömürlü yapar (sinir bozucu ama tehlikesiz, `redeemInvite` zaten
+        "süresi dolmuş" diyor); alt sınır konsaydı saati bozuk kullanıcı davet
+        ÜRETEMEZ hâle gelirdi ve hata ona sebebini söyleyemezdi. Slack 1 saat:
+        `createdAt` sunucu damgası, `expiresAt` istemci hesabı — ağ gecikmesi
+        yüzünden tam eşitlik istenemez.
+        Proje belgesindeki AYNAYA sunucu damgası KONMADI: o kopya yalnızca
+        gösterim, otorite `invites/{KOD}` ve proje kuralı damgayı
+        denetlemiyor — kanıt değeri olmayan bir yere kanıt görüntüsü koymak
+        olurdu. 4 yeni kural testi (147 kural + 55 işlev testi).
+      · **PROFİL DAMGASI YAPILMADI — gerekçesiyle.** `users/{uid}` için
+        simetri uğruna kural sıkmak reddedildi: belgeyi yalnızca sahibi
+        yazabiliyor (`uid() == userId`), aldatılacak ikinci taraf yok ve
+        `createdAt` hiçbir karara girmiyor (yalnızca `AppState`te taşınıyor).
+        Buna karşılık maliyeti gerçek: kuralı yayına alırken cihazda ESKİ bir
+        derleme varsa profil yazması reddedilir ve kullanıcı "Adın ne?"
+        ekranında kilitlenir. Davet damgası bunun tersiydi — orada denetlenen
+        değer sunucunun okuduğu bir GÜVENLİK denetimiydi.
+      · **YAYIN SIRASI ÖNEMLİ:** yeni kural HENÜZ YAYINA ALINMADI. Yeni
+        derleme eski kuralla ÇALIŞIYOR (kural `createdAt`i denetlemiyordu),
+        ama eski derleme yeni kuralla davet ÜRETEMEZ. Doğru sıra: önce
+        uygulamayı cihaza kur, sonra `npm run rules:deploy`.
       · **TAMAM (25 Ağu 2026).** Opsiyonel uygulama kilidi + uygulama değiştirici örtüsü. Ayar hesap ekranında, VARSAYILAN KAPALI ve ROLDEN BAĞIMSIZ (ortağın ekranları da ciro, tahsilat, taksit planı taşıyor).
       · `deviceOwnerAuthentication` seçildi, `...WithBiometrics` DEĞİL — ve bu ölçülerek doğrulandı: sınama simülatöründe biyometri kayıtlı değil (LAError −7) ama parola yolu var. Biyometri-yalnız politika böyle bir cihazda özelliği tümden kullanılamaz yapar ve yüzü okunmayan kullanıcıyı KENDİ verisinden dışarıda bırakırdı.
       · KİLİT `.background`TA, ÖRTÜ `.inactive`TE — aynı yaşam döngüsünün iki eşiği, iki ayrı sebeple. Fiş fotoğrafı çekmek sahneyi yalnızca `.inactive` yapıyor; kilidi oraya bağlamak en çok kullanılan eylemde her seferinde doğrulama istemek olurdu. Değiştirici anlık görüntüsü ise tam `.inactive` anında alınıyor.

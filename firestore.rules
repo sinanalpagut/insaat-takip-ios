@@ -179,11 +179,33 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ÖMÜR SUNUCU SAATİYLE SINIRLI (31 Ağu 2026).
+    //
+    // Önceden `createdAt` ve `expiresAt` istemciden geliyordu ve hiçbir şey
+    // onları denetlemiyordu: `redeemInvite` süreyi belgedeki `expiresAt`e
+    // bakarak ölçüyor (functions/src/index.ts), yani CİHAZ SAATİ ne derse o.
+    // Saati ileri alınmış bir cihaz — ya da değiştirilmiş bir istemci — 48
+    // saatlik kodu YILLARCA geçerli yapabilirdi. "Kod 48 saat geçerli"
+    // cümlesi ekranda yazıyordu ama uygulayan kimse yoktu; bu kod tabanının
+    // yedi kez tekrarlanan hatası ("iddia yazılı, uygulayan yok").
+    //
+    // ÜST SINIR VAR, ALT SINIR YOK ve bu bilinçli: saati GERİ alınmış cihaz
+    // kendi kodunu kısa ömürlü yapar — sinir bozucu ama tehlikeli değil ve
+    // `redeemInvite` zaten "kodun süresi dolmuş" diyor. Alt sınır konsaydı,
+    // saati bozuk kullanıcı davet üretemez hâle gelir ve hata mesajı ona
+    // sebebini söyleyemezdi.
+    //
+    // Slack 1 saat: `createdAt` sunucu damgası, `expiresAt` istemcinin
+    // hesabı (48 saat sonrası). İkisi arasındaki ağ gecikmesi ve saat sapması
+    // yüzünden tam eşitlik istenemez.
     match /invites/{code} {
       allow read: if false;
       allow create: if signedIn()
                     && request.resource.data.projectId is string
-                    && isOwner(request.resource.data.projectId);
+                    && isOwner(request.resource.data.projectId)
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.expiresAt is timestamp
+                    && request.resource.data.expiresAt <= request.time + duration.value(49, 'h');
       allow update, delete: if false;
     }
 

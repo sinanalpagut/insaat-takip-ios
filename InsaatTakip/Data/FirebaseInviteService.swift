@@ -45,15 +45,27 @@ final class FirebaseInviteService: InviteService {
         for _ in 0..<3 {
             let code = InviteCode.generate()
             let batch = db.batch()
+            // `createdAt` SUNUCU DAMGASI, cihaz saati DEĞİL. Kural artık
+            // `createdAt == request.time` istiyor ve `expiresAt`i sunucu
+            // saatinden 49 saatle sınırlıyor: daha önce kodun ömrünü cihaz
+            // saati belirliyordu ve saati ileri alınmış bir cihaz 48 saatlik
+            // kodu yıllarca geçerli yapabilirdi (`redeemInvite` süreyi
+            // belgedeki `expiresAt`e bakarak ölçüyor).
             batch.setData([
                 "projectId": pid,
-                "createdAt": Timestamp(date: createdAt),
+                "createdAt": FieldValue.serverTimestamp(),
                 "expiresAt": Timestamp(date: expiresAt),
                 "usedAt": NSNull(),
             ], forDocument: db.collection("invites").document(code))
 
             // Yöneticinin ekranda göreceği ayna. Otorite `invites/{KOD}`;
             // buradaki kopya yalnızca gösterim, çünkü kod okuma kapalı.
+            // AYNADA CİHAZ SAATİ KALIYOR ve bu bilinçli: bu kopya yalnızca
+            // yöneticinin ekranında "kod ne zaman üretildi" yazmak için var,
+            // otorite `invites/{KOD}`. Buraya da sunucu damgası konsaydı,
+            // damganın iç içe bir map alanında (`invite.createdAt`) yaşaması
+            // gerekirdi ve proje belgesinin kuralı damgayı denetlemiyor —
+            // yani kanıt değeri olmayan bir yerde kanıt görüntüsü olurdu.
             batch.updateData([
                 "invite": [
                     "code": code,
