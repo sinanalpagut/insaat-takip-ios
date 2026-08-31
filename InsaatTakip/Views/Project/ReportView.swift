@@ -333,13 +333,21 @@ struct ReportView: View {
             }
             .padding(.bottom, 12)
 
-            Text(Fmt.exactMoney(o.expected))
+            // SIFIR İLE BİLİNMEYEN AYRI: yeni projede hiçbir daireye fiyat
+            // girilmemişken toplam matematiksel olarak sıfır çıkıyor ama
+            // anlamı "bu projeden para beklenmiyor" değil, "henüz
+            // bilinmiyor". 24 puntoluk bir "0 ₺", uygulamanın `areaCost`ta
+            // nil döndürerek reddettiği hatayı en görünür yerinde tekrarlardı.
+            Text(o.isUnknown ? "—" : Fmt.exactMoney(o.expected))
                 .font(.sora(24, .bold))
-                .foregroundColor(Palette.ink)
+                .foregroundColor(o.isUnknown ? Palette.textTertiary : Palette.ink)
 
-            Text("Satılan + rezerve + boş dairelerin liste fiyatı")
+            Text(o.isUnknown
+                 ? "Henüz hesaplanamıyor: satış yok ve dairelere liste fiyatı girilmemiş."
+                 : "Satılan + rezerve + boş dairelerin liste fiyatı")
                 .font(.manrope(11.5, .medium))
                 .foregroundColor(Palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 3)
                 .padding(.bottom, 12)
 

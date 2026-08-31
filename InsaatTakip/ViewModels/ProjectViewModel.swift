@@ -3798,6 +3798,18 @@ final class ProjectViewModel: ObservableObject {
 
         /// Rakam tam mı? Fiyatsız daire varsa DEĞİL.
         var isComplete: Bool { pricelessCount == 0 }
+
+        /// Rakam SIFIR mı, yoksa BİLİNMİYOR mu?
+        ///
+        /// Yeni kurulan projede hiçbir daire satılmamış ve hiçbirine liste
+        /// fiyatı girilmemiş oluyor. Toplam matematiksel olarak sıfır ama
+        /// anlamı sıfır DEĞİL: "beklenen hasılatın sıfır" demek, o projeden
+        /// hiç para beklenmiyor demektir — oysa doğru cevap "henüz
+        /// bilinmiyor". Bu, `areaCost`un alan girilmemişken nil döndürerek ve
+        /// `remainingCostEstimate`in nil ile sıfırı ayırarak reddettiği
+        /// hatanın aynısı; ekran 24 punto ile "0 ₺" bağırırsa uygulama kendi
+        /// kuralını en görünür yerinde çiğnemiş olur.
+        var isUnknown: Bool { expected == .zero && pricelessCount > 0 }
     }
 
     /// Projenin ileriye bakan tablosunu üretir.

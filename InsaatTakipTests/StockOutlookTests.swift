@@ -212,4 +212,35 @@ final class StockOutlookTests: XCTestCase {
         XCTAssertNil(vm.projects.first { $0.id == proje.id }?.remainingCostEstimate)
     }
 
+
+    /// SIFIR İLE BİLİNMEYEN AYRI.
+    ///
+    /// Yeni kurulan projede hiç satış yok ve hiçbir daireye liste fiyatı
+    /// girilmemiş: toplam matematiksel olarak sıfır ama anlamı "bu projeden
+    /// para beklenmiyor" değil, "henüz bilinmiyor". Ekran o durumda rakam
+    /// yerine "—" gösteriyor.
+    func testAllPricelessMeansUnknownNotZero() {
+        let (vm, proje) = kur()
+        for i in vm.apartments.indices where vm.apartments[i].projectId == proje.id {
+            vm.apartments[i].status = .available
+            vm.apartments[i].price = .zero
+        }
+        let o = vm.stockOutlook(for: proje.id)
+        XCTAssertEqual(o.expected, .zero)
+        XCTAssertTrue(o.isUnknown, "fiyatsız yeni proje 'sıfır hasılat' demek değil")
+    }
+
+    /// GERÇEKTEN SIFIR OLAN DURUM bilinmeyen SAYILMIYOR: bütün daireler kat
+    /// karşılığıysa müteahhide gerçekten hasılat kalmıyor ve bu bir bilgi.
+    func testAllLandOwnerIsZeroNotUnknown() {
+        let (vm, proje) = kur()
+        for i in vm.apartments.indices where vm.apartments[i].projectId == proje.id {
+            vm.apartments[i].status = .landOwner
+            vm.apartments[i].price = .zero
+        }
+        let o = vm.stockOutlook(for: proje.id)
+        XCTAssertEqual(o.expected, .zero)
+        XCTAssertFalse(o.isUnknown, "kat karşılığı daireler bilinmeyen değil, bedelsiz")
+    }
+
 }

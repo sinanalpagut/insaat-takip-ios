@@ -1482,6 +1482,14 @@ açıldı. İyi haber: `financeTile` ve portföy kartı zaten uyum sağlıyor
   yerine `FlowLayout`: çipler alt satıra taşıyor, etiket tam kalıyor. Metni
   küçültmek (`minimumScaleFactor`) çözüm değil — kullanıcının açıkça istediği
   büyük yazıyı düzen sığsın diye geri küçültmek olurdu.
+· **Yeni projede "Beklenen Hasılat 0 ₺" yazıyordu.** Hiç satış yok ve
+  hiçbir daireye liste fiyatı girilmemişken toplam matematiksel olarak sıfır
+  çıkıyor, ama anlamı "bu projeden para beklenmiyor" değil "henüz
+  bilinmiyor". 24 puntoluk bir "0 ₺", uygulamanın `areaCost`ta nil döndürerek
+  ve `remainingCostEstimate`te nil ile sıfırı ayırarak reddettiği hatayı EN
+  GÖRÜNÜR yerinde tekrarlıyordu. `StockOutlook.isUnknown` eklendi; o durumda
+  ekran rakam yerine "—" ve sebebini yazıyor. Kat karşılığı daireler bilinmeyen
+  SAYILMIYOR: orada sıfır gerçekten sıfır (bedelsiz) ve bu bir bilgi. İki test.
 · **Proje başlığının alt satırı NORMAL BOYUTTA BİLE kesiliyordu:**
   "Tahsilat 26,88 M ₺ · Kalan alacak 1…" — kesilen parça yine BÜYÜKLÜK EKİ,
   yani 1 milyon ile 15 milyon ayırt edilemiyordu (gerçek değer 15,77 M ₺).
