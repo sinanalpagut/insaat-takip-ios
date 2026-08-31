@@ -1384,6 +1384,28 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 - [~] 71. **App Check ve oran sınırı yok.** Telefon girişi herkese açık, her SMS
       ücretli, callable'larda deneme sayacı yok. Bütçe uyarısı harcamayı
       KESMİYOR — mağazada görünür olmak kötüye kullanıma açık demek.
+      · **YENİ BULGU (31 Ağu 2026) — "+90 KISITI YALNIZCA İSTEMCİDE."**
+        `PhoneFormat.e164` girişi Türkiye biçimine zorluyor (10/11/12 hane,
+        başında 5 ya da 90) ve `FirebaseAuthService.sendCode` başka biçimi
+        reddediyor. Ama bu kısıtın uygulandığı tek yer BİZİM istemcimiz:
+        API anahtarı `GoogleService-Info.plist` içinde, yani uygulama
+        paketinden çıkarılabiliyor ve Identity Toolkit uç noktası doğrudan
+        çağrılabiliyor. Saldırgan bizim ekranımızı hiç kullanmaz.
+        Sonucu doğrudan PARA: SMS pompalama (premium ücretli hatlara doğrulama
+        SMS'i yağdırmak) Firebase telefon girişinin bilinen kötüye kullanım
+        yolu ve fatura proje sahibine çıkıyor. Bütçe uyarısı harcamayı
+        KESMİYOR — maddenin kendi cümlesi.
+        Aynı desenin dokuzuncu tekrarı: "Türkiye numarası" bir iddia,
+        uygulayan yok. Davet ömründeki (madde 79) bulgunun kardeşi.
+      · **UYGULAYICI KONSOLDA — KULLANICININ İŞİ (2 dakika, bedava):**
+        Firebase Console → Authentication → Settings → **SMS region policy** →
+        "Allow only these regions" → yalnızca **Türkiye (TR)**. Bu ayar
+        anahtarı çalan bir istemciyi de bağlar, çünkü kararı Firebase veriyor.
+        Test numaraları (App Review) bu kısıttan etkilenmiyor: onlar hiç SMS
+        göndermiyor.
+      · Kod tarafında yapılacak bir şey YOK ve bu bilinçli: istemciye ikinci
+        bir denetim eklemek, saldırganın hiç uğramadığı bir kapıya ikinci kilit
+        takmak olurdu. Doğru yer sunucu politikası.
 - [x] 72. **Uygulama içinde destek/geri bildirim/sürüm/politika satırı yok.**
       `AccountSheet`te yok, `CFBundleShortVersionString` okuyan kod yok.
       Crashlytics bilinçli ertelendi; ikisi birleşince sahadaki hata İKİ
