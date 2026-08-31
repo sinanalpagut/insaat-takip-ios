@@ -48,8 +48,13 @@ struct Expense: Codable, Identifiable, Equatable {
     let id: UUID
     let projectId: UUID
     var category: Category
-    var amount: Kurus           // Ödenen tutar
-    var date: Date              // Ödeme / hakediş tarihi — geçmiş tarih girilebilir
+    /// Giderin TUTARI. "Ödendi" DEMEK DEĞİL: model ödenmiş ile vadeli/çeke
+    /// bağlanmış gideri ayırmıyor (madde 81 ertelendi). Yorum önce "Ödenen
+    /// tutar" diyordu ve bu, kodun garanti etmediği bir iddiaydı — kayıt
+    /// tahakkuk esaslı: gider OLUŞTUĞUNDA yazılıyor, ödendiğinde değil.
+    var amount: Kurus
+    /// Ödeme / hakediş tarihi — geçmiş tarih girilebilir.
+    var date: Date
     var payee: String           // Kime ödendi: "Kalıpçı Ekibi", "Yılmaz Nakliyat"
     var note: String            // "3. hakediş", "Şubat SGK"
     var user: String            // Kaydı giren
