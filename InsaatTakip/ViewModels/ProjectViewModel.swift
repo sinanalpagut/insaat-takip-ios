@@ -3423,6 +3423,74 @@ final class ProjectViewModel: ObservableObject {
         var net: Kurus { salesTotal - totalCost }
     }
 
+    // MARK: - Kalan stok ve beklenen hasılat (madde 86)
+
+    /// Projenin İLERİYE bakan tablosu.
+    ///
+    /// Uygulama bugüne kadar yalnızca GERİYE bakıyordu: ciro, tahsilat, gider.
+    /// Müteahhidin uygulamayı açma sebebi olan soru — "elimde ne kaldı, ne
+    /// eder" — hiçbir ekranda cevaplanmıyordu. Üstelik cevabın verisi zaten
+    /// diskte: boş dairenin `price` alanında LİSTE FİYATI duruyor
+    /// (`ApartmentEditSheet` onu "LİSTE FİYATI (₺)" diye topluyor,
+    /// `SaleFormSheet` satışta ön dolum için okuyor). Kodda bu rakamı bilen
+    /// tek yer onu DIŞLAYAN bir yorumdu: `ProjectExporter.apartmentsCSV`,
+    /// "Kalan" sütununun bu yüzden %40'a varan oranda şiştiğini yazıyor.
+    ///
+    /// ÜÇ KOVA AYRI DURUYOR, tek "kalan stok" rakamına toplanmıyor. Güven
+    /// düzeyleri farklı: satılan gerçekleşti, rezerve sözleşmesi kesinleşmedi,
+    /// boş dairenin liste fiyatı bir HEDEF. Üçünü tek sayıya katlamak, bu
+    /// dosyanın `countsAsRevenue`/`isSellable`/`isInSalesScope` ayrımıyla
+    /// çözdüğü hatanın aynısını bir üst katta tekrarlamak olurdu.
+    struct StockOutlook {
+        /// Satılan dairelerin bedeli — gerçekleşen ciro.
+        var soldTotal: Kurus = .zero
+        /// Rezerve dairelerin bedeli — sözleşme kesinleşmedi.
+        var reservedTotal: Kurus = .zero
+        var reservedCount: Int = 0
+        /// Boş dairelerin LİSTE fiyatı toplamı.
+        var availableTotal: Kurus = .zero
+        var availableCount: Int = 0
+        /// Liste fiyatı GİRİLMEMİŞ boş daire sayısı.
+        ///
+        /// Bu alan olmadan rakam sessizce eksik çıkardı: 10 boş dairenin
+        /// 7'sine fiyat girilmemişse "kalan stok 3 daire kadar" görünür ve
+        /// hiçbir şey bunu söylemez. Ekran bu sayıyı YAZMAK zorunda.
+        var pricelessCount: Int = 0
+
+        /// Satılan + rezerve + boş stok.
+        var expected: Kurus { soldTotal + reservedTotal + availableTotal }
+
+        /// Rakam tam mı? Fiyatsız daire varsa DEĞİL.
+        var isComplete: Bool { pricelessCount == 0 }
+    }
+
+    /// Projenin ileriye bakan tablosunu üretir.
+    ///
+    /// KAT KARŞILIĞI DAİRE HİÇBİR KOVAYA GİRMİYOR: arsa sahibinin ve
+    /// bedelsiz. `isInSalesScope` zaten bu ayrımı taşıyor.
+    func stockOutlook(for projectId: UUID) -> StockOutlook {
+        var sonuc = StockOutlook()
+        for daire in apartments(for: projectId) {
+            switch daire.status {
+            case .sold:
+                sonuc.soldTotal = sonuc.soldTotal + daire.price
+            case .reserved:
+                sonuc.reservedTotal = sonuc.reservedTotal + daire.price
+                sonuc.reservedCount += 1
+            case .available:
+                sonuc.availableCount += 1
+                if daire.price == .zero {
+                    sonuc.pricelessCount += 1
+                } else {
+                    sonuc.availableTotal = sonuc.availableTotal + daire.price
+                }
+            case .landOwner:
+                continue
+            }
+        }
+        return sonuc
+    }
+
     struct MonthBar: Identifiable {
         let id = UUID()
         var label: String            // "Şub"

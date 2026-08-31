@@ -36,6 +36,7 @@ struct ReportView: View {
                 VStack(spacing: 14) {
                     summaryCard
                         .padding(.top, 16)
+                    outlookCard
                     chartCard
 
                     PrimaryButton(title: "PDF Olarak İndir", icon: "doc.text") {
@@ -253,6 +254,92 @@ struct ReportView: View {
     }
 
     // MARK: Grafik kartı
+
+    // MARK: İleriye bakan kart (madde 86)
+
+    /// "Elimde ne kaldı, ne eder" — müteahhidin uygulamayı açma sebebi.
+    ///
+    /// Rapor bugüne kadar YALNIZCA GERİYE bakıyordu: ciro, tahsilat, gider.
+    /// Oysa cevabın verisi zaten diskte — boş dairenin `price` alanında liste
+    /// fiyatı duruyor.
+    ///
+    /// DÖNEM ÇİPİNDEN BAĞIMSIZ ve etiket bunu söylüyor: "şu an elimde ne var"
+    /// sorusunun cevabı geçmiş bir çeyreğe göre süzülemez. Aynı gerekçe
+    /// `summary.reservedCount` ve m² maliyetinde de yazılı.
+    private var outlookCard: some View {
+        let o = viewModel.stockOutlook(for: projectId)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Beklenen Hasılat")
+                    .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                Spacer()
+                Text("proje geneli")
+                    .font(.manrope(11, .medium))
+                    .foregroundColor(Palette.textTertiary)
+            }
+            .padding(.bottom, 12)
+
+            Text(Fmt.exactMoney(o.expected))
+                .font(.sora(24, .bold))
+                .foregroundColor(Palette.ink)
+
+            Text("Satılan + rezerve + boş dairelerin liste fiyatı")
+                .font(.manrope(11.5, .medium))
+                .foregroundColor(Palette.textSecondary)
+                .padding(.top, 3)
+                .padding(.bottom, 12)
+
+            // ÜÇ KOVA AYRI GÖSTERİLİYOR. Güven düzeyleri farklı: satılan
+            // gerçekleşti, rezerve sözleşmesi kesinleşmedi, boş dairenin
+            // liste fiyatı bir HEDEF. Tek rakama katlamak, uygulamanın
+            // `countsAsRevenue`/`isSellable` ayrımıyla çözdüğü hatayı bir üst
+            // katta tekrarlamak olurdu.
+            Divider().overlay(Palette.divider)
+            summaryRow("Satılan (gerçekleşen)", Fmt.exactMoney(o.soldTotal))
+            if o.reservedCount > 0 {
+                Divider().overlay(Palette.divider)
+                summaryRow("Rezerve · \(o.reservedCount) daire",
+                           Fmt.exactMoney(o.reservedTotal))
+            }
+            Divider().overlay(Palette.divider)
+            summaryRow("Boş stok · \(o.availableCount) daire",
+                       Fmt.exactMoney(o.availableTotal))
+
+            // EKSİK RAKAM SÖYLENİYOR. Fiyatı girilmemiş daire toplamı sessizce
+            // küçültür ve hiçbir şey bunu söylemezse kullanıcı eksik bir
+            // rakama güvenir — bu uygulamanın tekrar tekrar düzelttiği hata.
+            if !o.isComplete {
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .iconFont(11, weight: .semibold)
+                        .padding(.top, 1)
+                    Text("\(o.pricelessCount) boş dairenin liste fiyatı girilmemiş; bu tutar o daireleri İÇERMİYOR.")
+                        .font(.manrope(11, .semiBold))
+                        .lineSpacing(2)
+                }
+                .foregroundColor(Palette.alertInk)
+                .padding(.top, 12)
+            }
+
+            // KALAN İNŞAAT MALİYETİ BURADA YOK ve olmaması bilinçli: uygulama
+            // onu bilmiyor. "Harcanan ÷ %ilerleme" ile türetmek, bu kod
+            // tabanının `areaCost`ta nil döndürerek reddettiği tahmini
+            // yapmak olurdu. Bu yüzden kart "hasılat" diyor, "kâr" demiyor.
+            HStack(alignment: .top, spacing: 7) {
+                Image(systemName: "info.circle")
+                    .iconFont(11, weight: .medium)
+                    .padding(.top, 1)
+                Text("Bu bir HASILAT tahminidir, kâr değildir: kalan inşaat maliyeti düşülmemiştir.")
+                    .font(.manrope(11, .medium))
+                    .lineSpacing(2)
+            }
+            .foregroundColor(Palette.textTertiary)
+            .padding(.top, 12)
+        }
+        .padding(16)
+        .background(Palette.surface)
+        .cornerRadius(18)
+    }
 
     private var chartCard: some View {
         VStack(alignment: .leading, spacing: 0) {
