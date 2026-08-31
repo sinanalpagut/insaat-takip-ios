@@ -1468,6 +1468,42 @@ eklendi ve PDF yeniden üretilip cümlelerin tamamlandığı görüldü.
 Yöntem notu: PDF'i ÜRETMEK yetmiyor, AÇMAK gerekiyor. "Dosya oluştu" ile
 "dosya doğru" arasındaki fark, bu turda bulunan üç kusurdan ikisiydi.
 
+### AÇIK SORU — sheet içindeki metin alanları odak almıyor (31 Ağu 2026)
+
+**TANI KONULMADI; gerçek cihazda 10 saniyede kapanacak bir soru ve cevabı
+iki uçta da önemli.**
+
+GÖZLEM: simülatörde enjekte edilen dokunuşla
+· `ApartmentsTabView` arama alanı ODAK ALIYOR — "Berk" yazıldı, liste süzüldü.
+· ÜÇ AYRI SHEET'te hiçbir metin alanı odak ALMIYOR: `ReceiptSheet`
+  (MİKTAR · decimalPad ve FİŞ/İRSALİYE · default), `ProgressSheet` (kalan
+  maliyet) ve `NewProjectSheet` (ADA). Yazılan karakterler hiçbir yere
+  düşmüyor.
+· Aynı sheet'lerde DOKUNUŞ ÇALIŞIYOR: çipler seçiliyor, "Kaydet" basılıyor,
+  sayfa kapanıyor. Yani hit-testing sağlam; sorun yalnızca ilk yanıtlayıcı
+  (first responder) olma anında.
+
+NEDEN ÖNEMLİ: bu uygulamada VERİ GİRİŞİNİN TAMAMI sheet'lerde — fiş, gider,
+satış, daire bilgisi, cari hareket, yeni proje. Gerçekten kullanıcıda da
+oluyorsa uygulama kullanılamaz demektir.
+
+İKİ AÇIKLAMA VAR, İKİSİ DE KANITLANMADI:
+(a) Otomasyon artefaktı: `simctl`/HID ile sentezlenen dokunuş, modal olarak
+    sunulmuş bir `UIHostingController` içinde ilk yanıtlayıcı atamasını
+    tetiklemiyor olabilir. Bu durumda gerçek parmakla sorun yoktur.
+(b) Gerçek kusur: sheet düzeninde alanın dokunma hedefi ya da odak zinciri
+    bozuk.
+
+BUGÜNE KADAR NEDEN GÖRÜLMEDİ: daha önceki yazma denemeleri hep TAM EKRAN
+alanlardaydı (telefon numarası, SMS kodu — madde 68/69) ve fiş akışı
+`ReceiptScanner` alanları OCR ile DOLDURDUĞU için elle yazmayı hiç
+gerektirmedi.
+
+CİHAZDA TEST (kullanıcı · 10 sn): Malzeme sekmesi → "+ Fiş Ekle" → MİKTAR
+alanına dokun. Klavye açılıp imleç yanıp sönüyorsa (a) doğrudur ve bu madde
+kapanır. Açılmıyorsa (b) doğrudur ve iş yayından ÖNCE gelen her şeyin önüne
+geçer.
+
 ### Büyük metin turu: kesilen parça yine anlam taşıyordu (31 Ağu 2026)
 
 Hedef kullanıcı 50 yaşında bir müteahhit; iOS'ta yazıyı büyütmesi olağan.
