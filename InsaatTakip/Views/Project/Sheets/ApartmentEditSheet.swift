@@ -29,6 +29,14 @@ struct ApartmentEditSheet: View {
         viewModel.apartments.first { $0.id == apartmentId }
     }
 
+    /// Satış tarafının KDV beyanı — alan etiketine yazılıyor (madde 80).
+    private var salesBasisSuffix: String {
+        guard let projectId = apartment?.projectId,
+              let project = viewModel.projects.first(where: { $0.id == projectId })
+        else { return "" }
+        return project.salesTaxBasis.fieldSuffix
+    }
+
     /// Satılmış daire bu formdan durum değiştiremez; satış kaydı satış formunun işi.
     private var isSoldRecord: Bool { apartment?.status == .sold }
 
@@ -109,7 +117,7 @@ struct ApartmentEditSheet: View {
                     .padding(.top, 14)
 
                     if showsPrice {
-                        field("LİSTE FİYATI (₺)", text: $listPriceText,
+                        field("LİSTE FİYATI (₺)\(salesBasisSuffix)", text: $listPriceText,
                               placeholder: "Örn. 3.400.000", keyboard: .decimalPad)
                             .padding(.top, 14)
                         Text("Satış formunda hazır gelir; ciroya ancak satış kaydedilince girer.")

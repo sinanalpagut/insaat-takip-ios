@@ -34,6 +34,7 @@ struct ProjectDetailView: View {
         case upload
         case progress
         case expense
+        case taxBasis
 
         var id: String {
             switch self {
@@ -41,6 +42,7 @@ struct ProjectDetailView: View {
             case .receipt:                 return "receipt"
             case .invite:                  return "invite"
             case .apartmentDetail(let id): return "apt-\(id)"
+            case .taxBasis:                return "taxbasis"
             case .apartmentEdit(let id):   return "aptedit-\(id)"
             case .saleForm(let id):        return "sale-\(id?.uuidString ?? "yeni")"
             case .upload:                  return "upload"
@@ -222,6 +224,8 @@ struct ProjectDetailView: View {
             ProgressSheet(projectId: projectId)
         case .expense:
             ExpenseSheet(projectId: projectId)
+        case .taxBasis:
+            TaxBasisSheet(projectId: projectId)
         }
     }
 
@@ -269,6 +273,15 @@ struct ProjectDetailView: View {
                             activeSheet = .progress
                         } label: {
                             Label("İnşaat İlerlemesi", systemImage: "slider.horizontal.3")
+                        }
+                        // KDV BEYANI (madde 80) — proje düzeyinde bir kayıt
+                        // sözleşmesi, ekran değil. Menüde duruyor çünkü bir
+                        // kez kurulup unutuluyor; her fiş girişinde sorulsa
+                        // haftada 20-30 kez tekrarlanan bir soru olurdu.
+                        Button {
+                            activeSheet = .taxBasis
+                        } label: {
+                            Label("KDV Beyanı", systemImage: "percent")
                         }
                         // DAİRE EKLEME (madde 61) — proje düzeyinde bir
                         // işlem olduğu için buraya konuyor. Kuruluşta yanlış

@@ -14,6 +14,11 @@ struct SaleFormSheet: View {
     /// FAB'dan gelindiyse nil — form içinden boş daire seçilir.
     let apartmentId: UUID?
 
+    /// Satış tarafının KDV beyanı — alan etiketine yazılıyor (madde 80).
+    private var salesBasisSuffix: String {
+        viewModel.projects.first { $0.id == projectId }?.salesTaxBasis.fieldSuffix ?? ""
+    }
+
     @State private var selectedApartmentId: UUID?
     @State private var buyerName = ""
     @State private var priceText = ""
@@ -87,7 +92,8 @@ struct SaleFormSheet: View {
                         .padding(.top, 8)
 
                     HStack(alignment: .top, spacing: 10) {
-                        moneyField("SATIŞ BEDELİ (₺)", text: $priceText, placeholder: "3.850.000")
+                        moneyField("SATIŞ BEDELİ (₺)\(salesBasisSuffix)",
+                                   text: $priceText, placeholder: "3.850.000")
                         // Tahsilat alanı YALNIZCA ilk kayıtta (yeni satış veya
                         // rezerveden çevirme) görünür. Kayıtlı bir satışta tahsilat
                         // tek kaynaktan — ödeme kayıtlarından — türetiliyor; burada

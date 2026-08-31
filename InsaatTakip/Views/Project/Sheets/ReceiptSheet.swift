@@ -153,7 +153,7 @@ struct ReceiptSheet: View {
                     HStack(alignment: .top, spacing: 10) {
                         inputField("MİKTAR (\(selectedMaterial?.unit ?? ""))",
                                    text: $quantityText, placeholder: "12.500")
-                        inputField("BİRİM FİYAT (₺)",
+                        inputField("BİRİM FİYAT (₺)\(project?.expenseTaxBasis.fieldSuffix ?? "")",
                                    text: $unitPriceText, placeholder: "28,50")
                     }
                     .padding(.top, 16)

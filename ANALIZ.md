@@ -1549,9 +1549,48 @@ taraf uygulama olur.
 Bunlar "ertelendi" değil: yol haritasında maddeleri hiç açılmadı. Kapsam kararı
 verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam dışı".
 
-- [~] 80. **KDV / vergi ayrımı** (İş Mantığı#9). "BİRİM FİYAT (₺)" ve gider
+- [x] 80. **KDV / vergi ayrımı** (İş Mantığı#9). "BİRİM FİYAT (₺)" ve gider
       "TUTAR (₺)" alanlarının KDV dahil mi hariç mi olduğu hiçbir ekranda
       yazmıyor; rapor bu belirsizliğin üzerine kuruluyor.
+      → **YAPILDI (31 Ağu 2026).** BU BİR DEFTER DEĞİL, KAYIT SÖZLEŞMESİ:
+      `TaxBasis` beyanı (KDV dahil / hariç / belirtilmedi), proje düzeyinde,
+      menüden → "KDV Beyanı". Uygulama vergi HESAPLAMIYOR ve beyan hiçbir
+      tutarı değiştirmiyor — test bunu doğrudan kanıtlıyor (ciro, gider ve
+      net beyandan önce ve sonra birebir aynı). Hesaplamak; oran alanı,
+      indirilecek/hesaplanan KDV defteri, beyanname dönemi ve düzeltme
+      kayıtları demek olurdu; kapsam kararı bunu (b) diye ayırıp dışarıda
+      bıraktı.
+      **İKİ AYRI BEYAN, TEK BAYRAK DEĞİL** — kararın en önemli düzeltmesi.
+      Kapsam kararı "proje düzeyinde tek işaret" diyordu; kodu okuyunca tek
+      bayrağın hangi değeri alırsa alsın YARISININ YALAN olacağı görüldü:
+      `ReceiptScanner` bilerek fişteki "Ödenecek KDV Dahil Tutar"ı seçiyor
+      (gider tarafı dahil), buna karşılık daire bedelleri KDV hariç
+      giriliyor. Bu yüzden `expenseTaxBasis` ve `salesTaxBasis` ayrı. Sahada
+      da ayrılar: fişin üstünde yazan rakam KDV dahildir, daire ise hariç
+      konuşulur.
+      **ALANLAR OPSİYONEL — ÖLÇÜLEREK.** Varsayılan değerli ama opsiyonel
+      olmayan bir alan, mevcut HER proje belgesini açılamaz yapardı: Swift'in
+      türetilmiş çözümleyicisi eksik anahtarda varsayılanı KULLANMIYOR,
+      `keyNotFound` atıyor. Küçük bir programla ölçüldü, sonra `nil = beyan
+      edilmedi` kalıbına geçildi (`areaM2` ve `remainingCostEstimate` ile
+      aynı desen) ve eski belgeyi çözen bir test yazıldı. Göç yok.
+      **BEYAN RAKAMIN YANINDA DURUYOR:** form etiketleri ("TUTAR (₺) · KDV
+      DAHİL", "LİSTE FİYATI (₺) · KDV HARİÇ", satış bedeli, birim fiyat) ve
+      CSV sütun başlıkları ("Tutar (KDV dahil)"). CSV'yi açan mali müşavir
+      projenin ayarını göremiyor, yalnızca sayıları görüyordu.
+      **SAPMANIN VARLIĞI YAZILI:** iki taban farklı beyan edildiyse rapor
+      kapsam cümlesi "Net rakam KDV hariç bir gelirden KDV dahil bir
+      maliyeti çıkarıyor; bu fark düzeltilmiş DEĞİLDİR" diyor — ortak
+      payının cümlesi de aynı şeyi söylüyor, çünkü pay o netin yüzdeyle
+      dilimlenmiş hâli. Eski cümle ("vergi ve finansman giderleri dahil
+      değildir") beyan varken TERS yönde okunuyordu: fiş KDV dahil
+      giriliyorsa vergi zaten maliyetin içinde.
+      **BEYAN DEĞİŞİKLİĞİ DENETİM İZİNDE:** beyan bir gün değiştiğinde
+      öncesi ve sonrası aynı defterde farklı anlam taşıyan rakamlar hâline
+      gelir; hangi fişin hangi beyan altında girildiği ancak izde kalıyor.
+      Geri alınabilir ("Belirtilmedi"e dönüş) — uydurma bir beyan,
+      beyansızlıktan kötüdür, çünkü sonrasında sorgulanmaz.
+      Testler: TaxBasisTests 8 test. Simülatörde doğrulandı.
 - [~] 81. **Tedarikçi / cari hesap, ödendi–vadeli ayrımı** (İş Mantığı#5).
       Uygulama kapsam dışı olduğunu ortağa YAZIYOR ama maddesi yok.
 - [~] 82. **Ortak cari hesabı** — sermaye, avans, dağıtım (Farklılaştırıcı#2,

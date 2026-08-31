@@ -213,7 +213,17 @@ struct PartnersTabView: View {
         if deposits > .zero {
             parts.append("Rezerve dairelerin \(Fmt.money(deposits)) kaporası kasadadır ama iade edilebilir olduğu için paya girmez.")
         }
-        parts.append("Vergi, finansman gideri ve tedarikçi vadesi dahil değildir.")
+        parts.append("Finansman gideri ve tedarikçi vadesi dahil değildir.")
+        // KDV TABANI KARIŞIMI PAYA DA GEÇİYOR (madde 80): pay, net rakamın
+        // yüzdeyle dilimlenmiş hâli; net karışımsa pay da karışım. Rapor
+        // kartında yazıp burada susmak, sapmayı tam da paranın konuşulduğu
+        // ekranda gizlemek olurdu.
+        let proje = viewModel.projects.first { $0.id == projectId }
+        if let proje, proje.expenseTaxBasis != nil || proje.salesTaxBasis != nil {
+            parts.append("Beyan: gider \(proje.expenseTaxBasis.label), "
+                         + "satış \(proje.salesTaxBasis.label); "
+                         + "uygulama vergi hesaplamaz ve iki taban arasındaki farkı düzeltmez.")
+        }
         parts.append("Ortakların koyduğu sermaye ve çektiği para henüz uygulamada tutulmuyor.")
         return parts.joined(separator: " ")
     }

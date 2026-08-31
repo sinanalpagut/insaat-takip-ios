@@ -827,6 +827,44 @@ final class ProjectViewModel: ObservableObject {
     /// raporlanabiliyor. Değişen tek şey portföy toplamlarına ve projeler
     /// arası karşılaştırmaya girmemesi — asıl şikâyet buydu: ilk kurulan
     /// "deneme" projesi sonsuza dek ciroyu ve m² sıralamasını kirletiyordu.
+    /// KDV tabanı beyanı — madde 80.
+    ///
+    /// DENETİM İZİNE YAZILIYOR ve bu, işin geri dönüşü olmayan yarısı:
+    /// beyan bir GÜN değiştiğinde, o günden öncesi ve sonrası aynı defterde
+    /// farklı anlam taşıyan rakamlar hâline gelir. İzsiz bırakılsaydı hangi
+    /// fişin hangi beyan altında girildiği hiçbir yerde kalmazdı — kaydın
+    /// kendisi zaten bu maddenin tek işi.
+    ///
+    /// UYGULAMA VERGİ HESAPLAMIYOR: bu bayrak hiçbir toplamı, hiçbir
+    /// dönüşümü tetiklemiyor. Tutarlar girildiği gibi duruyor; değişen tek
+    /// şey, o tutarın NE OLDUĞUNUN yazılı olması.
+    func setTaxBasis(role: UserRole, projectId: UUID,
+                     expense: TaxBasis?, sales: TaxBasis?) {
+        guard role == .admin,
+              let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
+        let before = projects[index]
+        guard before.expenseTaxBasis != expense || before.salesTaxBasis != sales else { return }
+
+        projects[index].expenseTaxBasis = expense
+        projects[index].salesTaxBasis = sales
+
+        var changes: [AuditEntry.Change] = []
+        if before.expenseTaxBasis != expense {
+            changes.append(.init(field: "Gider KDV tabanı",
+                                 oldValue: before.expenseTaxBasis.label, newValue: expense.label))
+        }
+        if before.salesTaxBasis != sales {
+            changes.append(.init(field: "Satış KDV tabanı",
+                                 oldValue: before.salesTaxBasis.label, newValue: sales.label))
+        }
+        var writes: [DocumentChange] = [.project(projects[index])]
+        writes += recordAudit(recordId: projectId, projectId: projectId,
+                              subject: "Proje · \(projects[index].title)",
+                              action: .update, changes: changes)
+        persist(writes, failureNote: "KDV beyanı")
+        flash("KDV beyanı kaydedildi")
+    }
+
     func setArchived(_ archived: Bool, role: UserRole, projectId: UUID) {
         guard role == .admin,
               let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
@@ -946,15 +984,18 @@ final class ProjectViewModel: ObservableObject {
 
         let projectExpenses = expenses.filter { $0.projectId == projectId }
         if !projectExpenses.isEmpty,
-           let url = ProjectExporter.write(ProjectExporter.expensesCSV(projectExpenses),
-                                           name: "\(stem)-Giderler.csv") {
+           let url = ProjectExporter.write(
+            ProjectExporter.expensesCSV(projectExpenses,
+                                        taxBasis: project.expenseTaxBasis),
+            name: "\(stem)-Giderler.csv") {
             urls.append(url)
         }
 
         let projectApartments = apartments(for: projectId)
         if !projectApartments.isEmpty,
            let url = ProjectExporter.write(
-            ProjectExporter.apartmentsCSV(projectApartments, includeBuyer: isAdmin),
+            ProjectExporter.apartmentsCSV(projectApartments, includeBuyer: isAdmin,
+                                          taxBasis: project.salesTaxBasis),
             name: "\(stem)-Daireler.csv") {
             urls.append(url)
         }

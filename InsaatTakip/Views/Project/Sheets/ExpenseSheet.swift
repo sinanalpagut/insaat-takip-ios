@@ -49,7 +49,12 @@ struct ExpenseSheet: View {
                     }
                     .padding(.top, 10)
 
-                    field("TUTAR (₺)", text: $amountText,
+                    // ETİKET BEYANI TAŞIYOR (madde 80): beyan bir kez
+                    // menüde yapılıyor ama rakamın girildiği an burası. Ek
+                    // yalnızca beyan varsa görünüyor; "· BELİRTİLMEDİ" her
+                    // forma gürültü katardı ve yapacak bir şey söylemezdi.
+                    field("TUTAR (₺)\(project?.expenseTaxBasis.fieldSuffix ?? "")",
+                          text: $amountText,
                           placeholder: "Örn. 85.000", keyboard: .decimalPad)
                         .padding(.top, 16)
 

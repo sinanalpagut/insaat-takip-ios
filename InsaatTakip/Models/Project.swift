@@ -10,6 +10,50 @@ enum ProjectPhase: String, Codable, CaseIterable {
     case teslim = "Teslim"
 }
 
+/// Girilen tutarların KDV tabanı — BEYAN, hesap değil (madde 80).
+///
+/// Uygulama vergi HESAPLAMIYOR ve hesaplamayacak: indirilecek/hesaplanan KDV
+/// defteri, oran alanı, beyanname dönemi ve düzeltme kayıtları demek. Burada
+/// yapılan şey daha küçük ve geri dönüşü olmayan tek şey: BUGÜN girilen
+/// rakamın ne olduğunu kaydetmek. Bugün girilen 100.000 ₺'lik fişin KDV
+/// dahil mi hariç mi olduğu kaydedilmezse, yarın hiçbir kod bunu geri
+/// getiremez.
+enum TaxBasis: String, Codable, CaseIterable, Identifiable {
+    case dahil
+    case haric
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .dahil: return "KDV dahil"
+        case .haric: return "KDV hariç"
+        }
+    }
+
+    /// Alan etiketine eklenen kısa ek: "TUTAR (₺) · KDV DAHİL".
+    var fieldSuffix: String {
+        switch self {
+        case .dahil: return " · KDV DAHİL"
+        case .haric: return " · KDV HARİÇ"
+        }
+    }
+}
+
+/// `nil` = BEYAN EDİLMEDİ. `areaM2` ve `remainingCostEstimate` ile aynı
+/// kalıp: bilinmeyeni bir enum durumuna katlamak yerine yokluğu olarak
+/// tutmak.
+///
+/// OPSİYONEL OLMASI AYRICA ZORUNLU: Swift'in türetilmiş çözümleyicisi eksik
+/// anahtarda özelliğin VARSAYILAN DEĞERİNİ KULLANMIYOR, `keyNotFound`
+/// atıyor (ölçüldü). Varsayılanlı ve opsiyonel olmayan bir alan, bu maddeden
+/// önce yazılmış HER proje belgesini açılamaz hâle getirirdi — yani
+/// üretimdeki gerçek projeleri.
+extension Optional where Wrapped == TaxBasis {
+    var label: String { self?.label ?? "Belirtilmedi" }
+    var fieldSuffix: String { self?.fieldSuffix ?? "" }
+}
+
 struct Project: Codable, Identifiable, Equatable {
     /// Kimlik iş verisinden TÜRETİLMEZ. Önceden "p1" / "kars309" gibi elle
     /// verilen dizelerdi; ada/parsel değişince kimlik de değişir, üstelik
@@ -68,6 +112,19 @@ struct Project: Codable, Identifiable, Equatable {
     /// göstermiyor. İkisini tek değere katlamak, girilmemiş bir tahmini
     /// "masraf kalmadı" diye okutmak olurdu.
     var remainingCostEstimate: Kurus? = nil
+
+    /// GİDER tarafının KDV tabanı: fiş, malzeme birim fiyatı, gider tutarı.
+    ///
+    /// SATIŞ TARAFINDAN AYRI, çünkü sahada gerçekten ayrılar ve bu kod
+    /// tabanı iki tarafı zaten farklı topluyordu: `ReceiptScanner` bilerek
+    /// fişteki "Ödenecek KDV Dahil Tutar"ı seçiyor, buna karşılık daire
+    /// bedelleri KDV HARİÇ giriliyor. Tek bir proje bayrağı olsaydı,
+    /// kullanıcı hangisini seçerse seçsin yarısı yalan olurdu. Konutta oran
+    /// %1-10, malzemede %20 olduğu için sapma tek yönlü de değil.
+    var expenseTaxBasis: TaxBasis? = nil
+
+    /// SATIŞ tarafının KDV tabanı: daire liste ve satış bedelleri.
+    var salesTaxBasis: TaxBasis? = nil
 
     var isArchived: Bool { archivedAt != nil }
 

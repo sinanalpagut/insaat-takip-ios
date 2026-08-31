@@ -231,7 +231,8 @@ struct ReportView: View {
     /// dolayısıyla gerçek m² maliyeti gösterilen rakamın ALTINDA. Model ortak
     /// alan katsayısı tutmadığı için uydurulmuyor, söyleniyor.
     private var scopeNote: String {
-        var parts = ["Yalnızca uygulamaya girilen gider kayıtlarını kapsar; vergi ve finansman giderleri dahil değildir."]
+        var parts = ["Yalnızca uygulamaya girilen gider kayıtlarını kapsar; finansman gideri dahil değildir."]
+        parts.append(taxNote)
         if let area = viewModel.areaCost(for: projectId) {
             parts.append("m² maliyetinin paydası dairelerin brüt alan toplamı (\(Fmt.qty(area.totalAreaM2)) m², \(area.measuredCount) daire); merdiven ve hol gibi ortak alanlar dahil değil, bu yüzden gerçek m² maliyeti bir miktar daha düşüktür.")
             if area.missingCount > 0 {
@@ -239,6 +240,44 @@ struct ReportView: View {
             }
         }
         return parts.joined(separator: " ")
+    }
+
+    /// KDV cümlesi — madde 80.
+    ///
+    /// ESKİ CÜMLE ("vergi ve finansman giderleri dahil değildir") beyan
+    /// varken YANLIŞ YÖNDE okunuyordu: fişler KDV DAHİL giriliyorsa vergi
+    /// zaten maliyetin içinde ve cümle tersini söylüyordu.
+    ///
+    /// Asıl söylenmesi gereken şey daha ağır: iki taban FARKLI beyan
+    /// edildiyse "Dönem net" KDV hariç bir gelirden KDV dahil bir maliyeti
+    /// çıkarıyor demektir. Konutta oran %1-10, malzemede %20 — yani sapma
+    /// tek yönlü bile değil: maliyet şişik, ciro düşük. Bu kart ortağa PDF
+    /// olarak dağıtıldığı için sapmanın VARLIĞI yazılmak zorunda; uygulama
+    /// düzeltmeye kalkışmıyor, çünkü düzeltmek oran defteri tutmak olurdu.
+    private var taxNote: String {
+        guard let project = viewModel.projects.first(where: { $0.id == projectId }) else {
+            return "Uygulama vergi hesaplamaz."
+        }
+        let gider = project.expenseTaxBasis
+        let satis = project.salesTaxBasis
+
+        if gider == nil, satis == nil {
+            return "Tutarların KDV tabanı belirtilmedi (proje menüsü → KDV Beyanı); "
+                 + "uygulama vergi hesaplamaz."
+        }
+        // KISALTMA KÜÇÜLTÜLMÜYOR: `lowercased` "KDV"yi "kdv" yapıyordu.
+        var cumle = "Beyan: gider tarafı \(gider.label), satış tarafı \(satis.label). "
+                  + "Uygulama vergi hesaplamaz."
+        // İKİ TABAN FARKLIYSA NET RAKAM KARIŞIM: söylenmezse ortak onu saf
+        // bir kâr sanır.
+        if gider == .dahil, satis == .haric {
+            cumle += " Net rakam KDV hariç bir gelirden KDV dahil bir maliyeti "
+                   + "çıkarıyor; bu fark düzeltilmiş DEĞİLDİR."
+        } else if gider == .haric, satis == .dahil {
+            cumle += " Net rakam KDV dahil bir gelirden KDV hariç bir maliyeti "
+                   + "çıkarıyor; bu fark düzeltilmiş DEĞİLDİR."
+        }
+        return cumle
     }
 
     private func summaryRow(_ label: String, _ value: String, valueColor: Color = Palette.ink) -> some View {

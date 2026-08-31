@@ -78,6 +78,13 @@ struct ProjectExporter {
 
     static func date(_ value: Date) -> String { dateFormatter.string(from: value) }
 
+    /// Sütun başlığına eklenen beyan: " (KDV dahil)". Beyan yoksa ek de yok —
+    /// "(belirtilmedi)" başlığı, olmayan bir bilgiyi varmış gibi gösterirdi.
+    static func taxSuffix(_ basis: TaxBasis?) -> String {
+        guard let basis else { return "" }
+        return " (\(basis.label))"
+    }
+
     /// CSV alanı kaçışlama. Ayraç, tırnak ya da satır sonu içeren alan
     /// tırnaklanır; içerideki tırnak ikilenir. Bu olmadan bir açıklamadaki
     /// noktalı virgül sütunları kaydırır ve dosyanın geri kalanı bozulur.
@@ -173,18 +180,25 @@ struct ProjectExporter {
                    rows: openingRows + rows)
     }
 
-    static func expensesCSV(_ expenses: [Expense]) -> String {
+    /// KDV TABANI SÜTUN BAŞLIĞINDA (madde 80): dosyayı açan mali müşavir
+    /// projenin beyanını göremez, yalnızca sayıları görür. "Tutar" başlığı
+    /// tek başına, o rakamın KDV dahil mi hariç mi olduğunu söylemiyor ve
+    /// müşavirin bunu tahmin etmesi gerekiyordu. Ekrandaki alan etiketiyle
+    /// aynı desen: beyan, rakamın YANINDA durur.
+    static func expensesCSV(_ expenses: [Expense], taxBasis: TaxBasis? = nil) -> String {
         let rows = expenses.sorted { $0.date > $1.date }.map { expense in
             [date(expense.date), expense.category.rawValue, money(expense.amount),
              expense.payee, expense.note, expense.user]
         }
-        return csv(header: ["Tarih", "Kategori", "Tutar", "Ödenen", "Açıklama", "Kaydeden"],
+        return csv(header: ["Tarih", "Kategori", "Tutar\(taxSuffix(taxBasis))",
+                            "Ödenen", "Açıklama", "Kaydeden"],
                    rows: rows)
     }
 
     /// Satışlar. `includeBuyer` YALNIZCA yöneticide true — gerekçe dosya
     /// başındaki GİZLİLİK notunda.
-    static func apartmentsCSV(_ apartments: [Apartment], includeBuyer: Bool) -> String {
+    static func apartmentsCSV(_ apartments: [Apartment], includeBuyer: Bool,
+                              taxBasis: TaxBasis? = nil) -> String {
         let rows = apartments.sorted { $0.apartmentNumber < $1.apartmentNumber }
             .map { apartment -> [String] in
                 // KAPSAM: "Satış Bedeli / Tahsil Edilen / Kalan Alacak"
@@ -231,8 +245,9 @@ struct ProjectExporter {
         // "Liste Fiyatı" ile "Satış Bedeli" AYRI sütunlar: boş daire de liste
         // fiyatı taşır ama o ciro değildir. Tek sütunda toplanınca ekrandaki
         // satış rakamıyla dosyadaki toplam ayrışıyordu.
+        let ek = taxSuffix(taxBasis)
         var header = ["Daire No", "Blok / Etap", "Kat", "Tip", "Brüt m²", "Durum",
-                      "Liste Fiyatı", "Satış Bedeli", "Tahsil Edilen",
+                      "Liste Fiyatı\(ek)", "Satış Bedeli\(ek)", "Tahsil Edilen",
                       "Kalan Alacak", "Kapora", "Satış Tarihi"]
         if includeBuyer { header.append("Alıcı") }
         return csv(header: header, rows: rows)
