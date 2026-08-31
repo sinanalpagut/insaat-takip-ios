@@ -240,6 +240,66 @@ final class BackupRestoreTests: XCTestCase {
         }
     }
 
+    /// ESKİ SÜRÜM YEDEK HÂLÂ OKUNUYOR — sürüm denetimi ASİMETRİK.
+    ///
+    /// Madde 82 yedeğe ortak cari hesabını ekleyip sürümü 2'ye çıkardı. Eski
+    /// eşitlik koşulu (`surum == backupVersion`) korunsaydı, kullanıcının
+    /// kendi SÜRÜM 1 yedekleri o gün okunamaz hâle gelirdi: veri kaybını
+    /// önlemek için konmuş bir kural veri kaybına sebep olurdu.
+    ///
+    /// Yönler AYRI: eskide kaybolacak bir şey yok (o dosyada cari hesap
+    /// gerçekten yoktu), yenide sessizce düşen bir koleksiyon var — o yüzden
+    /// yeni sürüm hâlâ reddediliyor (üstteki test).
+    func testOlderVersionBackupStillDecodes() throws {
+        let pid = UUID().uuidString
+        let aid = UUID().uuidString
+        // SÜRÜM 1 dosyası: `ortakCari` alanı HİÇ YOK.
+        let eski = """
+        {"surum":1,"olusturma":"2026-08-24T00:00:00Z","aliciDahil":false,
+         "proje":{"id":"\(pid)","blockNumber":"145","parcelNumber":"2",
+                  "district":"—","city":"—","floors":1,"totalApartments":1,
+                  "phase":"Temel","progress":0,"ownerUid":"u1","memberUids":["u1"],
+                  "createdAt":"2026-01-01T00:00:00Z","photoCount":0},
+         "malzemeler":[],"malzemeHareketleri":[],"giderler":[],
+         "daireler":[{"id":"\(aid)","projectId":"\(pid)","apartmentNumber":1,
+                      "floor":1,"type":"3+1","status":"available",
+                      "price":0,"paidAmount":0,"deliveryNote":""}],
+         "tahsilatlar":[],"taksitler":[],"ortaklar":[],"belgeler":[],
+         "alicilar":[],"denetimIzi":[]}
+        """.data(using: .utf8)!
+
+        let yedek = try ProjectExporter.decodeBackup(eski)
+        XCTAssertEqual(yedek.surum, 1)
+        XCTAssertNil(yedek.ortakCari, "sürüm 1'de cari hesap YOK — boş dizi değil, yokluk")
+        XCTAssertEqual(yedek.daireler.count, 1)
+    }
+
+    /// Eski sürüm yedek gerçekten GERİ YÜKLENİYOR — yalnızca çözülmesi yetmez.
+    func testOlderVersionBackupRestores() throws {
+        let pid = UUID().uuidString
+        let aid = UUID().uuidString
+        let eski = """
+        {"surum":1,"olusturma":"2026-08-24T00:00:00Z","aliciDahil":false,
+         "proje":{"id":"\(pid)","blockNumber":"908","parcelNumber":"7",
+                  "district":"—","city":"—","floors":1,"totalApartments":1,
+                  "phase":"Temel","progress":0,"ownerUid":"u1","memberUids":["u1"],
+                  "createdAt":"2026-01-01T00:00:00Z","photoCount":0},
+         "malzemeler":[],"malzemeHareketleri":[],"giderler":[],
+         "daireler":[{"id":"\(aid)","projectId":"\(pid)","apartmentNumber":1,
+                      "floor":1,"type":"3+1","status":"available",
+                      "price":0,"paidAmount":0,"deliveryNote":""}],
+         "tahsilatlar":[],"taksitler":[],"ortaklar":[],"belgeler":[],
+         "alicilar":[],"denetimIzi":[]}
+        """.data(using: .utf8)!
+
+        let yedek = try ProjectExporter.decodeBackup(eski)
+        let model = vm()
+        let ozet = try XCTUnwrap(model.restore(from: yedek, user: yeniKullanici()))
+        XCTAssertEqual(ozet.apartments, 1)
+        XCTAssertEqual(ozet.ledgerEntries, 0, "olmayan cari hesap sıfır sayılmalı, çökmemeli")
+        XCTAssertTrue(model.projects.contains { $0.id.uuidString == pid })
+    }
+
     /// Bozuk dosya SEBEBİYLE reddedilir.
     func testCorruptFileIsRefused() {
         let bozuk = Data("bu bir yedek değil".utf8)

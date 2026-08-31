@@ -231,6 +231,13 @@ struct Apartment: Codable, Identifiable, Equatable {
         try c.encode(apartmentNumber, forKey: .apartmentNumber)
         try c.encode(floor, forKey: .floor)
         try c.encode(type, forKey: .type)
+        // ELLE YAZILAN KODLAYICI, ELLE EKLEME İSTER (madde 83). Alan
+        // `CodingKeys`e ve çözümleyiciye eklendiği hâlde BURAYA eklenmemişti:
+        // blok etiketi ekranda çalışıyor, belleğe yazılıyor, testlerden
+        // geçiyor ama Firestore'a HİÇ GİTMİYORDU. Bellek içi depoyla koşan
+        // birim testleri bunu göremez; hatayı `FirestoreCodecTests`in gidiş
+        // dönüş testi yakaladı.
+        try c.encode(blockLabel, forKey: .blockLabel)
         try c.encodeIfPresent(areaM2, forKey: .areaM2)
         try c.encode(status, forKey: .status)
         try c.encode(price, forKey: .price)

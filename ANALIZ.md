@@ -1427,6 +1427,29 @@ koleksiyon listesini (`FirestoreProjectRepository.Coll`) kural dosyasındaki
 proje altı `match` bloklarıyla karşılaştırıyor ve ayrışmayı adıyla söylüyor.
 Testin kendisi UYDURMA BİR KOLEKSİYON eklenerek doğrulandı: kırmızıya döndü,
 sonra geri alındı — koşmamış test kanıt değildir.
+
+### GERÇEK KUSUR: blok etiketi Firestore'a hiç yazılmıyordu (31 Ağu 2026)
+
+Aynı taramanın devamında birim testlerinin kör noktası soruldu: hepsi
+`InMemoryProjectRepository` kullanıyor, yani modellerin FIRESTORE kodlaması
+hiç koşmuyor. `FirestoreCodecTests` yazıldı (gidiş-dönüş) ve İLK KOŞUŞTA
+madde 83'ün alanını düşürdü: `Apartment` ELLE YAZILMIŞ bir `encode(to:)`
+taşıyor ve `blockLabel` `CodingKeys`e ve çözümleyiciye eklendiği hâlde
+KODLAYICIYA eklenmemişti.
+
+Sonucu: blok etiketi ekranda çalışıyor, bellekte duruyor, 147 testten
+geçiyor ama gerçek veritabanına HİÇ GİTMİYORDU. Kullanıcı etiketleri girer,
+uygulamayı kapatıp açar ve hepsi yok olurdu — üstelik kırılım yalnızca birden
+çok etiket varsa göründüğü için ekran "özellik çalışmıyor" gibi değil,
+"böyle bir şey yokmuş" gibi görünürdü. Demo veri bellek içi olduğu için
+simülatör turu da bunu göstermedi.
+
+Ders yine aynı: **koşmamış kod okunarak doğrulanamaz** — bu sefer kod
+"koşuyordu" ama YANLIŞ DEPOYA karşı. Testler artık şunları da kilitliyor:
+alıcı adının daire belgesine yazılmadığı (madde 18'in kodlama sınırındaki
+kanıtı), malzemenin türetilen toplamlarının kodlanmadığı ("türetilen rakam
+saklanmaz" kararının koruyucusu), cari hareketin üç türünün ham değerleriyle
+gidip geldiği ve alansız ESKİ belgelerin hâlâ çözüldüğü.
 - [x] 72. **Uygulama içinde destek/geri bildirim/sürüm/politika satırı yok.**
       `AccountSheet`te yok, `CFBundleShortVersionString` okuyan kod yok.
       Crashlytics bilinçli ertelendi; ikisi birleşince sahadaki hata İKİ
