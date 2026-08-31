@@ -314,8 +314,14 @@ describe('invites/{KOD}', () => {
   // cümlesini uygulayan kimse yoktu: saati ileri alınmış bir cihaz kodu
   // yıllarca geçerli yapabilirdi.
   it('CİHAZ SAATİYLE yazılmış createdAt reddedilir', async () => {
+    // SAAT AÇIKÇA KAYDIRILIYOR (bir dakika geri) ve bu bir detay değil:
+    // `new Date()` ile yazıldığında istemcinin damgası sunucununkiyle AYNI
+    // MİLİSANİYEYE düşebiliyor (ikisi de aynı makinede, yerel ağ turu sıfıra
+    // yakın) ve kural yazmayı haklı olarak kabul ediyordu — test rastgele
+    // kırmızıya dönüyordu. Saldırının gerçek biçimi de bu zaten: kayık saat.
     await assertFails(setDoc(doc(ownerDb, 'invites', 'EEEEEE'), {
-      projectId: P1, createdAt: new Date(), expiresAt: future(), usedAt: null,
+      projectId: P1, createdAt: new Date(Date.now() - 60_000),
+      expiresAt: future(), usedAt: null,
     }));
   });
 
