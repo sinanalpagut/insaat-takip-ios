@@ -70,7 +70,10 @@ struct PartnerLedgerSheet: View {
                           placeholder: "Örn. 500.000", keyboard: .decimalPad)
                         .padding(.top, 18)
 
-                    field("NOT", text: $note, placeholder: "Örn. Nisan sermaye katkısı")
+                    // ÖRNEK SEÇİLEN TÜRE UYUYOR: "Kâr dağıtımı" seçiliyken
+                    // "Örn. sermaye katkısı" yazan bir kutu, kullanıcıya
+                    // yanlış içerik öneriyor.
+                    field("NOT", text: $note, placeholder: notePlaceholder)
                         .padding(.top, 14)
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -114,6 +117,14 @@ struct PartnerLedgerSheet: View {
             guard !didLoad else { return }
             didLoad = true
             selectedPartnerId = partnerId ?? partners.first?.id
+        }
+    }
+
+    private var notePlaceholder: String {
+        switch kind {
+        case .sermaye: return "Örn. Nisan sermaye katkısı"
+        case .cekilen: return "Örn. Elden avans"
+        case .dagitim: return "Örn. 2026 birinci dönem kâr payı"
         }
     }
 
