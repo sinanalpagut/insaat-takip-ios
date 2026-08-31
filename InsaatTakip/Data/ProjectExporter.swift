@@ -190,8 +190,14 @@ struct ProjectExporter {
             [date(expense.date), expense.category.rawValue, money(expense.amount),
              expense.payee, expense.note, expense.user]
         }
+        // SÜTUN ADI "ÖDENEN" DEĞİL "KİME ÖDENDİ" (31 Ağu 2026): sütunda KİŞİ
+        // adı var ("Şantiye ekibi") ve hemen "Tutar"ın yanında duruyordu —
+        // dosyayı açan mali müşavir ikisini "ödenen tutar" diye okuyabilirdi.
+        // Uygulamanın kendi form etiketi de "KİME ÖDENDİ"; dosya ekranla aynı
+        // kelimeyi kullanmalı. Madde 81'in kayıt dilini düzeltme işinin
+        // dosyadaki yarısı.
         return csv(header: ["Tarih", "Kategori", "Tutar\(taxSuffix(taxBasis))",
-                            "Ödenen", "Açıklama", "Kaydeden"],
+                            "Kime Ödendi", "Açıklama", "Kaydeden"],
                    rows: rows)
     }
 

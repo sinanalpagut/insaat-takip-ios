@@ -102,4 +102,21 @@ final class ExporterTests: XCTestCase {
                        "ekrandaki rakamlarla yapılan çıkarma net'i vermiyor")
         XCTAssertTrue(Fmt.exactMoney(.kurus(-50)).hasPrefix("−"))
     }
+
+    /// GİDER SÜTUNU KİŞİ ADINI "ÖDENEN" DİYE SUNMAMALI.
+    ///
+    /// Sütunda `payee` var ("Şantiye ekibi") ve hemen "Tutar"ın yanında
+    /// duruyor; başlık "Ödenen" olduğunda dosyayı açan mali müşavir ikisini
+    /// "ödenen tutar" diye okuyabiliyordu. Üstelik model ödemeyi zaten
+    /// garanti etmiyor (madde 81): kayıt tahakkuk esaslı.
+    func testExpenseCSVNamesThePayeeColumnHonestly() {
+        let gider = Expense(id: UUID(), projectId: UUID(), category: .iscilik,
+                            amount: Kurus.lira(1_240_000), date: Date(),
+                            payee: "Şantiye ekibi", note: "Ağustos puantajı",
+                            user: "Mehmet Kılıç")
+        let baslik = ProjectExporter.expensesCSV([gider]).components(separatedBy: "\r\n")[0]
+        XCTAssertTrue(baslik.contains("Kime Ödendi"), "başlık: \(baslik)")
+        XCTAssertFalse(baslik.contains(";Ödenen;"), "kişi sütunu 'Ödenen' diye adlandırılmamalı")
+    }
+
 }

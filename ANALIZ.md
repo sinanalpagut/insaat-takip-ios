@@ -1467,6 +1467,18 @@ eklendi ve PDF yeniden üretilip cümlelerin tamamlandığı görüldü.
 
 Yöntem notu: PDF'i ÜRETMEK yetmiyor, AÇMAK gerekiyor. "Dosya oluştu" ile
 "dosya doğru" arasındaki fark, bu turda bulunan üç kusurdan ikisiydi.
+
+### CSV'ler de açıldı: "Ödenen" sütununda kişi adı vardı
+
+Aynı yöntem dosyalara uygulandı — beş CSV ve yedek JSON simülatörden çekilip
+AÇILDI. Biçim doğru çıktı (`;` ayracı, UTF-8 BOM, CRLF, ondalık virgül —
+"Excel'de doğrudan açılır" iddiası uygulanıyor), yeni sütunlar yerinde
+(`Daireler.csv` → "Blok / Etap", yeni `Ortak-Cari.csv` → "Yön" ve "İşaretli
+Tutar"). Ama `Giderler.csv` başlığında **"Ödenen" sütununda KİŞİ ADI**
+duruyordu ("Şantiye ekibi") ve hemen "Tutar"ın yanındaydı: dosyayı açan mali
+müşavir ikisini "ödenen tutar" diye okuyabilirdi. Üstelik model ödemeyi zaten
+garanti etmiyor (madde 81 — kayıt tahakkuk esaslı). Başlık "Kime Ödendi"
+oldu; uygulamanın kendi form etiketiyle aynı kelime. Bir test kilitliyor.
  Testler artık şunları da kilitliyor:
 alıcı adının daire belgesine yazılmadığı (madde 18'in kodlama sınırındaki
 kanıtı), malzemenin türetilen toplamlarının kodlanmadığı ("türetilen rakam
