@@ -12,6 +12,7 @@ struct ProjectDetailView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let projectId: UUID
 
@@ -236,29 +237,14 @@ struct ProjectDetailView: View {
             HStack(alignment: .center, spacing: 10) {
                 DarkHeaderButton(systemName: "chevron.left", label: "Geri") { dismiss() }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    // TEK SATIR KIRPMASI KALDIRILDI (31 Ağu 2026) — aynı ders
-                    // `financeTile`da yazılı: kesilen parça büyüklük eki
-                    // olduğunda 1 milyon ile 15 milyon ayırt edilemiyor.
-                    // Alt satır PARA taşıyor ("Tahsilat 26,88 M ₺ · Kalan
-                    // alacak 1…") ve normal boyutta bile kesiliyordu.
-                    //
-                    // Başlık ise projenin KİMLİĞİ: "145…" ada/parselin
-                    // parselini yutuyor ve madde 83'ten sonra önerilen kurulum
-                    // tam olarak "parsel başına tek proje" — yani aynı adada
-                    // iki proje gerçekten olabiliyor.
-                    Text(project.title)
-                        .font(.sora(17, .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.85)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(headerSubtitle(project))
-                        .font(.manrope(11.5, .medium))
-                        .foregroundColor(.white.opacity(0.55))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.85)
-                        .fixedSize(horizontal: false, vertical: true)
+                // AX BOYUTUNDA BAŞLIK BU SATIRDA DEĞİL (31 Ağu 2026): geri
+                // düğmesi, menü ve rol rozetiyle genişliği paylaşınca başlığa
+                // ancak %40 kalıyor ve "145 Ada / 2 Parsel" kelime ortasından
+                // ("Pars/el") bölünüyordu. Yatay sıkışmanın çözümü metni
+                // küçültmek değil, düzeni dikey açmak — `financeTile` ve
+                // portföy şeridinin yaptığının aynısı.
+                if !dynamicTypeSize.isAccessibilitySize {
+                    titleBlock(project)
                 }
 
                 Spacer(minLength: 8)
@@ -337,6 +323,11 @@ struct ProjectDetailView: View {
             }
             .padding(.top, 6)
 
+            if dynamicTypeSize.isAccessibilitySize {
+                titleBlock(project)
+                    .padding(.top, 12)
+            }
+
             // SATIŞ / MALZEME / NET finans şeridi — dört sekmede de görünür.
             // Sabit başlık yüksekliği, sekme çubuğunun yerinden oynamasını önler
             // (sekme değiştirirken ikinci dokunuş kaymasın diye).
@@ -363,6 +354,33 @@ struct ProjectDetailView: View {
     }
 
     /// Sekmeye göre değişen alt başlık.
+    /// Proje kimliği ve sekmeye göre değişen özet satırı.
+    private func titleBlock(_ project: Project) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            // TEK SATIR KIRPMASI KALDIRILDI (31 Ağu 2026) — aynı ders
+            // `financeTile`da yazılı: kesilen parça büyüklük eki olduğunda
+            // 1 milyon ile 15 milyon ayırt edilemiyor. Alt satır PARA taşıyor
+            // ("Tahsilat 26,88 M ₺ · Kalan alacak 1…") ve normal boyutta bile
+            // kesiliyordu.
+            //
+            // Başlık ise projenin KİMLİĞİ: "145…" parseli yutuyor ve madde
+            // 83'ten sonra önerilen kurulum tam olarak "parsel başına tek
+            // proje" — aynı adada iki proje gerçekten olabiliyor.
+            Text(project.title)
+                .font(.sora(17, .bold))
+                .foregroundColor(.white)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(headerSubtitle(project))
+                .font(.manrope(11.5, .medium))
+                .foregroundColor(.white.opacity(0.55))
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private func headerSubtitle(_ project: Project) -> String {
         switch tab {
         case .malzemeler:
