@@ -29,6 +29,8 @@ final class ProjectViewModel: ObservableObject {
     /// Taksit planı — BEKLENEN ödemeler (madde 21). `payments` gerçekleşeni
     /// tutuyor; ikisinin farkı "gecikmiş tahsilat".
     @Published var installments: [Installment] = []
+    /// Ortak cari hareketleri (madde 82).
+    @Published var partnerLedger: [PartnerLedgerEntry] = []
     /// Kullanıcı bildirim iznini REDDETTİ mi. Ekran bunu dürüstçe söylüyor:
     /// gecikme listesi çalışmaya devam ediyor, yalnızca hatırlatma gelmiyor.
     @Published var remindersDenied = false
@@ -190,6 +192,7 @@ final class ProjectViewModel: ObservableObject {
         expenses = snapshot.expenses
         payments = snapshot.payments
         installments = snapshot.installments
+        partnerLedger = snapshot.partnerLedger
         apartmentPhotos = snapshot.apartmentPhotos
         auditEntries = snapshot.auditEntries
 
@@ -1008,8 +1011,16 @@ final class ProjectViewModel: ObservableObject {
             urls.append(url)
         }
 
+        let projectLedger = ledger(for: projectId)
+        if !projectLedger.isEmpty,
+           let url = ProjectExporter.write(
+            ProjectExporter.partnerLedgerCSV(projectLedger, partners: partners(for: projectId)),
+            name: "\(stem)-Ortak-Cari.csv") {
+            urls.append(url)
+        }
+
         let backup = ProjectExporter.Backup(
-            surum: 1,
+            surum: ProjectExporter.backupVersion,
             olusturma: Date(),
             aliciDahil: isAdmin,
             proje: project,
@@ -1020,6 +1031,7 @@ final class ProjectViewModel: ObservableObject {
             tahsilatlar: projectPayments,
             taksitler: installments.filter { $0.projectId == projectId },
             ortaklar: partners(for: projectId),
+            ortakCari: ledger(for: projectId),
             belgeler: documents.filter { $0.projectId == projectId && (isAdmin || $0.partnerVisible) },
             alicilar: isAdmin ? buyersSnapshot(for: projectId) : [],
             denetimIzi: auditEntries.filter { $0.projectId == projectId })
@@ -2745,6 +2757,8 @@ final class ProjectViewModel: ObservableObject {
         var payments = 0
         var installments = 0
         var partners = 0
+        /// Ortak cari hareketleri (madde 82).
+        var ledgerEntries = 0
         var buyers = 0
         var auditEntries = 0
         /// Yedekte kayıtlı ama geri YÜKLENMEYEN belgeler (dosyaları yok).
@@ -2770,13 +2784,14 @@ final class ProjectViewModel: ObservableObject {
             if payments > 0 { gelenler.append("\(payments) tahsilat") }
             if installments > 0 { gelenler.append("\(installments) taksit") }
             if partners > 0 { gelenler.append("\(partners) ortak") }
+            if ledgerEntries > 0 { gelenler.append("\(ledgerEntries) cari hareket") }
             satirlar.append(gelenler.joined(separator: ", ") + ".")
 
             if skippedDocuments > 0 {
                 satirlar.append("\(skippedDocuments) belge GERİ YÜKLENMEDİ · yedek kayıtları taşır, dosyaları taşımaz.")
             }
             if droppedRecords > 0 {
-                satirlar.append("\(droppedRecords) kayıt atlandı · ait olduğu daire ya da malzeme yedekte yoktu.")
+                satirlar.append("\(droppedRecords) kayıt atlandı · ait olduğu daire, malzeme ya da ortak yedekte yoktu.")
             }
             if !buyersIncluded {
                 satirlar.append("Alıcı adları yedeğe girmemiş · bu yedek ortak görünümünden alınmış.")
@@ -2862,6 +2877,14 @@ final class ProjectViewModel: ObservableObject {
             bu($0.projectId) && daireKimlikleri.contains($0.apartmentId)
         }
         var ortaklar = backup.ortaklar.filter { bu($0.projectId) }
+        let ortakKimlikleri = Set(ortaklar.map(\.id))
+        // ORTAĞI OLMAYAN CARİ HAREKET DÜŞÜYOR: sahipsiz bir sermaye kaydı
+        // hiçbir bakiyeye girmez ama proje toplamında görünürdü — yani
+        // kimsenin sahiplenmediği bir para. Düşenler `droppedRecords`ta
+        // sayılıyor, sessizce yok olmuyor.
+        let cari = (backup.ortakCari ?? []).filter {
+            bu($0.projectId) && ortakKimlikleri.contains($0.partnerId)
+        }
         let denetim = backup.denetimIzi.filter { bu($0.projectId) }
 
         // Düşürülenlerin sayısı — sessiz kalmıyor.
@@ -2869,6 +2892,7 @@ final class ProjectViewModel: ObservableObject {
             (backup.malzemeHareketleri.count - hareketler.count) +
             (backup.tahsilatlar.count - tahsilatlar.count) +
             (backup.taksitler.count - taksitler.count) +
+            ((backup.ortakCari?.count ?? 0) - cari.count) +
             (backup.alicilar.count - aliciKayitlari.count)
         ozet.skippedDocuments = backup.belgeler.count
 
@@ -2889,6 +2913,7 @@ final class ProjectViewModel: ObservableObject {
         payments.append(contentsOf: tahsilatlar)
         installments.append(contentsOf: taksitler)
         partners.append(contentsOf: ortaklar)
+        partnerLedger.append(contentsOf: cari)
         auditEntries.append(contentsOf: denetim)
 
         // ---- Yazmalar ------------------------------------------------------
@@ -2900,6 +2925,7 @@ final class ProjectViewModel: ObservableObject {
         writes += tahsilatlar.map { .payment($0) }
         writes += taksitler.map { .installment($0) }
         writes += ortaklar.map { .partner($0) }
+        writes += cari.map { .partnerLedger($0) }
         writes += aliciKayitlari.map { .buyer($0) }
         writes += denetim.map { .audit($0) }
 
@@ -2930,6 +2956,7 @@ final class ProjectViewModel: ObservableObject {
         ozet.payments = tahsilatlar.count
         ozet.installments = taksitler.count
         ozet.partners = ortaklar.count
+        ozet.ledgerEntries = cari.count
         ozet.buyers = aliciKayitlari.count
         ozet.auditEntries = denetim.count
         return ozet
@@ -3057,6 +3084,116 @@ final class ProjectViewModel: ObservableObject {
                             difference: slice(netAmount(for: pid)),
                             collected: slice(collectedAmount(for: pid)),
                             outstanding: slice(outstandingAmount(for: pid)))
+    }
+
+    // MARK: - Ortak cari hesabı (madde 82)
+
+    /// Projenin cari hareketleri — yeniden eskiye.
+    func ledger(for projectId: UUID) -> [PartnerLedgerEntry] {
+        partnerLedger
+            .filter { $0.projectId == projectId }
+            .sorted { $0.date > $1.date }
+    }
+
+    /// Tek ortağın hareketleri.
+    func ledger(forPartner partnerId: UUID) -> [PartnerLedgerEntry] {
+        partnerLedger
+            .filter { $0.partnerId == partnerId }
+            .sorted { $0.date > $1.date }
+    }
+
+    /// Ortağın cari bakiyesi: koydu − çekti.
+    func balance(forPartner partnerId: UUID) -> PartnerBalance {
+        var sonuc = PartnerBalance()
+        for hareket in partnerLedger where hareket.partnerId == partnerId {
+            switch hareket.kind {
+            case .sermaye: sonuc.capital = sonuc.capital + hareket.amount
+            case .cekilen: sonuc.withdrawn = sonuc.withdrawn + hareket.amount
+            case .dagitim: sonuc.distributed = sonuc.distributed + hareket.amount
+            }
+        }
+        return sonuc
+    }
+
+    /// Projenin cari toplamı — ortakların koyduğu ve çektiği para.
+    func balance(forProject projectId: UUID) -> PartnerBalance {
+        var sonuc = PartnerBalance()
+        for hareket in partnerLedger where hareket.projectId == projectId {
+            switch hareket.kind {
+            case .sermaye: sonuc.capital = sonuc.capital + hareket.amount
+            case .cekilen: sonuc.withdrawn = sonuc.withdrawn + hareket.amount
+            case .dagitim: sonuc.distributed = sonuc.distributed + hareket.amount
+            }
+        }
+        return sonuc
+    }
+
+    /// Cari hareket ekler.
+    ///
+    /// BU KAYIT İNŞAAT MALİYETİ DEĞİL ve hiçbir gider toplamına girmiyor.
+    /// Korkuluk maddenin kendi gerekçesinden geliyor: bugün bir dağıtımı
+    /// kaydetmenin tek yolu `.diger` kategorisinde bir giderdi ve
+    /// `netAmount = satış − (malzeme + diğer gider)` olduğu için ortağa para
+    /// ödemek, dağıtımın dayandığı rakamı BÜTÜN ortaklar için birden
+    /// düşürüyordu. Sermaye ve çekiş bir NAKİT/FİNANSMAN hareketi; ayrı
+    /// koleksiyonda durmasının tek sebebi de bu.
+    @discardableResult
+    func addLedgerEntry(role: UserRole, projectId: UUID, partnerId: UUID,
+                        kind: PartnerLedgerEntry.Kind, amountText: String,
+                        date: Date, note: String) -> Bool {
+        guard role == .admin else { return false }
+        // ORTAK KAYDI BU PROJEDE OLMALI: başka projenin ortağına hareket
+        // yazmak, iki projenin cari hesabını sessizce birbirine karıştırırdı.
+        guard partners(for: projectId).contains(where: { $0.id == partnerId }) else {
+            flash("Ortak bulunamadı")
+            return false
+        }
+        let amount = Self.parseMoney(amountText)
+        guard amount > .zero else {
+            flash("Tutar girilmedi")
+            return false
+        }
+
+        let entry = PartnerLedgerEntry(id: UUID(), projectId: projectId,
+                                       partnerId: partnerId, kind: kind,
+                                       amount: amount, date: date,
+                                       note: note.trimmingCharacters(in: .whitespaces),
+                                       user: actorName)
+        partnerLedger.append(entry)
+
+        let ortakAdi = partners(for: projectId).first { $0.id == partnerId }?.name ?? "Ortak"
+        var writes: [DocumentChange] = [.partnerLedger(entry)]
+        writes += recordAudit(recordId: entry.id, projectId: projectId,
+                              subject: "Ortak cari · \(ortakAdi)",
+                              action: .create,
+                              changes: [.init(field: kind.rawValue,
+                                              oldValue: "—", newValue: Fmt.money(amount))])
+        persist(writes, failureNote: "Cari hareket")
+        flash("\(kind.rawValue) kaydedildi")
+        return true
+    }
+
+    /// Cari hareketi siler.
+    ///
+    /// SİLME DE İZE YAZILIYOR: bu kayıtlar ortaklar arasındaki hesabın
+    /// dayanağı; sessizce kaybolan bir sermaye kaydı, tam olarak uygulamanın
+    /// önlemek için var olduğu tartışmayı üretir.
+    @discardableResult
+    func deleteLedgerEntry(role: UserRole, entryId: UUID) -> Bool {
+        guard role == .admin else { return false }
+        guard let index = partnerLedger.firstIndex(where: { $0.id == entryId }) else { return false }
+        let entry = partnerLedger.remove(at: index)
+
+        let ortakAdi = partners(for: entry.projectId).first { $0.id == entry.partnerId }?.name ?? "Ortak"
+        var writes: [DocumentChange] = [.deletePartnerLedger(id: entryId, projectId: entry.projectId)]
+        writes += recordAudit(recordId: entryId, projectId: entry.projectId,
+                              subject: "Ortak cari · \(ortakAdi)",
+                              action: .delete,
+                              changes: [.init(field: entry.kind.rawValue,
+                                              oldValue: Fmt.money(entry.amount), newValue: "silindi")])
+        persist(writes, failureNote: "Cari hareket silme")
+        flash("Cari hareket silindi")
+        return true
     }
 
     /// Oturumu açan kişinin BU PROJEDEKİ ortak kaydı. Bağ `userUid` üzerinden:

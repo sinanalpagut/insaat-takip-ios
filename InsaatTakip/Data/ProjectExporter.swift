@@ -253,6 +253,32 @@ struct ProjectExporter {
         return csv(header: header, rows: rows)
     }
 
+    /// Ortak cari hesabı (madde 82).
+    ///
+    /// AYRI DOSYA, giderlerin içinde DEĞİL: bu kayıtlar inşaat maliyeti değil,
+    /// nakit/finansman hareketi. Aynı dosyaya konsaydı müşavir onları gider
+    /// sanır ve uygulamanın düzelttiği hata dosyada geri açılırdı.
+    static func partnerLedgerCSV(_ entries: [PartnerLedgerEntry],
+                                 partners: [Partner]) -> String {
+        let adlar = Dictionary(uniqueKeysWithValues: partners.map { ($0.id, $0.name) })
+        let rows = entries.sorted { $0.date > $1.date }.map { entry in
+            [date(entry.date),
+             adlar[entry.partnerId] ?? "—",
+             entry.kind.rawValue,
+             // YÖN SÜTUNU: "Sermaye" ve "Çekilen" kelimeleri Excel'de
+             // toplanınca yönü kaybediyor; işaretli tutar sütunu toplamı
+             // doğrudan bakiyeyi veriyor.
+             entry.kind.increasesBalance ? "Giren" : "Çıkan",
+             money(entry.amount),
+             money(entry.signedAmount),
+             field(entry.note),
+             field(entry.user)]
+        }
+        return csv(header: ["Tarih", "Ortak", "Hareket", "Yön",
+                            "Tutar", "İşaretli Tutar", "Not", "Kaydeden"],
+                   rows: rows)
+    }
+
     static func paymentsCSV(_ payments: [Payment], apartments: [Apartment]) -> String {
         let byId = Dictionary(uniqueKeysWithValues: apartments.map { ($0.id, $0) })
         let rows = payments.sorted { $0.date > $1.date }.map { payment in
@@ -294,6 +320,10 @@ struct ProjectExporter {
         /// denetlenirken yakalandı.
         let taksitler: [Installment]
         let ortaklar: [Partner]
+        /// Ortak cari hareketleri (madde 82). OPSİYONEL: sürüm 1 yedeklerinde
+        /// bu alan yok ve olmaması normal. Opsiyonel olmasaydı eski her yedek
+        /// `keyNotFound` ile okunamazdı — kullanıcının kendi dosyası.
+        let ortakCari: [PartnerLedgerEntry]?
         let belgeler: [ProjectDocument]
         let alicilar: [ApartmentBuyer]
         let denetimIzi: [AuditEntry]
@@ -301,7 +331,9 @@ struct ProjectExporter {
 
     /// Yedeğin şema sürümü. Değiştiğinde ESKİ uygulama yeni dosyayı REDDETMELİ,
     /// yarım okumamalı — madde 56'nın yedek dosyasındaki karşılığı.
-    static let backupVersion = 1
+    ///
+    /// SÜRÜM 2 (madde 82): ortak cari hesabı eklendi.
+    static let backupVersion = 2
 
     /// Yedek okunamama sebepleri. Hepsi kullanıcıya AYRI cümleyle söyleniyor:
     /// "dosya okunamadı" tek başına kişiye ne yapacağını söylemiyor.
@@ -316,7 +348,8 @@ struct ProjectExporter {
             case .unreadable:
                 return "Dosya okunamadı · geçerli bir yedek değil"
             case .unsupportedVersion(let v):
-                return "Yedek sürüm \(v) · bu uygulama sürüm \(backupVersion) okuyor"
+                return "Yedek sürüm \(v) · bu uygulama en çok sürüm \(backupVersion) okuyor · "
+                     + "uygulamayı güncelle"
             }
         }
     }
@@ -335,7 +368,16 @@ struct ProjectExporter {
         guard let probe = try? decoder.decode(VersionProbe.self, from: data) else {
             throw BackupError.unreadable
         }
-        guard probe.surum == backupVersion else {
+        // ASİMETRİK: YENİ sürüm reddedilir, ESKİ sürüm kabul edilir.
+        //
+        // Reddin gerekçesi kaybolan veri: yeni sürümde eklenmiş bir koleksiyon
+        // eski uygulamada sessizce düşer ve kullanıcı verisinin tamamının
+        // geldiğini sanır. ESKİ dosyada ise kaybolacak bir şey YOK — sürüm 1
+        // yedeğinde ortak cari hesabı gerçekten yoktu. Eşitlik koşulu
+        // korunsaydı, madde 82 kullanıcının kendi eski yedeklerini
+        // okunamaz hâle getirirdi; yani veri kaybını önlemek için konmuş bir
+        // kural veri kaybına sebep olurdu.
+        guard probe.surum <= backupVersion else {
             throw BackupError.unsupportedVersion(probe.surum)
         }
         do { return try decoder.decode(Backup.self, from: data) }

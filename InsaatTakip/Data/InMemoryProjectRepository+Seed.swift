@@ -421,6 +421,33 @@ extension InMemoryProjectRepository {
             }
         }
 
+        // ORTAK CARİ HAREKETLERİ (madde 82) — yalnızca Çayırova projesinde.
+        //
+        // Demo veride cari hesabın ÜÇ hâli de görünsün: sermaye koymuş ortak,
+        // avans çekmiş ortak ve hiç hareketi olmayan ortak (kartta o ortak
+        // için satır çıkmıyor). Kurucunun koyduğu sermayenin diğerlerinden
+        // büyük olması bilinçli: maddenin gerekçesi tam olarak buydu —
+        // "8 M ₺ koyan ortakla 0 koyan ortak aynı kartı görüyor".
+        if let cayirova = projects.first(where: { $0.id == DemoID.cayirova }) {
+            let ortaklar = partners.filter { $0.projectId == cayirova.id }
+            func ortakId(_ ad: String) -> UUID? { ortaklar.first { $0.name == ad }?.id }
+            let plan: [(String, PartnerLedgerEntry.Kind, Kurus, Int, String)] = [
+                ("Mehmet Kılıç", .sermaye, .lira(8_000_000), 400, "Kuruluş sermayesi"),
+                ("Serkan Aydın", .sermaye, .lira(5_000_000), 395, "Kuruluş sermayesi"),
+                ("Ayşe Tuna",    .sermaye, .lira(4_000_000), 150, "Sermaye katkısı"),
+                ("Mehmet Kılıç", .cekilen, .lira(750_000),   90,  "Elden avans"),
+                ("Serkan Aydın", .cekilen, .lira(400_000),   60,  "Elden avans"),
+            ]
+            for (ad, tur, tutar, gunOnce, not) in plan {
+                guard let pid = ortakId(ad) else { continue }
+                partnerLedger.append(PartnerLedgerEntry(id: UUID(), projectId: cayirova.id,
+                                                        partnerId: pid, kind: tur,
+                                                        amount: tutar,
+                                                        date: Fmt.daysAgo(gunOnce),
+                                                        note: not, user: "Mehmet Kılıç"))
+            }
+        }
+
         // ---- Belgeler (ekran 11) --------------------------------------------
         let p1Documents: [(ProjectDocument.Group, ProjectDocument.FileType, String, String, Double, Date, Bool)] = [
             (.mimari, .pdf, "Vaziyet Planı", "v3", 4.2, Fmt.makeDate(12, 1, 2026), true),

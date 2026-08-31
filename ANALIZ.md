@@ -1593,8 +1593,61 @@ verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam
       Testler: TaxBasisTests 8 test. Simülatörde doğrulandı.
 - [~] 81. **Tedarikçi / cari hesap, ödendi–vadeli ayrımı** (İş Mantığı#5).
       Uygulama kapsam dışı olduğunu ortağa YAZIYOR ama maddesi yok.
-- [~] 82. **Ortak cari hesabı** — sermaye, avans, dağıtım (Farklılaştırıcı#2,
+- [x] 82. **Ortak cari hesabı** — sermaye, avans, dağıtım (Farklılaştırıcı#2,
       🔴 Kritik). `PartnersTabView:174` kullanıcıya "henüz tutulmuyor" diyor.
+      → **YAPILDI (31 Ağu 2026).** `PartnerLedgerEntry` (tarih, ortak, tür ∈
+      {sermaye, çekilen/avans, kâr dağıtımı}, tutar, not) + ortak bazında
+      yürüyen bakiye; `Payment` desenini birebir izliyor.
+      **NEDEN EN ÖNEMLİSİYDİ:** `share(of:)` hesap TUTMUYOR, proje
+      toplamlarını yüzdeyle DİLİMLİYOR — 8 M ₺ koyan ortakla hiç para
+      koymamış ortak birebir aynı "Payın %50" kartını görüyordu. Daha ağırı:
+      bir dağıtımı kaydetmenin TEK yolu `.diger` kategorisinde bir giderdi ve
+      `netAmount = satış − (malzeme + diğer gider)` olduğu için ortağa para
+      ödemek inşaat maliyeti gibi görünüp dağıtımın dayandığı rakamı BÜTÜN
+      ortaklar için birden düşürüyordu: uygulamanın ürettiği rakam, kendi
+      sebep olduğu ortaklık ihtilafının dayanağı oluyordu.
+      **KORKULUK 1 — CARİ HAREKET GİDER DEĞİL.** Ayrı koleksiyon, hiçbir
+      gider toplamına ve dönem netine girmiyor; test bunu doğrudan kilitliyor
+      (dağıtım + sermaye eklendikten sonra `totalCost`, `netAmount`,
+      malzeme ve diğer gider toplamları birebir aynı). Sermaye ve çekiş bir
+      NAKİT/FİNANSMAN hareketi; madde 35 sınıfı bir sapmanın geri açılmaması
+      buna bağlı.
+      **KORKULUK 2 — "DAĞITILABİLİR KÂR" HESAPLANMIYOR.** Defter açılır
+      açılmaz sorulacak ilk soru bu ve o soru madde 86'nın kalan inşaat
+      maliyetini, stoğun gerçekleşme oranını ve vergi yükünü ister. Kart çok
+      daha dar bir şey söylüyor: ortak ne koydu, ne çekti, arada ne kaldı.
+      **KORKULUK 3 — GİZLİLİK KARARI KURALDA ALINDI, EKRANDA DEĞİL.**
+      `firestore.rules · partnerLedger`: A ortağı B'nin çektiğini GÖRÜR.
+      `buyers/{apartmentId}` ile aynı sınıfta bir karar ama sonucu TERS ve
+      sebebi yazılı: alıcı ÜÇÜNCÜ KİŞİ, ortaklara görünmeyi hiç kabul
+      etmedi; ortak ise hesabın TARAFI — kimin ne koyduğu hepsinin aynı havuz
+      üzerindeki iddiasını belirliyor. Gizlemek, uygulamanın önlemek için var
+      olduğu tartışmayı WhatsApp'a geri gönderir ve yöneticinin her ortağa
+      ayrı hikâye anlatmasına izin verirdi. Ortak YAZAMAZ (`ownerWrite`):
+      kendi çektiğini kendi yazabilseydi kayıt mutabakat belgesi olmaktan
+      çıkardı. Kural testlerinde koleksiyon ortak kalıba eklendi (143 test).
+      **TUTAR HER ZAMAN POZİTİF, YÖN TÜRDEN GELİYOR:** tek bir işaretli para
+      alanı olsaydı formda "−" yazmayı unutan kullanıcı sessizce ters yönde
+      kayıt üretirdi. Bakiye EKSİYE DÜŞEBİLİYOR ve düşmeli — koyduğundan
+      fazlasını çekmiş ortak ortaklığa borçludur.
+      **PAY KARTI CARİYİ İÇERMİYOR** ve cümle sertleşti: "Ortakların koyduğu
+      sermaye ve çektiği para AYRI tutuluyor; bu paylara eklenmez, buradan
+      düşülmez." İkisini tek rakama katlamak "payına düşen" ile "sana kalan"
+      arasındaki farkı silerdi.
+      **YEDEK SÜRÜMÜ 2 VE SÜRÜM DENETİMİ ASİMETRİK OLDU:** eşitlik koşulu
+      (`surum == backupVersion`) korunsaydı bu madde kullanıcının kendi
+      SÜRÜM 1 yedeklerini okunamaz yapardı — yani veri kaybını önlemek için
+      konmuş kural veri kaybına sebep olurdu. Artık eski sürüm kabul, YENİ
+      sürüm ret: eskide kaybolacak bir şey yok, yenide sessizce düşen bir
+      koleksiyon var. Alan opsiyonel (madde 80'de ölçülen `keyNotFound`
+      sebebiyle). Geri yüklemede ortağı yedekte bulunmayan hareket düşüyor ve
+      `droppedRecords`ta sayılıyor.
+      CSV AYRI DOSYA ("Ortak-Cari.csv") — giderlerin içine konsaydı müşavir
+      onları gider sanırdı; "Yön" ve "İşaretli Tutar" sütunları var, çünkü
+      "Sermaye"/"Çekilen" kelimeleri Excel'de toplanınca yön kayboluyor.
+      Testler: PartnerLedgerTests 11 test. Toplam 166 Swift + 143 kural testi.
+      Demo veride Çayırova'ya üç sermaye ve iki çekim kondu; hareketsiz
+      ortak (Burak Erdoğan) kartta satır üretmiyor.
 - [x] 83. **Blok / etap kavramı** (Gözden Kaçanlar#6). Kanıtı demo verisinin
       içinde: "SF-1 Blok 1" ve "GB Blok 1" iki AYRI proje olarak, uydurma
       ada/parsel numaralarıyla modellenmiş.

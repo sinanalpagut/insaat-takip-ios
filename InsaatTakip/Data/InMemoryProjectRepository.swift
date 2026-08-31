@@ -21,6 +21,7 @@ final class InMemoryProjectRepository: ProjectRepository {
     var sitePhotos: [SitePhoto] = []
     var expenses: [Expense] = []
     var payments: [Payment] = []
+    var partnerLedger: [PartnerLedgerEntry] = []
     var installments: [Installment] = []
     var apartmentPhotos: [ApartmentPhoto] = []
     var auditEntries: [AuditEntry] = []
@@ -36,6 +37,7 @@ final class InMemoryProjectRepository: ProjectRepository {
                      apartments: apartments, partners: partners, documents: documents,
                      activities: activities, sitePhotos: sitePhotos, expenses: expenses,
                      payments: payments, installments: installments,
+                     partnerLedger: partnerLedger,
                      apartmentPhotos: apartmentPhotos,
                      auditEntries: auditEntries)
     }
@@ -66,6 +68,7 @@ final class InMemoryProjectRepository: ProjectRepository {
         case .activity(let value):       upsert(value, into: &activities, newestFirst: true)
 
         case .payment(let value):        upsert(value, into: &payments)
+        case .partnerLedger(let value):  upsert(value, into: &partnerLedger)
         case .installment(let value):    upsert(value, into: &installments)
         case .document(let value):       upsert(value, into: &documents, newestFirst: true)
         case .sitePhoto(let value):      upsert(value, into: &sitePhotos, newestFirst: true)
@@ -87,6 +90,7 @@ final class InMemoryProjectRepository: ProjectRepository {
         case .deleteMaterialLog(let id, _):     materialLogs.removeAll { $0.id == id }
         case .deleteExpense(let id, _):         expenses.removeAll { $0.id == id }
         case .deletePayment(let id, _):         payments.removeAll { $0.id == id }
+        case .deletePartnerLedger(let id, _):   partnerLedger.removeAll { $0.id == id }
         case .deleteApartmentPhoto(let id, _):  apartmentPhotos.removeAll { $0.id == id }
         case .deletePartner(let id, _):         partners.removeAll { $0.id == id }
         case .deleteApartment(let id, _):       apartments.removeAll { $0.id == id }

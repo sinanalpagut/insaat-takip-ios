@@ -378,6 +378,11 @@ describe('alt koleksiyonların tamamı aynı yetki kalıbına uyuyor', () => {
     // ödemelerin tarih ve tutarını görüyor, vadeleri gizlemek onu bilgisiz
     // bırakmaz — aynı sonucu elle çıkarmaya zorlar ve şeffaflıkla çelişir.
     'installments',
+    // Ortak cari hesabı (madde 82). Ortağa AÇIK ve bu bilinçli: ortak
+    // hesabın TARAFI — kimin ne koyduğu ve çektiği, hepsinin aynı havuz
+    // üzerindeki iddiasını belirliyor. Alıcı kimliğiyle aynı sınıfta bir
+    // karar ama sonucu ters, çünkü alıcı üçüncü kişi.
+    'partnerLedger',
   ];
 
   for (const name of COLLECTIONS) {

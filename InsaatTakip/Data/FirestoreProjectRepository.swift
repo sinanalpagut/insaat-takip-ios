@@ -46,6 +46,7 @@ final class FirestoreProjectRepository: ProjectRepository {
         case expenses
         case payments
         case installments
+        case partnerLedger
         case apartmentPhotos
         case auditEntries
         case buyers
@@ -149,6 +150,7 @@ final class FirestoreProjectRepository: ProjectRepository {
         async let expenses = fetch(Expense.self, .expenses, pid)
         async let payments = fetch(Payment.self, .payments, pid)
         async let installments = fetch(Installment.self, .installments, pid)
+        async let ledger = fetch(PartnerLedgerEntry.self, .partnerLedger, pid)
         async let audits = fetch(AuditEntry.self, .auditEntries, pid)
         async let sitePhotos = fetchSitePhotos(pid)
         async let apartmentPhotos = fetchApartmentPhotos(pid)
@@ -162,6 +164,7 @@ final class FirestoreProjectRepository: ProjectRepository {
         result.expenses += try await expenses
         result.payments += try await payments
         result.installments += try await installments
+        result.partnerLedger += try await ledger
         result.auditEntries += try await audits
         result.sitePhotos += try await sitePhotos
         result.apartmentPhotos += try await apartmentPhotos
@@ -237,6 +240,7 @@ final class FirestoreProjectRepository: ProjectRepository {
             case .sitePhoto(let p):      upsert(p, into: &latest.sitePhotos)
             case .expense(let e):        upsert(e, into: &latest.expenses)
             case .payment(let p):        upsert(p, into: &latest.payments)
+            case .partnerLedger(let l):  upsert(l, into: &latest.partnerLedger)
             case .installment(let i):    upsert(i, into: &latest.installments)
             case .apartmentPhoto(let p): upsert(p, into: &latest.apartmentPhotos)
             case .audit(let a):          upsert(a, into: &latest.auditEntries)
@@ -255,6 +259,8 @@ final class FirestoreProjectRepository: ProjectRepository {
                 latest.expenses.removeAll { $0.id == id }
             case .deletePayment(let id, _):
                 latest.payments.removeAll { $0.id == id }
+            case .deletePartnerLedger(let id, _):
+                latest.partnerLedger.removeAll { $0.id == id }
             case .deleteApartmentPhoto(let id, _):
                 latest.apartmentPhotos.removeAll { $0.id == id }
             case .deletePartner(let id, _):
@@ -307,6 +313,8 @@ final class FirestoreProjectRepository: ProjectRepository {
             batch.setData(try encode(p), forDocument: ref(.payments, p.projectId, p.id))
         case .installment(let i):
             batch.setData(try encode(i), forDocument: ref(.installments, i.projectId, i.id))
+        case .partnerLedger(let l):
+            batch.setData(try encode(l), forDocument: ref(.partnerLedger, l.projectId, l.id))
         case .audit(let a):
             batch.setData(try encode(a), forDocument: ref(.auditEntries, a.projectId, a.id))
 
@@ -340,6 +348,8 @@ final class FirestoreProjectRepository: ProjectRepository {
             batch.deleteDocument(ref(.expenses, pid, id))
         case .deletePayment(let id, let pid):
             batch.deleteDocument(ref(.payments, pid, id))
+        case .deletePartnerLedger(let id, let pid):
+            batch.deleteDocument(ref(.partnerLedger, pid, id))
         case .deleteInstallments(let ids, let pid):
             for id in ids { batch.deleteDocument(ref(.installments, pid, id)) }
         case .deleteApartmentPhoto(let id, let pid):

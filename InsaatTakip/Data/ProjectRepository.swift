@@ -27,6 +27,8 @@ struct DataSnapshot {
     var expenses: [Expense] = []
     var payments: [Payment] = []
     var installments: [Installment] = []
+    /// Ortak cari hareketleri (madde 82).
+    var partnerLedger: [PartnerLedgerEntry] = []
     var apartmentPhotos: [ApartmentPhoto] = []
     var auditEntries: [AuditEntry] = []
 
@@ -85,6 +87,8 @@ enum DocumentChange {
     case payment(Payment)
     /// Taksit planı kaydı (madde 21).
     case installment(Installment)
+    /// Ortak cari hareketi (madde 82) — sermaye, çekim, dağıtım.
+    case partnerLedger(PartnerLedgerEntry)
     case apartmentPhoto(ApartmentPhoto)
     case audit(AuditEntry)
     /// Alıcının kimliği — daire belgesinden AYRI (madde 18): kural alan
@@ -95,6 +99,7 @@ enum DocumentChange {
     case deleteMaterialLog(id: UUID, projectId: UUID)
     case deleteExpense(id: UUID, projectId: UUID)
     case deletePayment(id: UUID, projectId: UUID)
+    case deletePartnerLedger(id: UUID, projectId: UUID)
     case deleteApartmentPhoto(id: UUID, projectId: UUID)
     /// Ortak kaydının silinmesi (madde 66). Üyeliğin kendisi `projects`
     /// belgesindeki `memberUids` alanında; ikisi AYNI partide gitmeli, yoksa

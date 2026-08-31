@@ -90,7 +90,7 @@ final class BackupRestoreTests: XCTestCase {
             malzemeHareketleri: [hareket, sahipsizHareket],
             giderler: [], daireler: [daire],
             tahsilatlar: [tahsilat, sahipsizTahsilat],
-            taksitler: [taksit], ortaklar: [ortak], belgeler: [belge],
+            taksitler: [taksit], ortaklar: [ortak], ortakCari: nil, belgeler: [belge],
             alicilar: [ApartmentBuyer(apartmentId: aid, projectId: pid, name: "Berk Koç")],
             denetimIzi: [denetim])
     }
@@ -287,6 +287,7 @@ final class BackupRestoreTests: XCTestCase {
             malzemeHareketleri: yedek.malzemeHareketleri, giderler: yedek.giderler,
             daireler: yedek.daireler, tahsilatlar: yedek.tahsilatlar,
             taksitler: yedek.taksitler, ortaklar: yedek.ortaklar,
+            ortakCari: yedek.ortakCari,
             belgeler: yedek.belgeler, alicilar: [], denetimIzi: yedek.denetimIzi)
 
         let ozet = try XCTUnwrap(vm().restore(from: turAt(yedek), user: yeniKullanici()))
@@ -312,7 +313,7 @@ final class BackupRestoreTests: XCTestCase {
             surum: ProjectExporter.backupVersion, olusturma: tarih, aliciDahil: true,
             proje: proje, malzemeler: [], malzemeHareketleri: [], giderler: [],
             daireler: [daire], tahsilatlar: [], taksitler: [], ortaklar: [],
-            belgeler: [], alicilar: [], denetimIzi: [])
+            ortakCari: nil, belgeler: [], alicilar: [], denetimIzi: [])
 
         let ozet = try XCTUnwrap(vm().restore(from: turAt(temiz), user: yeniKullanici()))
         let metin = ozet.message

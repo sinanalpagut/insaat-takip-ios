@@ -14,6 +14,17 @@ struct PartnersTabView: View {
     /// Hissesi düzenlenen ortak (yalnızca yönetici).
     @State private var pendingRemoval: Partner?
     @State private var editingPartner: Partner?
+    /// Cari hareket sayfası (madde 82). Ortak kimliği taşıyor: bir ortağın
+    /// kartından açıldığında o ortak seçili gelsin.
+    @State private var ledgerFor: LedgerTarget?
+    @State private var pendingLedgerDelete: PartnerLedgerEntry?
+
+    /// `sheet(item:)` için sarmalayıcı — nil ortak kimliği de geçerli bir
+    /// hedef (üstteki "+ Hareket" düğmesi).
+    struct LedgerTarget: Identifiable {
+        let partnerId: UUID?
+        var id: String { partnerId?.uuidString ?? "yeni" }
+    }
 
     /// PROJE BAZLI rol — global rol DEĞİL. `appState.isAdmin` her gerçek
     /// oturuma `.admin` veriyor (rol artık projede yaşıyor, kullanıcıda değil —
@@ -73,6 +84,8 @@ struct PartnersTabView: View {
                         }
                 }
 
+                ledgerCard
+
                 // Ortak görünümü: davet yetkisinin kimde olduğunu açıklayan not.
                 if !isAdmin {
                     HStack(alignment: .top, spacing: 10) {
@@ -100,6 +113,25 @@ struct PartnersTabView: View {
             PartnerShareSheet(partner: partner)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(item: $ledgerFor) { hedef in
+            PartnerLedgerSheet(projectId: projectId, partnerId: hedef.partnerId)
+        }
+        .alert("Cari hareket silinsin mi?", isPresented: Binding(
+            get: { pendingLedgerDelete != nil },
+            set: { if !$0 { pendingLedgerDelete = nil } }
+        ), presenting: pendingLedgerDelete) { entry in
+            Button("Vazgeç", role: .cancel) { pendingLedgerDelete = nil }
+            Button("Sil", role: .destructive) {
+                viewModel.deleteLedgerEntry(role: isAdmin ? .admin : .partner, entryId: entry.id)
+                pendingLedgerDelete = nil
+            }
+        } message: { entry in
+            // SİLMENİN İZ BIRAKTIĞI SÖYLENİYOR: bu kayıtlar ortaklar arasındaki
+            // hesabın dayanağı, sessizce kaybolmaları tam olarak uygulamanın
+            // önlemek için var olduğu tartışmayı üretirdi.
+            Text("\(entry.kind.rawValue) · \(Fmt.money(entry.amount)) kaydı silinecek. "
+                 + "Silme işlemi Kayıt İzi'ne yazılır.")
+        }
         .alert("Ortak projeden çıkarılsın mı?", isPresented: Binding(
             get: { pendingRemoval != nil },
             set: { if !$0 { pendingRemoval = nil } }
@@ -117,6 +149,138 @@ struct PartnersTabView: View {
                  + "daireler ve belgeler dahil.\n\n"
                  + "%\(partner.sharePercent) hissesi de kaydından düşer. Geri almak için "
                  + "yeni bir davet kodu göndermen gerekir.")
+        }
+    }
+
+    // MARK: Ortak cari hesabı (madde 82)
+
+    /// Kim ne koydu, kim ne çekti.
+    ///
+    /// BU KART "DAĞITILABİLİR KÂR" DEMİYOR ve demeyecek: o soru madde 86'nın
+    /// kalan inşaat maliyetini, satılmamış stoğun gerçekleşme oranını ve
+    /// vergi yükünü ister. Buradaki rakam çok daha dar ve kesin: ortak bu
+    /// projeye ne koydu, ne çekti, arada ne kaldı.
+    ///
+    /// ORTAK DA GÖRÜYOR ve karar kuralda alındı (firestore.rules ·
+    /// partnerLedger): ortak hesabın TARAFI, alıcı gibi üçüncü kişi değil.
+    /// Kimin ne koyduğunu gizlemek, uygulamanın önlemek için var olduğu
+    /// tartışmayı WhatsApp'a geri gönderirdi.
+    @ViewBuilder
+    private var ledgerCard: some View {
+        let hareketler = viewModel.ledger(for: projectId)
+        let ortaklar = viewModel.partners(for: projectId)
+
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Ortak Cari Hesabı")
+                    .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                Spacer()
+                if isAdmin {
+                    Button {
+                        ledgerFor = LedgerTarget(partnerId: nil)
+                    } label: {
+                        Text("+ Hareket")
+                            .font(.manrope(12, .bold))
+                            .foregroundColor(Palette.accent)
+                    }
+                }
+            }
+
+            if hareketler.isEmpty {
+                // BOŞ DURUM NE İŞE YARADIĞINI ANLATIYOR: bu defter bugüne
+                // kadar hiç olmadığı için kullanıcı ne yazacağını bilmiyor.
+                Text(isAdmin
+                     ? "Ortakların koyduğu sermaye, çektiği avans ve kâr dağıtımları burada tutulur. Gider defterinden ayrıdır: bu kayıtlar inşaat maliyetine girmez."
+                     : "Henüz cari hareket girilmemiş. Sermaye ve çekimler girildiğinde burada görünür.")
+                    .font(.manrope(11.5, .medium))
+                    .foregroundColor(Palette.textTertiary)
+                    .lineSpacing(3)
+                    .padding(.top, 10)
+            } else {
+                // ORTAK BAZINDA BAKİYE — hareket listesinden ÖNCE: "bende ne
+                // kaldı" sorusu, "ne zaman ne oldu"dan önce geliyor.
+                ForEach(ortaklar) { ortak in
+                    let bakiye = viewModel.balance(forPartner: ortak.id)
+                    if !bakiye.isEmpty {
+                        Divider().overlay(Palette.divider)
+                        balanceRow(ortak, bakiye)
+                    }
+                }
+
+                Divider().overlay(Palette.divider)
+                Text("HAREKETLER")
+                    .smallCapsLabel(size: 9.5, color: Palette.textFaded, tracking: 1.1)
+                    .padding(.top, 12)
+
+                ForEach(hareketler) { hareket in
+                    ledgerRow(hareket, partnerName: ortaklar.first { $0.id == hareket.partnerId }?.name ?? "—")
+                }
+            }
+        }
+        .padding(16)
+        .background(Palette.surface)
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Palette.border, lineWidth: 1))
+        .padding(.top, 6)
+    }
+
+    private func balanceRow(_ partner: Partner, _ balance: PartnerBalance) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(partner.name)
+                    .font(.manrope(13, .bold))
+                    .foregroundColor(Palette.ink)
+                Spacer()
+                // EKSİ BAKİYE GİZLENMİYOR: koyduğundan fazlasını çekmiş
+                // ortak ortaklığa borçludur ve rakam bunu söylemeli.
+                Text(Fmt.money(balance.net))
+                    .font(.sora(14.5, .bold))
+                    .foregroundColor(balance.net >= .zero ? Palette.ink : Palette.alertInk)
+            }
+            Text(balanceDetail(balance))
+                .font(.manrope(11, .medium))
+                .foregroundColor(Palette.textTertiary)
+        }
+        .padding(.vertical, 11)
+    }
+
+    private func balanceDetail(_ balance: PartnerBalance) -> String {
+        var parts: [String] = []
+        if balance.capital > .zero { parts.append("sermaye \(Fmt.compactMoney(balance.capital))") }
+        if balance.withdrawn > .zero { parts.append("çekilen \(Fmt.compactMoney(balance.withdrawn))") }
+        if balance.distributed > .zero { parts.append("dağıtım \(Fmt.compactMoney(balance.distributed))") }
+        return parts.joined(separator: " · ")
+    }
+
+    private func ledgerRow(_ entry: PartnerLedgerEntry, partnerName: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: entry.kind.icon)
+                .iconFont(13, weight: .medium)
+                .foregroundColor(entry.kind.increasesBalance ? Palette.success : Palette.accent)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(partnerName) · \(entry.kind.rawValue)")
+                    .font(.manrope(12.5, .semiBold))
+                    .foregroundColor(Palette.ink)
+                Text(entry.note.isEmpty ? entry.dateText : "\(entry.dateText) · \(entry.note)")
+                    .font(.manrope(11, .medium))
+                    .foregroundColor(Palette.textTertiary)
+            }
+            Spacer()
+            Text((entry.kind.increasesBalance ? "+ " : "− ") + Fmt.money(entry.amount))
+                .font(.sora(13, .bold))
+                .foregroundColor(entry.kind.increasesBalance ? Palette.success : Palette.ink)
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .contextMenu {
+            if isAdmin {
+                Button(role: .destructive) {
+                    pendingLedgerDelete = entry
+                } label: {
+                    Label("Hareketi Sil", systemImage: "trash")
+                }
+            }
         }
     }
 
@@ -224,7 +388,14 @@ struct PartnersTabView: View {
                          + "satış \(proje.salesTaxBasis.label); "
                          + "uygulama vergi hesaplamaz ve iki taban arasındaki farkı düzeltmez.")
         }
-        parts.append("Ortakların koyduğu sermaye ve çektiği para henüz uygulamada tutulmuyor.")
+        // MADDE 82 SONRASI: sermaye ve çekimler ARTIK tutuluyor, ama bu kart
+        // onları PAYA KATMIYOR ve katmamalı. Pay, proje toplamlarının
+        // yüzdeyle dilimlenmiş hâli; cari hesap ise ortağın kasayla arasındaki
+        // ayrı bir hesap. İkisini tek rakama katlamak, "payına düşen" ile
+        // "sana kalan" arasındaki farkı silerdi — üstelik kart bir mutabakat
+        // belgesi gibi görünmeye başladığı için burada daha da tehlikeli.
+        parts.append("Ortakların koyduğu sermaye ve çektiği para AYRI tutuluyor "
+                     + "(Ortak Cari Hesabı); bu paylara eklenmez, buradan düşülmez.")
         return parts.joined(separator: " ")
     }
 }

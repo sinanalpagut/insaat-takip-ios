@@ -28,6 +28,7 @@ rules_version = '2';
 //   projects/{pid}/sitePhotos/{id}
 //   projects/{pid}/expenses/{id}
 //   projects/{pid}/payments/{id}
+//   projects/{pid}/partnerLedger/{id}        → ortak cari (sermaye/çekim/dağıtım)
 //   projects/{pid}/apartmentPhotos/{id}
 //   projects/{pid}/auditEntries/{id}         → EKLE-ONLY
 //
@@ -289,6 +290,25 @@ service cloud.firestore {
       }
 
       match /payments/{docId} {
+        allow read: if isMember(pid);
+        allow create, update: if ownerWrite(pid);
+        allow delete: if isOwner(pid);
+      }
+
+      // ORTAK CARİ HESABI (madde 82) — sermaye, çekim, kâr dağıtımı.
+      //
+      // GİZLİLİK KARARI BURADA ALINIYOR, EKRANDA DEĞİL: A ortağı B'nin
+      // çektiği parayı GÖRÜR. Karar `buyers/{apartmentId}` ile aynı sınıfta
+      // ama sonucu TERS ve sebebi şu: alıcı ÜÇÜNCÜ KİŞİ, ortaklara
+      // görünmeyi hiç kabul etmedi; ortak ise hesabın TARAFI. Aynı kasaya
+      // kimin ne koyduğu ve kimin ne çektiği, hepsinin aynı havuz üzerindeki
+      // iddiasını belirliyor — bunu gizlemek, uygulamanın önlemek için var
+      // olduğu "kim ne aldı" tartışmasını WhatsApp'a geri gönderir ve
+      // yöneticinin her ortağa ayrı hikâye anlatmasına izin verirdi.
+      //
+      // Ortak YAZAMAZ: `ownerWrite(pid)`. Kendi çektiğini kendi yazabilseydi
+      // kayıt bir mutabakat belgesi olmaktan çıkardı.
+      match /partnerLedger/{docId} {
         allow read: if isMember(pid);
         allow create, update: if ownerWrite(pid);
         allow delete: if isOwner(pid);
