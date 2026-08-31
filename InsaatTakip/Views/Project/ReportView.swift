@@ -37,6 +37,7 @@ struct ReportView: View {
                     summaryCard
                         .padding(.top, 16)
                     outlookCard
+                    blockCard
                     chartCard
 
                     PrimaryButton(title: "PDF Olarak İndir", icon: "doc.text") {
@@ -371,6 +372,88 @@ struct ReportView: View {
         .padding(16)
         .background(Palette.surface)
         .cornerRadius(18)
+    }
+
+    // MARK: Blok / etap kırılımı (madde 83)
+
+    /// Aynı parselde birden çok blok varsa: hangi blok satıldı, hangisinde
+    /// stok kaldı.
+    ///
+    /// GİDER SATIRI YOK ve bu kartın en önemli kararı bu. Beton bütün
+    /// şantiyeye dökülüyor, vinç iki bloğu birden kaldırıyor, ruhsat harcı
+    /// parsele ödeniyor — blok başına maliyet dağıtmak, hiç toplanmamış bir
+    /// veriden blok kârı üretmek olurdu. Kart bu yüzden yalnızca daireye
+    /// KESİN olarak ait rakamları taşıyor ve eksiği kendi altında yazıyor.
+    @ViewBuilder
+    private var blockCard: some View {
+        let slices = viewModel.blockBreakdown(for: projectId)
+        if !slices.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("Blok / Etap")
+                        .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                    Spacer()
+                    Text("proje geneli")
+                        .font(.manrope(11, .medium))
+                        .foregroundColor(Palette.textTertiary)
+                }
+                .padding(.bottom, 4)
+
+                ForEach(slices) { slice in
+                    Divider().overlay(Palette.divider)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(slice.label.isEmpty ? "Blok belirtilmemiş" : slice.label)
+                                .font(.manrope(13.5, .semiBold))
+                                .foregroundColor(Palette.ink)
+                            Spacer()
+                            Text(Fmt.exactMoney(slice.salesTotal))
+                                .font(.sora(15, .bold))
+                                .foregroundColor(Palette.ink)
+                        }
+                        // Sayılar tek satırda: "12/16 satıldı · 3 boş · 1 kat karşılığı".
+                        Text(blockDetail(slice))
+                            .font(.manrope(11.5, .medium))
+                            .foregroundColor(Palette.textMuted)
+                    }
+                    .padding(.vertical, 11)
+                }
+
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "info.circle")
+                        .iconFont(11, weight: .medium)
+                        .padding(.top, 1)
+                    Text("Tutarlar SATILAN dairelerin bedelidir. Gider blok bazında "
+                         + "ayrılmıyor: beton, vinç ve harç bütün parsele ait.")
+                        .font(.manrope(11, .medium))
+                        .lineSpacing(2)
+                }
+                .foregroundColor(Palette.textTertiary)
+                .padding(.top, 12)
+            }
+            .padding(16)
+            .background(Palette.surface)
+            .cornerRadius(18)
+        }
+    }
+
+    private func blockDetail(_ slice: ProjectViewModel.BlockSlice) -> String {
+        var parts = ["\(slice.soldCount)/\(slice.total) satıldı"]
+        if slice.stockTotal > .zero {
+            // Rezerve SAYISI yazılıyor: tutarın içinde sözleşmesi
+            // kesinleşmemiş daire varsa okuyucu bunu bilmeli.
+            parts.append(slice.reservedCount > 0
+                         ? "stok \(Fmt.compactMoney(slice.stockTotal)) · \(slice.reservedCount) rezerve dahil"
+                         : "stok \(Fmt.compactMoney(slice.stockTotal))")
+        }
+        if slice.pricelessCount > 0 {
+            // Eksik rakam SÖYLENİYOR — outlookCard'daki desenin aynısı.
+            parts.append("\(slice.pricelessCount) dairenin fiyatı girilmedi")
+        }
+        if slice.landOwnerCount > 0 {
+            parts.append("\(slice.landOwnerCount) kat karşılığı")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private var chartCard: some View {

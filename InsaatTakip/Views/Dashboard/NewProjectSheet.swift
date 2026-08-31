@@ -41,6 +41,29 @@ struct NewProjectSheet: View {
                     }
                     .padding(.top, 14)
 
+                    // PARSEL BAŞINA TEK PROJE — madde 83.
+                    //
+                    // Bu cümle kurulum ekranında duruyor çünkü kararın
+                    // alındığı an burası ve geri dönüşü olan tek an da bu.
+                    // Üç bloğu üç ayrı proje olarak kurduktan SONRA
+                    // birleştirmek, o projelerin altındaki her daire,
+                    // malzeme, fiş, gider, tahsilat, taksit ve denetim izi
+                    // belgesini yeni yola kopyalayıp silmek demek — madde
+                    // 77'nin "iz sonradan yazılamaz" kuralını uygulamanın
+                    // kendi eliyle çiğnemesi. Bir cümlenin önlediği göç.
+                    HStack(alignment: .top, spacing: 7) {
+                        Image(systemName: "info.circle")
+                            .iconFont(11, weight: .medium)
+                            .padding(.top, 1)
+                        Text("Aynı ada/parselde birden çok blok varsa TEK proje aç: "
+                             + "blok adını daire bilgisinde \"Blok / Etap\" alanına yaz. "
+                             + "Belge ve ortaklar bir kez girilir, parsel toplamı doğru çıkar.")
+                            .font(.manrope(11, .medium))
+                            .lineSpacing(2)
+                    }
+                    .foregroundColor(Palette.textTertiary)
+                    .padding(.top, 14)
+
                     PrimaryButton(title: "Projeyi Oluştur") {
                         if viewModel.addProject(user: appState.currentUser,
                                                 block: block, parcel: parcel,

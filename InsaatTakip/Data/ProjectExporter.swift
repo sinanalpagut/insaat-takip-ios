@@ -202,6 +202,12 @@ struct ProjectExporter {
                 let satildi = apartment.countsAsRevenue
                 var values = [
                     String(apartment.apartmentNumber),
+                    // BLOK SÜTUNU (madde 83): mali müşavir dosyayı blok
+                    // bazında süzebilsin. Ekranda kırılım yalnızca birden
+                    // çok etiket varsa görünüyor ama CSV'de sütun HER ZAMAN
+                    // var — süzülecek bir dosyada sütunun bazen olup bazen
+                    // olmaması, şablonu her seferinde bozardı.
+                    apartment.blockLabel,
                     Apartment.floorLabel(for: apartment.floor),
                     apartment.type,
                     apartment.areaM2.map { quantity($0) } ?? "",
@@ -225,7 +231,7 @@ struct ProjectExporter {
         // "Liste Fiyatı" ile "Satış Bedeli" AYRI sütunlar: boş daire de liste
         // fiyatı taşır ama o ciro değildir. Tek sütunda toplanınca ekrandaki
         // satış rakamıyla dosyadaki toplam ayrışıyordu.
-        var header = ["Daire No", "Kat", "Tip", "Brüt m²", "Durum",
+        var header = ["Daire No", "Blok / Etap", "Kat", "Tip", "Brüt m²", "Durum",
                       "Liste Fiyatı", "Satış Bedeli", "Tahsil Edilen",
                       "Kalan Alacak", "Kapora", "Satış Tarihi"]
         if includeBuyer { header.append("Alıcı") }

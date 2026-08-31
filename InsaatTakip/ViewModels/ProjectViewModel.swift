@@ -1143,6 +1143,73 @@ final class ProjectViewModel: ObservableObject {
             .sorted { $0.apartmentNumber < $1.apartmentNumber }
     }
 
+    // MARK: - Blok / etap kırılımı (madde 83)
+
+    /// Tek bloğun rakamları. HEPSİ DAİREDEN TÜRÜYOR — bilerek.
+    struct BlockSlice: Identifiable {
+        /// Boş dize "belirtilmedi" demek; ekran bunu "Blok belirtilmemiş" yazıyor.
+        let label: String
+        var id: String { label }
+        var total: Int = 0
+        var soldCount: Int = 0
+        var landOwnerCount: Int = 0
+        /// Satılan dairelerin bedeli — bu bloğa KESİN olarak ait.
+        var salesTotal: Kurus = .zero
+        /// Boş + rezerve dairelerin liste fiyatı.
+        var stockTotal: Kurus = .zero
+        /// Bu toplamın içindeki REZERVE daire sayısı.
+        ///
+        /// Beklenen hasılat kartı rezerveyi kendi kovasında tutuyor çünkü
+        /// sözleşmesi kesinleşmedi. Blok kartında ayrı bir kova daha satır
+        /// eklerdi, ama rakamın içinde rezerve olduğunu SÖYLEMEMEK aynı
+        /// ayrımı bir kat yukarıda silmek olurdu — o yüzden sayı taşınıyor
+        /// ve satır "1 rezerve dahil" diye yazıyor.
+        var reservedCount: Int = 0
+        /// Liste fiyatı girilmemiş boş/rezerve daire sayısı.
+        var pricelessCount: Int = 0
+    }
+
+    /// Projenin blok kırılımı — YALNIZCA birden çok farklı etiket varsa dolu.
+    ///
+    /// GİDER BU KIRILIMDA YOK ve olmaması maddenin kararı: beton bütün
+    /// şantiyeye dökülüyor, vinç iki bloğu birden kaldırıyor, ruhsat harcı
+    /// parsele ödeniyor. Malzemeyi blok başına dağıtmak, veri hiç
+    /// toplanmadığı hâlde blok kârı üretmek olurdu — bu kod tabanının
+    /// `areaCost`ta nil döndürerek ve m² maliyetinin paydasını yazarak
+    /// defalarca reddettiği sahte hassasiyet. Bu yüzden kırılım yalnızca
+    /// daireye KESİN olarak ait olan rakamları taşıyor: adet, ciro, stok.
+    ///
+    /// TEK ETİKET VARSA BOŞ DÖNER: tek bloklu her projeye "A Blok · 20 daire"
+    /// diye bir kart koymak, hiçbir şey söylemeyen bir kart olurdu.
+    func blockBreakdown(for projectId: UUID) -> [BlockSlice] {
+        var kovalar: [String: BlockSlice] = [:]
+        for daire in apartments(for: projectId) {
+            let etiket = daire.blockLabel
+            var kova = kovalar[etiket] ?? BlockSlice(label: etiket)
+            kova.total += 1
+            switch daire.status {
+            case .sold:
+                kova.soldCount += 1
+                kova.salesTotal = kova.salesTotal + daire.price
+            case .reserved, .available:
+                if daire.status == .reserved { kova.reservedCount += 1 }
+                if daire.price == .zero { kova.pricelessCount += 1 }
+                else { kova.stockTotal = kova.stockTotal + daire.price }
+            case .landOwner:
+                kova.landOwnerCount += 1
+            }
+            kovalar[etiket] = kova
+        }
+        guard kovalar.count > 1 else { return [] }
+        // Etiketsiz daireler EN SONA: "belirtilmedi" bir blok adı değil,
+        // eksik veri. Listenin başında dursaydı bir bloğun adıymış gibi
+        // okunurdu.
+        return kovalar.values.sorted {
+            if $0.label.isEmpty != $1.label.isEmpty { return $1.label.isEmpty }
+            return $0.label.localizedStandardCompare($1.label) == .orderedAscending
+        }
+    }
+
     func partners(for projectId: UUID) -> [Partner] {
         partners.filter { $0.projectId == projectId }
     }
@@ -1731,7 +1798,7 @@ final class ProjectViewModel: ObservableObject {
     func updateApartment(role: UserRole, apartmentId: UUID, type: String, areaM2: Double?,
                          floor: Int, status: Apartment.Status,
                          listPriceText: String, deliveryNote: String,
-                         buyerName: String = "") -> Bool {
+                         buyerName: String = "", blockLabel: String = "") -> Bool {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return false }
 
@@ -1749,6 +1816,7 @@ final class ProjectViewModel: ObservableObject {
 
         var apartment = before
         apartment.type = type.trimmingCharacters(in: .whitespaces)
+        apartment.blockLabel = blockLabel.trimmingCharacters(in: .whitespaces)
         apartment.areaM2 = areaM2
         apartment.floor = floor
         apartment.deliveryNote = deliveryNote.trimmingCharacters(in: .whitespaces)
@@ -1812,6 +1880,15 @@ final class ProjectViewModel: ObservableObject {
         }
         if before.type != apartment.type {
             changes.append(.init(field: "Tip", oldValue: before.type, newValue: apartment.type))
+        }
+        // BLOK DEĞİŞİKLİĞİ İZE YAZILIYOR: etiket ciroyu blok bazında
+        // kırıyor, yani bir daireyi başka bloğa taşımak raporda iki bloğun
+        // rakamını birden değiştiriyor. İzsiz bırakılsaydı, kırılımın neden
+        // değiştiği sorusunun cevabı hiçbir yerde olmazdı.
+        if before.blockLabel != apartment.blockLabel {
+            changes.append(.init(field: "Blok / Etap",
+                                 oldValue: before.blockLabel.isEmpty ? "—" : before.blockLabel,
+                                 newValue: apartment.blockLabel.isEmpty ? "—" : apartment.blockLabel))
         }
         if before.areaM2 != apartment.areaM2 {
             changes.append(.init(field: "Alan",
@@ -2051,6 +2128,10 @@ final class ProjectViewModel: ObservableObject {
 
         var writes: [DocumentChange] = []
         for i in hedefler {
+            // BLOK ETİKETİ KOPYALANMIYOR (madde 83): tip ve alan fiziksel
+            // olarak tekrar eden özellikler, blok ise dairenin NEREDE
+            // olduğu. Kopyalansaydı tek dokunuşla bütün projenin daireleri
+            // aynı bloğa taşınır ve blok kırılımı sessizce tek bloğa inerdi.
             apartments[i].type = source.type
             apartments[i].areaM2 = source.areaM2
             writes.append(.apartment(apartments[i]))

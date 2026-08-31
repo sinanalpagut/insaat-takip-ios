@@ -56,6 +56,33 @@ struct Apartment: Codable, Identifiable, Equatable {
     var floor: Int
     var type: String            // "2+1" / "3+1"
 
+    /// Blok / etap etiketi — SERBEST METİN (madde 83). "A Blok", "SF-1",
+    /// "2. Etap"…
+    ///
+    /// NEDEN DAİREDE, PROJEDE DEĞİL: aynı ada/parselde birden çok blok
+    /// yapılıyor ve uygulamanın önerdiği kurulum "parsel başına TEK proje".
+    /// Etiket projede olsaydı proje başına tek blok demek olurdu; kullanıcı
+    /// da her blok için ayrı proje açardı ve gerçek maliyet o zaman
+    /// çıkardı: üç bloğu sonradan birleştirmek daire, malzeme, fiş, gider,
+    /// tahsilat, taksit ve DENETİM İZİ belgelerini yeni yola kopyalayıp
+    /// silmek demek — madde 77'nin "iz sonradan yazılamaz" kuralını
+    /// uygulamanın kendi eliyle çiğnemesi.
+    ///
+    /// SERBEST METİN, çünkü blok adlandırması standart değil: TOKİ "SF-1
+    /// Blok 1" derken müteahhit "A Blok", belediye "2. Etap" diyor. Sabit
+    /// bir liste, sahadaki adı uygulamanın adına çevirmeyi kullanıcıya
+    /// yıkardı.
+    ///
+    /// BOŞ = BELİRTİLMEDİ ve tek bloklu projede normal olan bu. Ekranlar
+    /// blok kırılımını yalnızca BİRDEN ÇOK farklı etiket varsa gösteriyor;
+    /// yoksa tek bloklu her proje "Blok: —" başlığı taşırdı.
+    ///
+    /// DAİRE NUMARASI HÂLÂ PROJE GENELİNDE TEKİL (`addApartment` max+1) ve
+    /// öyle kalmalı: denetim izi daireyi NUMARASINDAN yazıyor
+    /// (`apartment(in:number:)`), blok başına 1'den başlayan numaralandırma
+    /// geçmiş izleri iki daire arasında belirsiz bırakırdı.
+    var blockLabel: String = ""
+
     /// BRÜT alan, m² — SAYI, metin değil.
     ///
     /// Önce `area: String` idi ("95 m²", "111,55 m²", "103,8 m²") ve hiçbir
@@ -94,7 +121,7 @@ struct Apartment: Codable, Identifiable, Equatable {
     var deliveryNote: String    // "Anahtar teslim bekliyor" vb.
 
     enum CodingKeys: String, CodingKey {
-        case id, projectId, apartmentNumber, floor, type, areaM2, status
+        case id, projectId, apartmentNumber, floor, type, blockLabel, areaM2, status
         /// ESKİ metin alanı — yalnızca GÖÇ için okunuyor, hiç yazılmıyor.
         case area
         case price, paidAmount, paymentStatus, saleDate, deliveryNote
@@ -135,7 +162,7 @@ struct Apartment: Codable, Identifiable, Equatable {
     /// sağlamıyor. Alan sırası ve varsayılanlar kaydın okunuşunu belirlediği
     /// için burada duruyor.
     init(id: UUID, projectId: UUID, apartmentNumber: Int, floor: Int,
-         type: String, areaM2: Double?, status: Status,
+         type: String, blockLabel: String = "", areaM2: Double?, status: Status,
          buyerName: String? = nil, price: Kurus, paidAmount: Kurus,
          paymentStatus: PaymentStatus? = nil, saleDate: Date? = nil,
          deliveryNote: String) {
@@ -144,6 +171,7 @@ struct Apartment: Codable, Identifiable, Equatable {
         self.apartmentNumber = apartmentNumber
         self.floor = floor
         self.type = type
+        self.blockLabel = blockLabel
         self.areaM2 = areaM2
         self.status = status
         self.buyerName = buyerName
@@ -170,6 +198,10 @@ struct Apartment: Codable, Identifiable, Equatable {
         apartmentNumber = try c.decode(Int.self, forKey: .apartmentNumber)
         floor = try c.decode(Int.self, forKey: .floor)
         type = try c.decode(String.self, forKey: .type)
+        // ESKİ BELGEDE YOK: madde 83'ten önce yazılmış her daire belgesi
+        // etiketsiz. `decodeIfPresent` + boş dize, "belirtilmedi" durumunun
+        // ta kendisi — göç gerekmiyor, çünkü boş etiket zaten geçerli hâl.
+        blockLabel = try c.decodeIfPresent(String.self, forKey: .blockLabel) ?? ""
         status = try c.decode(Status.self, forKey: .status)
         price = try c.decode(Kurus.self, forKey: .price)
         paidAmount = try c.decode(Kurus.self, forKey: .paidAmount)

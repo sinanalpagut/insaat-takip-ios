@@ -22,6 +22,7 @@ struct ApartmentEditSheet: View {
     @State private var buyerName = ""
     @State private var listPriceText = ""
     @State private var deliveryNote = ""
+    @State private var blockLabel = ""
     @State private var didLoad = false
 
     private var apartment: Apartment? {
@@ -75,6 +76,15 @@ struct ApartmentEditSheet: View {
                               keyboard: .decimalPad)
                     }
                     .padding(.top, 16)
+
+                    // BLOK / ETAP — madde 83. Serbest metin: TOKİ "SF-1 Blok
+                    // 1", müteahhit "A Blok", belediye "2. Etap" diyor; sabit
+                    // liste sahadaki adı uygulamanınkine çevirmeyi kullanıcıya
+                    // yıkardı. Tek bloklu projede boş kalır ve hiçbir ekran
+                    // blok kırılımı göstermez.
+                    field("BLOK / ETAP", text: $blockLabel,
+                          placeholder: "Örn. A Blok · boş bırakılabilir")
+                        .padding(.top, 16)
 
                     // Kat — bodrum (negatif) ve zemin (0) ifade edilebilsin:
                     // yeni proje kurulumu katları 1'den başlatıyordu, oysa gerçek
@@ -269,6 +279,7 @@ struct ApartmentEditSheet: View {
         buyerName = apartment.buyerName ?? ""
         listPriceText = apartment.price > .zero ? Fmt.moneyText(apartment.price) : ""
         deliveryNote = apartment.deliveryNote
+        blockLabel = apartment.blockLabel
     }
 
     /// Önce kaynağı kaydeder, sonra kopyalar. Sıra önemli: kaydetmeden
@@ -281,7 +292,8 @@ struct ApartmentEditSheet: View {
                                         floor: floor, status: status,
                                         listPriceText: listPriceText,
                                         deliveryNote: deliveryNote,
-                                        buyerName: buyerName) else { return }
+                                        buyerName: buyerName,
+                                        blockLabel: blockLabel) else { return }
         let n = viewModel.applyTypeAndArea(role: role, from: apartmentId,
                                            wholeProject: wholeProject)
         if n == 0 { viewModel.flash("Diğer daireler zaten aynı") }
@@ -297,7 +309,8 @@ struct ApartmentEditSheet: View {
                                               status: status,
                                               listPriceText: listPriceText,
                                               deliveryNote: deliveryNote,
-                                              buyerName: buyerName)
+                                              buyerName: buyerName,
+                                              blockLabel: blockLabel)
         if saved { dismiss() }
     }
 }

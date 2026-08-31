@@ -263,10 +263,16 @@ extension InMemoryProjectRepository {
                 else if isReserved { status = .reserved }
                 else { status = .available }
 
+                // BLOK ETİKETİ (madde 83): Çayırova 20 daire = iki blok
+                // (A: 1-10, B: 11-20). Demo veride blok kırılımının HEM
+                // gruplama hem rapor kartı hâli görülebilsin diye; diğer
+                // projeler tek bloklu, orada kırılım hiç görünmüyor.
+                let blok = isCayirova ? (n <= 10 ? "A Blok" : "B Blok") : ""
+
                 apartments.append(Apartment(id: UUID(), projectId: project.id,
                                             apartmentNumber: n,
                                             floor: (n - 1) / perFloor + 1,
-                                            type: t.0, areaM2: t.1,
+                                            type: t.0, blockLabel: blok, areaM2: t.1,
                                             status: status,
                                             buyerName: sale?.1 ?? (isReserved ? p1Reserved.buyer : nil),
                                             // Kat karşılığı daire bedelsizdir: arsa bedeli gider
@@ -315,7 +321,9 @@ extension InMemoryProjectRepository {
         for (no, floor, buyer, price, paid, date) in karsUnits {
             apartments.append(Apartment(id: UUID(), projectId: DemoID.kars309,
                                         apartmentNumber: no, floor: floor,
-                                        type: "3+1", areaM2: 111.55,
+                                        // GERÇEK blok adı: bugüne kadar yalnızca
+                                        // yorum satırında yaşıyordu (madde 83).
+                                        type: "3+1", blockLabel: "SF-1 Blok 1", areaM2: 111.55,
                                         status: buyer == nil ? .available : .sold,
                                         buyerName: buyer,
                                         price: price,
@@ -361,7 +369,7 @@ extension InMemoryProjectRepository {
         for (no, floor, buyer, price, paid, date) in kars327Units {
             apartments.append(Apartment(id: UUID(), projectId: DemoID.kars327,
                                         apartmentNumber: no, floor: floor,
-                                        type: "3+1", areaM2: 103.8,
+                                        type: "3+1", blockLabel: "GB Blok 1", areaM2: 103.8,
                                         status: buyer == nil ? .available : .sold,
                                         buyerName: buyer,
                                         price: price,

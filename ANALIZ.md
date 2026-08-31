@@ -1556,9 +1556,62 @@ verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam
       Uygulama kapsam dışı olduğunu ortağa YAZIYOR ama maddesi yok.
 - [~] 82. **Ortak cari hesabı** — sermaye, avans, dağıtım (Farklılaştırıcı#2,
       🔴 Kritik). `PartnersTabView:174` kullanıcıya "henüz tutulmuyor" diyor.
-- [~] 83. **Blok / etap kavramı** (Gözden Kaçanlar#6). Kanıtı demo verisinin
+- [x] 83. **Blok / etap kavramı** (Gözden Kaçanlar#6). Kanıtı demo verisinin
       içinde: "SF-1 Blok 1" ve "GB Blok 1" iki AYRI proje olarak, uydurma
       ada/parsel numaralarıyla modellenmiş.
+      → **DÜZELTME:** ada/parsel numaraları UYDURMA DEĞİL, ikisi de gerçek
+      TOKİ verisi (1224/1 ve 1139/3). Gerçek eksik daha dar ve daha net:
+      veride "blok" diye bir alan YOKTU; blok adları yalnızca yorum
+      satırında yaşıyordu.
+      → **YAPILDI (31 Ağu 2026, dar dilim).** `Apartment.blockLabel` —
+      serbest metin, boş = belirtilmedi.
+      **NEDEN DAİREDE, PROJEDE DEĞİL:** etiket projede olsaydı "proje başına
+      tek blok" demek olurdu ve kullanıcı her blok için ayrı proje açmaya
+      devam ederdi — maddenin bütün maliyeti orada. Üç bloğu sonradan
+      birleştirmek, o projelerin altındaki her daire, malzeme, fiş, gider,
+      tahsilat, taksit ve DENETİM İZİ belgesini yeni yola kopyalayıp silmek
+      demek; yani madde 77'nin "iz sonradan yazılamaz" kuralını uygulamanın
+      kendi eliyle çiğnemesi. Listedeki tek FAİZİYLE BÜYÜYEN madde buydu, o
+      yüzden dar dilim bugün girdi.
+      **SERBEST METİN:** TOKİ "SF-1 Blok 1", müteahhit "A Blok", belediye
+      "2. Etap" diyor; sabit liste, sahadaki adı uygulamanın adına çevirmeyi
+      kullanıcıya yıkardı.
+      **GİDER BLOĞA DAĞITILMIYOR** — kararın en önemli yarısı. Beton bütün
+      şantiyeye dökülüyor, vinç iki bloğu birden kaldırıyor, ruhsat harcı
+      parsele ödeniyor. Blok başına maliyet dağıtmak, hiç toplanmamış bir
+      veriden blok KÂRI üretmek olurdu: `areaCost`ta nil döndürerek ve m²
+      maliyetinin paydasını yazarak defalarca reddedilen sahte hassasiyet.
+      Rapor kartı bu yüzden yalnızca daireye KESİN ait rakamları taşıyor
+      (adet, ciro, stok) ve eksiği kendi altında yazıyor. Stok satırı
+      rezerve sayısını da söylüyor: beklenen hasılat kartı rezerveyi ayrı
+      kovada tutuyor, blok kartında sessizce karıştırmak o ayrımı bir kat
+      yukarıda silmek olurdu.
+      **DAİRE NUMARASI PROJE GENELİNDE TEKİL KALDI:** denetim izi daireyi
+      NUMARASINDAN yazıyor (`apartment(in:number:)`); blok başına 1'den
+      başlayan numaralandırma geçmiş izleri iki daire arasında belirsiz
+      bırakırdı.
+      **KIRILIM YALNIZCA BİRDEN ÇOK ETİKET VARSA** görünüyor (liste
+      gruplaması ve rapor kartı): tek bloklu her projeye "A Blok · 20 daire"
+      kartı koymak hiçbir şey söylemeyen bir kart olurdu. Gruplama süzgecin
+      ALTINDA: "Boş" süzgeci açıkken boş dairesi olmayan blok başlığı
+      görünmemeli, yoksa başlık var olmayan bir stoğu ima ederdi.
+      Etiketsizler her yerde EN SONDA — "belirtilmedi" bir blok adı değil.
+      **GÖÇ YOK:** eski belgelerde alan hiç yok, `decodeIfPresent` + boş dize
+      zaten geçerli hâl. CSV'de sütun HER ZAMAN var (ekranda kırılım
+      koşullu): sütunun bazen olup bazen olmaması müşavirin şablonunu
+      bozardı. Toplu "tipi/alanı bütün projeye uygula" etiketi KOPYALAMIYOR —
+      tek dokunuşla bütün daireler aynı bloğa taşınırdı.
+      Kurulum ekranına yönlendirme cümlesi eklendi ("aynı ada/parselde birden
+      çok blok varsa TEK proje aç") — kararın alındığı ve geri dönüşü olan
+      tek an orası.
+      Testler: BlockLabelTests 8 test. Demo veride Çayırova iki bloğa
+      (A: 1-10, B: 11-20) bölündü, Kars projeleri gerçek blok adlarını aldı.
+      Simülatörde doğrulandı: A Blok 31.450.000 ₺ (9/10) + B Blok
+      11.200.000 ₺ (3/10) = 42.650.000 ₺, başlıktaki satış rakamıyla aynı.
+      **KAPSAM DIŞI KALAN:** gerçek Proje → Blok → Daire hiyerarşisi ve blok
+      bazlı maliyet dağıtımı. Tetik: aynı sahibin aynı ada/parsel/ilçe ile
+      ikinci projeyi açmaya devam etmesi (`addProject` içinde tespit
+      edilebilir bir sinyal).
 - [~] 84. **Ortak ↔ yönetici iletişimi** (Gözden Kaçanlar#7). Ortağın yüzeyi
       salt okunur bir vitrin: gideri sorgulayamıyor, raporu "gördüm" diye
       işaretleyemiyor. Bildirim de gitmediği için ilişki tek yönlü.

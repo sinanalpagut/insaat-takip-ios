@@ -51,6 +51,7 @@ struct ApartmentsTabView: View {
                 apartment.areaText,
                 Apartment.floorLabel(for: apartment.floor),
                 apartment.status.label,
+                apartment.blockLabel,
             ]
             if isAdmin, let buyer = apartment.buyerName { haystack.append(buyer) }
             // EŞLEŞTİRME ORTAK YARDIMCIDA (madde 79). Burada kendi kuralını
@@ -65,6 +66,67 @@ struct ApartmentsTabView: View {
         GridItem(.flexible(), spacing: 9),
         GridItem(.flexible(), spacing: 9),
     ]
+
+    /// Süzgeçten GEÇEN dairelerin blok grupları.
+    ///
+    /// Gruplama süzgecin ÜSTÜNDE değil ALTINDA: "Boş" süzgeci açıkken
+    /// listede boş dairesi olmayan bir blok başlığı görünmemeli, yoksa
+    /// başlık var olmayan bir stoğu ima ederdi.
+    private var blockGroups: [(label: String, items: [Apartment])] {
+        let gruplar = Dictionary(grouping: visibleApartments, by: \.blockLabel)
+        return gruplar
+            .map { (label: $0.key, items: $0.value.sorted { $0.apartmentNumber < $1.apartmentNumber }) }
+            // Etiketsizler en sona: "belirtilmedi" bir blok adı değil.
+            .sorted {
+                if $0.label.isEmpty != $1.label.isEmpty { return $1.label.isEmpty }
+                return $0.label.localizedStandardCompare($1.label) == .orderedAscending
+            }
+    }
+
+    private func blockHeader(_ group: (label: String, items: [Apartment])) -> some View {
+        HStack {
+            Text(group.label.isEmpty ? "Blok belirtilmemiş" : group.label)
+                .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+            Spacer()
+            Text("\(group.items.count) daire")
+                .font(.manrope(11, .medium))
+                .foregroundColor(Palette.textTertiary)
+        }
+        .padding(.top, 4)
+    }
+
+    private func grid(_ items: [Apartment]) -> some View {
+        LazyVGrid(columns: columns, spacing: 9) {
+            ForEach(items) { apartment in
+                Button {
+                    onSelect(apartment)
+                } label: {
+                    ApartmentCellView(apartment: apartment)
+                }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    if isAdmin {
+                        Button {
+                            onEditInfo(apartment)
+                        } label: {
+                            Label("Daire Bilgisini Düzenle", systemImage: "pencil")
+                        }
+                        // SİLME YALNIZCA TAAHHÜTSÜZ DAİREDE (madde 61).
+                        // Satılmış/rezerve dairenin tahsilatı, taksit
+                        // planı ve alıcı kaydı var; seçeneği hiç
+                        // göstermemek, dokunup hata almaktan iyi.
+                        if !apartment.isCommitted {
+                            Button(role: .destructive) {
+                                pendingApartmentDelete = apartment
+                            } label: {
+                                Label("Daireyi Sil", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -91,35 +153,16 @@ struct ApartmentsTabView: View {
                     noMatchState
                 }
 
-                LazyVGrid(columns: columns, spacing: 9) {
-                    ForEach(visibleApartments) { apartment in
-                        Button {
-                            onSelect(apartment)
-                        } label: {
-                            ApartmentCellView(apartment: apartment)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            if isAdmin {
-                                Button {
-                                    onEditInfo(apartment)
-                                } label: {
-                                    Label("Daire Bilgisini Düzenle", systemImage: "pencil")
-                                }
-                                // SİLME YALNIZCA TAAHHÜTSÜZ DAİREDE (madde 61).
-                                // Satılmış/rezerve dairenin tahsilatı, taksit
-                                // planı ve alıcı kaydı var; seçeneği hiç
-                                // göstermemek, dokunup hata almaktan iyi.
-                                if !apartment.isCommitted {
-                                    Button(role: .destructive) {
-                                        pendingApartmentDelete = apartment
-                                    } label: {
-                                        Label("Daireyi Sil", systemImage: "trash")
-                                    }
-                                }
-                            }
-                        }
+                // BLOĞA GÖRE GRUPLAMA — madde 83. Yalnızca birden çok etiket
+                // varsa: tek bloklu projede tek başlık, hiçbir şey söylemeyen
+                // bir gürültü olurdu.
+                if blockGroups.count > 1 {
+                    ForEach(blockGroups, id: \.label) { group in
+                        blockHeader(group)
+                        grid(group.items)
                     }
+                } else {
+                    grid(visibleApartments)
                 }
 
                 Spacer().frame(height: 90)
