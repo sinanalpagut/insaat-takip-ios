@@ -52,6 +52,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // yakaladığı Firestore örneğini öldürüp bir sonraki girişte çökmeye
         // yol açıyordu (bkz. LocalDataPurge).
         LocalDataPurge.purgeFirestoreCacheIfPending()
+
+        // TEŞHİS: `-firelog` verilmişse SDK günlüğü açılıyor. Emülatör
+        // dalındaki `enableLogging` yalnızca emülatörde koşuyordu; üretimde
+        // sessizce reddedilen bir yazmayı görmenin başka yolu yok.
+        if LaunchConfig.firestoreLogging { Firestore.enableLogging(true) }
         return true
     }
 

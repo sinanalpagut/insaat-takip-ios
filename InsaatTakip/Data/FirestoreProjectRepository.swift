@@ -117,6 +117,16 @@ final class FirestoreProjectRepository: ProjectRepository {
             }
         }
 
+        #if DEBUG
+        // ALT KOLEKSİYONLAR BİRLEŞTİKTEN SONRA. İlk satır yalnızca proje
+        // belgelerini sayıyor; alt koleksiyonlar bu döngüde geliyor. Sayaç
+        // yukarıda kalsaydı her zaman sıfır basar ve "veri gelmiyor" gibi
+        // okunurdu — bir teşhis turu tam olarak bu yüzden yanlış yola saptı.
+        print("[load] alt: daire=\(result.apartments.count) cari=\(result.partnerLedger.count) "
+              + "gider=\(result.expenses.count) tahsilat=\(result.payments.count) "
+              + "ortak=\(result.partners.count) düşen proje=\(result.failedProjects.count)")
+        #endif
+
         // Malzeme toplamları KAYITLI DEĞİL (madde 19): `Material.CodingKeys`
         // türetilen alanları dışarıda bırakıyor, çünkü kalıcı olsalardı her fiş
         // işlemi tam dokümanı yazar ve iki cihaz eşzamanlı giriş yaptığında
@@ -216,6 +226,7 @@ final class FirestoreProjectRepository: ProjectRepository {
             for change in rest { try stage(change, in: batch) }
             try await batch.commit()
         }
+
 
         // Yazma başarılı: iç kopya da güncellenir.
         mirror(changes)

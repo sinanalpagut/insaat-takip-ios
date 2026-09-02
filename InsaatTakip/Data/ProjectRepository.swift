@@ -64,6 +64,12 @@ extension DataSnapshot {
         expenses += other.expenses
         payments += other.payments
         installments += other.installments
+        // 2 Eyl 2026'da EKSİKTİ ve cihaz turunda yakalandı: proje başına
+        // okunan cari hareketler burada sessizce düşüyordu. Sunucuda belge
+        // vardı, `fetch` okuyordu, birleştirme çöpe atıyordu — ekran boş,
+        // hata yok. `DataSnapshotMergeTests` artık her koleksiyonu Mirror ile
+        // sayıyor, yani bir dahaki eklemede test patlar.
+        partnerLedger += other.partnerLedger
         apartmentPhotos += other.apartmentPhotos
         auditEntries += other.auditEntries
         failedProjects += other.failedProjects

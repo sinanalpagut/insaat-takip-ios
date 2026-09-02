@@ -633,6 +633,11 @@ final class ProjectViewModel: ObservableObject {
             ("şantiye fotoğrafı", sitePhotos.count, mirror.sitePhotos.count),
             ("gider", expenses.count, mirror.expenses.count),
             ("tahsilat", payments.count, mirror.payments.count),
+            // İKİSİ DE EKSİKTİ (2 Eyl 2026). Dikiş denetiminin tek işi
+            // "persist çağırmayı unutmayı" yakalamak; saymadığı koleksiyonda
+            // kördü ve cari hesap tam oradan kaybolmuştu.
+            ("taksit", installments.count, mirror.installments.count),
+            ("cari hareket", partnerLedger.count, mirror.partnerLedger.count),
             ("daire görseli", apartmentPhotos.count, mirror.apartmentPhotos.count),
             ("denetim kaydı", auditEntries.count, mirror.auditEntries.count),
         ]

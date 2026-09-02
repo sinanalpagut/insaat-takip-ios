@@ -1447,6 +1447,40 @@ simülatör turu da bunu göstermedi.
 Ders yine aynı: **koşmamış kod okunarak doğrulanamaz** — bu sefer kod
 "koşuyordu" ama YANLIŞ DEPOYA karşı.
 
+
+
+### CİHAZ TURU BULGUSU — cari hareketler birleştirmede düşüyordu (2 Eyl 2026)
+
+Ortak cari hesabı cihazda ilk kez koştu ve kayıt yeniden başlatmada KAYBOLDU.
+Ekranda görünüyordu, hata yoktu, amber şerit yoktu, `[persist]` satırı yoktu.
+
+TANI TAHMİNLE DEĞİL SONDAYLA KONDU. Üç aday vardı (yazma gitmedi / kural
+reddetti / okuma boş dönüyor) ve üçü de aynı belirtiyi veriyor. Uygulamaya
+geçici iki sonda kondu: yazmadan sonra `getDocuments(source: .server)` ve
+okumada ham belge sayısı. Cevap tek satırdı:
+
+    [sonda] okuma partnerLedger pid=323BDD9D belge=1 önbellekten=false
+    [load]  alt: daire=52 cari=0 …
+
+Yani belge SUNUCUDA VARDI ve OKUNUYORDU; kayıp arada. `DataSnapshot.merge`
+proje başına gelen veriyi birleştirirken on üç koleksiyonu ELLE sayıyor ve
+`partnerLedger` listede yoktu — okunan kayıtlar sessizce çöpe gidiyordu.
+Aynı gün bulunan `Apartment.encode(to:)` kusuruyla AYNI SINIF: elle yazılmış
+bir liste, yeni koleksiyonda sessizce eksik kalıyor.
+
+ÜÇÜNCÜ ELLE LİSTE de kördü: `verifySeam` — tek işi "persist çağırmayı
+unutmayı yakalamak" olan denetim — `partnerLedger`ı DA `installments`ı DA
+saymıyordu. İkisi de eklendi.
+
+SINIF KAPATILDI: `DataSnapshotMergeTests` artık koleksiyon adı saymıyor,
+`Mirror` ile HER dizi özelliğini geziyor; yeni bir koleksiyon eklenip
+`merge`e yazılmazsa test kırmızıya döner ve eksik olanın ADINI söyler.
+Doğrulandı: düzeltme geri alındığında test "partnerLedger BİRLEŞTİRMEDE
+DÜŞÜYOR" diyerek patladı, geri konunca yeşile döndü.
+
+VERİ KAYBI YOK: kullanıcının girdiği 100.000 ₺'lik hareket sunucuda duruyordu,
+düzeltmeden sonra ekrana geri geldi (`cari=1`).
+
 **CİHAZDA DOĞRULANDI (2 Eyl 2026).** iPhone 13 Pro + gerçek Firestore: iki
 daireye "A Blok" / "B Blok" girildi, uygulama yeniden başlatıldı (yükleme
 `önbellekten=false`, yani sunucudan) ve etiketler DURDU. Daireler listesinde

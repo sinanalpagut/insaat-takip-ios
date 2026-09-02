@@ -92,6 +92,24 @@ enum LaunchConfig {
         #endif
     }
 
+    /// "-firedebug" → Firestore SDK günlüğü AÇIK.
+    ///
+    /// AD ÇAKIŞMASI: bayrak önce "-firelog"du ve `devicectl` onu kendi
+    /// `-l <path>` seçeneği sanıp başlatmayı reddetti (kısa seçenekler
+    /// harf harf ayrıştırılıyor). Cihaza argüman geçirirken `l`, `t`, `j`
+    /// gibi değer isteyen kısa seçenek harflerinden kaçınmak gerekiyor.
+    ///
+    /// TEŞHİS ARACI, kalıcı davranış değil. Kayıtlı ders: "Firebase'de bir şey
+    /// SESSİZCE çalışmıyorsa önce SDK günlüğünü aç" — yazma reddedildiğinde
+    /// uygulama hiçbir şey basmıyor, SDK basıyor.
+    static var firestoreLogging: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-firedebug")
+        #else
+        return false
+        #endif
+    }
+
     /// "-emulator 127.0.0.1:8080" → Firestore ve Auth emülatörüne bağlan.
     ///
     /// Kural testleri (tests/rules.test.mjs) kuralları JavaScript tarafından
