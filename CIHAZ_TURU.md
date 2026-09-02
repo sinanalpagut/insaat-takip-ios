@@ -1,5 +1,9 @@
 # Cihaz Turu — tam modül taraması
 
+> **2 Eyl 2026'da koşturuldu.** Sonuçlar `ANALIZ.md` içinde ("CİHAZ TURU"
+> başlıkları) ve hafızada. Aşağıdaki liste bir dahaki tur için duruyor;
+> geçenler ve kalanlar sonunda özetli.
+
 **Amaç:** simülatörde YAPISAL olarak kanıtlanamayan yollar + son turdan (18 Ağu)
 sonra eklenen her şey, GERÇEK cihazda ve GERÇEK Firebase'de bir kez koşsun.
 
@@ -115,3 +119,20 @@ iş bu olur.
 - [ ] Rapor: dönem çipleri okunabiliyor mu (sarılmalı, kesilmemeli)
 - [ ] Proje başlığı: tam görünüyor mu, kendi satırında mı
 - [ ] Para rakamları kesiliyor mu (kesilmemeli)
+
+---
+
+## 2 Eyl 2026 turunun sonucu
+
+**GEÇTİ:** sheet odak sorusu (araç sınırıymış), giriş/oturum, proje ve daire
+kurulumu, blok etiketi + gruplama + rapor kartı, KDV beyanı (ekran → PDF →
+CSV), ortak cari hesabı, **davet akışı uçtan uca** (üretimde ilk kez), ortak
+yüzeyinin sınırları, Kayıt İzi, PDF ve CSV/yedek dosyalarının içeriği,
+uygulama kilidi (Face ID).
+
+**BULUNAN KUSURLAR (üçü de düzeltildi):** cari hareketlerin
+`DataSnapshot.merge`de düşmesi · CSV'de girilmemiş fiyatın "0,00" yazılması ·
+büyük metinde portföy satırı ve kilit başlığının kesilmesi.
+
+**KOŞMAYANLAR:** hesap silme (gerçek hesabı yok edeceği için bilinçli olarak
+atlandı), dolu depolama dalı, davet BAĞLANTISI (alan adı yok — madde 29).
