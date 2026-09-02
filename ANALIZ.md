@@ -1447,6 +1447,12 @@ simülatör turu da bunu göstermedi.
 Ders yine aynı: **koşmamış kod okunarak doğrulanamaz** — bu sefer kod
 "koşuyordu" ama YANLIŞ DEPOYA karşı.
 
+**CİHAZDA DOĞRULANDI (2 Eyl 2026).** iPhone 13 Pro + gerçek Firestore: iki
+daireye "A Blok" / "B Blok" girildi, uygulama yeniden başlatıldı (yükleme
+`önbellekten=false`, yani sunucudan) ve etiketler DURDU. Daireler listesinde
+gruplama başlıkları ve raporda blok kırılımı kartı çıktı. Düzeltmeden önce bu
+etiketler her açılışta sessizce kaybolacaktı.
+
 ### PDF ekranla ayrışmıştı — ve kapsam cümlesi kesiliyordu (31 Ağu 2026)
 
 Aynı sorunun üçüncü biçimi: bugün eklenen `outlookCard` (beklenen hasılat +
