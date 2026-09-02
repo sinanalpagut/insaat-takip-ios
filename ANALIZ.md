@@ -1397,12 +1397,18 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
         KESMİYOR — maddenin kendi cümlesi.
         Aynı desenin dokuzuncu tekrarı: "Türkiye numarası" bir iddia,
         uygulayan yok. Davet ömründeki (madde 79) bulgunun kardeşi.
-      · **UYGULAYICI KONSOLDA — KULLANICININ İŞİ (2 dakika, bedava):**
-        Firebase Console → Authentication → Settings → **SMS region policy** →
-        "Allow only these regions" → yalnızca **Türkiye (TR)**. Bu ayar
-        anahtarı çalan bir istemciyi de bağlar, çünkü kararı Firebase veriyor.
-        Test numaraları (App Review) bu kısıttan etkilenmiyor: onlar hiç SMS
-        göndermiyor.
+      · **KAPANDI (2 Eyl 2026) — SMS BÖLGE POLİTİKASI YAYINDA.** Firebase
+        Console → Authentication → Settings → SMS region policy → **Allow** +
+        yalnızca **Türkiye (TR)**; kaydedildiği sayfa yenilenerek doğrulandı.
+        Artık kısıtı uygulayan Firebase: anahtarı uygulama paketinden çıkarıp
+        Identity Toolkit'i doğrudan çağıran bir saldırgan da bağlanıyor, çünkü
+        karar istemcide değil sunucuda veriliyor. Test numaraları (App Review)
+        etkilenmiyor — onlar hiç SMS göndermiyor.
+      · **KABUL EDİLEN TAKAS, YAZILI OLSUN:** artık YALNIZCA +90 numaralar
+        giriş yapabiliyor. Yurt dışı numarasıyla bir ortağı davet etmek
+        isteyen kullanıcı giremez. Hedef kitle Türkiye'deki müteahhit ve
+        ortakları olduğu için doğru takas; ama "yurt dışındaki ortağım
+        giremiyor" sorusunun cevabı bu ayardır.
       · Kod tarafında yapılacak bir şey YOK ve bu bilinçli: istemciye ikinci
         bir denetim eklemek, saldırganın hiç uğramadığı bir kapıya ikinci kilit
         takmak olurdu. Doğru yer sunucu politikası.
