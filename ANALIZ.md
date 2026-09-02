@@ -1701,7 +1701,20 @@ gidip geldiği ve alansız ESKİ belgelerin hâlâ çözüldüğü.
       · ORAN SINIRI (`redeemInvite`): uid başına 15 dakikada 10 BAŞARISIZ deneme. Uid başına çünkü callable'da istemci IP'si güvenilir değil ve uid sınırı saldırganı yeni hesap açmaya zorluyor — her hesap gerçek bir SMS, yani saldırının kendi maliyeti var. Başarı sayacı sıfırlıyor. Sayaç İŞLEMİN DIŞINDA yazılıyor: transaction içinde olsaydı her hata onu da geri alır ve sınır çalışıyor görünüp hiçbir şey yapmazdı.
       · `rateLimits/{uid}` istemciye kapalı ve kural açıkça yazılı (yazma açık olsa kullanıcı sıfırlar, okuma açık olsa saldırgan kalan hakkını görürdü).
       · 8 test. 121 Swift + 192 emülatör testi geçiyor.
-      · **AÇIK KALAN (kullanıcının işi):** (a) Firebase konsolunda App Check'e uygulamayı kaydetmek ve debug jetonunu eklemek (`APP_REVIEW.local.md`), (b) ölçümlere bakıp ZORLAMAYI açmak, (c) sonra callable'larda `enforceAppCheck`i açmak. Ayrıca bütçe uyarısı harcamayı KESMİYOR — bunu kodla çözmek mümkün değil, bilinen sınır olarak duruyor.
+      · **(a) YAPILDI (2 Eyl 2026):** uygulama App Check'e **App Attest** ile
+        kaydedildi (Team ID `36HVD2S94X` — APNs anahtarıyla aynı takım, yani
+        doğru hesap) ve cihazın hata ayıklama jetonu "iPhone 13 Pro ·
+        geliştirme" adıyla eklendi (jeton `APP_REVIEW.local.md`'de, gitignore'lu).
+        ZORLAMA BİLEREK KAPALI bırakıldı.
+      · **NİYE HEMEN ZORLAMIYORUZ:** App Check açıldığı an doğrulanmamış her
+        istek reddedilir ve bugüne kadar TEK ÖLÇÜM toplanmadı — App Attest'in
+        bu uygulamada gerçekten çalıştığı bilinmiyor. Ölçüm görmeden açmak,
+        kendi uygulamasını ve gerçek verisini kapının dışında bırakma riski;
+        madde 68'de Cloud Functions'ın IAM rollerinin eksik olduğu da ancak
+        DENENDİĞİNDE ortaya çıkmıştı. Sıra: birkaç gün normal kullanım →
+        App Check → Request metrics → "Verified requests" oranı → zorlama +
+        callable'larda `enforceAppCheck` AYNI ANDA.
+      · **AÇIK KALAN (kullanıcının işi):** (b) ölçümlere bakıp ZORLAMAYI açmak, (c) sonra callable'larda `enforceAppCheck`i açmak. Ayrıca bütçe uyarısı harcamayı KESMİYOR — bunu kodla çözmek mümkün değil, bilinen sınır olarak duruyor.
       · **DAĞITILDI VE DOĞRULANDI (25 Ağu 2026).** Kurallar ve iki callable
       üretime çıkarıldı; ardından `redeemInvite` oturumsuz çağrıldı ve
       beklenen `UNAUTHENTICATED · signed-in-required` döndü — yani yeniden
