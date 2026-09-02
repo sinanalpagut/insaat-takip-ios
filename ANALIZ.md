@@ -1449,6 +1449,30 @@ Ders yine aynı: **koşmamış kod okunarak doğrulanamaz** — bu sefer kod
 
 
 
+### DAVET AKIŞI ÜRETİMDE KOŞTU — projenin en büyük kanıtsız işi kapandı (2 Eyl 2026)
+
+Ağustos turunda "davet akışı üretimde HİÇ koşmadı" diye işaretlenmişti ve
+madde 68'in dersi ortadaydı: dağıtıldı ≠ çalışıyor. Bugün uçtan uca koştu.
+
+· Yönetici hesabı davet kodu üretti — **bugün sıkılaştırılan kural yazmayı
+  KABUL ETTİ** (`createdAt == request.time` + 49 saat üst sınırı). Ekranda
+  "47 saat geçerli" yazıyor, yani ömür artık sunucu saatinden ölçülüyor.
+· İkinci gerçek hesap (App Review test numarası) kodu kullandı; `redeemInvite`
+  gerçek IAM rolleri, gerçek kurallar ve App Check altında üyeliği yazdı.
+· Ortak hesabın yüklemesi: `proje=1 daire=4 cari=1 ortak=2` — yani kendi
+  projelerini DEĞİL yalnızca davet edildiğini görüyor.
+· Ortak yüzeyinin sınırları ekranda doğrulandı: rozet İZLEYİCİ, hiçbir yazma
+  düğmesi yok, ⋯ menüsünde yalnızca Fotoğraflar/Rapor/Kayıt İzi (madde 76'nın
+  rolden bağımsız izi), cari hareketi GÖRÜYOR ama "+ Hareket" yok.
+
+**Madde 82'nin gizlilik kararı üretimde doğrulandı:** ortak, hesabın tarafı
+olduğu için cari hareketleri okuyor; alıcı gibi üçüncü kişi olmadığı için
+karar `buyers/{apartmentId}` ile aynı sınıfta ama TERS yönde alınmıştı.
+
+AÇIK KALAN: davet BAĞLANTISI (`insaattakip.app/katil/<kod>`) hâlâ 404 —
+alan adı yok (madde 29). Kod elle girilince çalışıyor, WhatsApp'tan gönderilen
+link çalışmıyor.
+
 ### CİHAZ TURU BULGUSU — cari hareketler birleştirmede düşüyordu (2 Eyl 2026)
 
 Ortak cari hesabı cihazda ilk kez koştu ve kayıt yeniden başlatmada KAYBOLDU.
