@@ -238,7 +238,14 @@ struct ProjectExporter {
                     // da yazıldığında satılan her satır aynı parayı iki farklı
                     // başlık altında tekrar ediyordu ve "Liste Fiyatı" sütun
                     // toplamı ekranda karşılığı olmayan bir karışıma dönüşüyordu.
-                    satildi ? "" : money(apartment.price),
+                    // FİYATI GİRİLMEMİŞ DAİRE BOŞ HÜCRE, "0,00" DEĞİL
+                    // (2 Eyl 2026 · cihaz turu). Dosyayı açan mali müşavir
+                    // "0,00"ı "fiyatı sıfır" diye okur; oysa doğru cevap
+                    // "girilmedi". Ekranda aynı ayrım bugün yapılmıştı
+                    // (`StockOutlook.isUnknown`), dosyada eksik kalmıştı.
+                    // Sıfır ile bilinmeyeni ayırmak bu kod tabanının
+                    // `areaCost`tan beri tekrarlanan kuralı.
+                    satildi || apartment.price == .zero ? "" : money(apartment.price),
                     satildi ? money(apartment.price) : "",
                     satildi ? money(apartment.paidAmount) : "",
                     satildi ? money(max(.zero, apartment.price - apartment.paidAmount)) : "",

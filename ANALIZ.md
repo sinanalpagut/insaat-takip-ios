@@ -1449,6 +1449,26 @@ Ders yine aynı: **koşmamış kod okunarak doğrulanamaz** — bu sefer kod
 
 
 
+### CİHAZ TURU — dosyalar cihazdan çekilip açıldı (2 Eyl 2026)
+
+`devicectl` ile uygulamanın `tmp` klasörü çekildi; PDF ve CSV'ler gerçek
+cihazın ürettiği hâlleriyle açıldı. Bugünkü işlerin dördü birden doğrulandı:
+kapsam cümleleri TAM (kesilmiyor), KDV beyanı hem PDF metnine hem CSV sütun
+başlıklarına işlemiş ("Liste Fiyatı (KDV hariç)"), blok kırılımı PDF'te ve
+`Daireler.csv`'de, yeni `Ortak-Cari.csv` doğru biçimde ("Yön", "İşaretli
+Tutar", `;` ayracı, BOM).
+
+**BEKLENEN HASILAT "—" ÇIKTI** ve altında sebebi yazılı ("Henüz
+hesaplanamıyor: satış yok ve dairelere liste fiyatı girilmemiş") — bugün
+eklenen `isUnknown` ayrımının gerçek dünyadaki ilk sınavı yepyeni bir proje
+oldu ve geçti.
+
+**KÜÇÜK BULGU:** aynı ayrım DOSYADA eksikti — fiyatı girilmemiş daire için
+`Daireler.csv` "0,00" yazıyordu. Mali müşavir bunu "fiyatı sıfır" diye okur;
+doğru cevap boş hücre. Düzeltildi ve test eklendi. Ekranda çözülen bir ayrımın
+dosyada eksik kalması, bu turun tekrar eden dersi: **üretmek yetmiyor, açmak
+gerekiyor.**
+
 ### DAVET AKIŞI ÜRETİMDE KOŞTU — projenin en büyük kanıtsız işi kapandı (2 Eyl 2026)
 
 Ağustos turunda "davet akışı üretimde HİÇ koşmadı" diye işaretlenmişti ve

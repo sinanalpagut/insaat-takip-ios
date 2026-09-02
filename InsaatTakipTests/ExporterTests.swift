@@ -119,4 +119,29 @@ final class ExporterTests: XCTestCase {
         XCTAssertFalse(baslik.contains(";Ödenen;"), "kişi sütunu 'Ödenen' diye adlandırılmamalı")
     }
 
+
+    /// FİYATI GİRİLMEMİŞ DAİRE DOSYADA BOŞ HÜCRE.
+    ///
+    /// "0,00" yazmak, dosyayı açan mali müşavire "bu dairenin fiyatı sıfır"
+    /// demek olurdu; doğru cevap "girilmedi". Ekranda aynı ayrım
+    /// `StockOutlook.isUnknown` ile yapılıyor.
+    func testApartmentWithoutListPriceLeavesCellEmpty() {
+        let pid = UUID()
+        let fiyatsiz = Apartment(id: UUID(), projectId: pid, apartmentNumber: 1,
+                                 floor: 1, type: "—", areaM2: nil, status: .available,
+                                 buyerName: nil, price: .zero, paidAmount: .zero,
+                                 paymentStatus: nil, saleDate: nil, deliveryNote: "")
+        let fiyatli = Apartment(id: UUID(), projectId: pid, apartmentNumber: 2,
+                                floor: 1, type: "3+1", areaM2: nil, status: .available,
+                                buyerName: nil, price: Kurus.lira(3_400_000), paidAmount: .zero,
+                                paymentStatus: nil, saleDate: nil, deliveryNote: "")
+        let satirlar = ProjectExporter.apartmentsCSV([fiyatsiz, fiyatli], includeBuyer: false)
+            .components(separatedBy: "\r\n")
+        // Sütun sırası: Daire No;Blok;Kat;Tip;Brüt m²;Durum;Liste Fiyatı;…
+        let fiyatsizHucre = satirlar[1].components(separatedBy: ";")[6]
+        let fiyatliHucre = satirlar[2].components(separatedBy: ";")[6]
+        XCTAssertEqual(fiyatsizHucre, "", "girilmemiş fiyat 0,00 diye yazılmamalı")
+        XCTAssertEqual(fiyatliHucre, "3400000,00")
+    }
+
 }
