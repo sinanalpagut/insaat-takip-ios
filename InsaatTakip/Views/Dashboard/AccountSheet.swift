@@ -295,9 +295,13 @@ struct AccountSheet: View {
                         .cornerRadius(13)
 
                     VStack(alignment: .leading, spacing: 3) {
+                        // BAŞLIK KESİLMİYOR (2 Eyl 2026 · cihaz turu): en
+                        // büyük metinde "Uygulam…" oluyordu — ayarın ADI
+                        // okunamıyordu, oysa altındaki açıklama sarılıyordu.
                         Text("Uygulama kilidi")
                             .font(.manrope(13.5, .bold))
                             .foregroundColor(Palette.ink)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text("Uygulamaya dönüşte kimlik doğrulanır · değiştiricide içerik gizlenir")
                             .font(.manrope(11.5, .medium))
                             .foregroundColor(Palette.textSecondary)

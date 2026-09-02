@@ -456,12 +456,21 @@ struct DashboardView: View {
             let rows = viewModel.comparisons(for: appState.currentUser)
             let shown = 5
             ForEach(rows.prefix(shown)) { row in
-                HStack(spacing: 8) {
+                // AX'te satır DİKEY: üç sütun (ad · yüzde · ₺/m²) yan yana
+                // sığmıyor ve üçü birden kırpılıyordu.
+                AdaptiveTileRow(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
+                        // AX BOYUTUNDA KESİLMİYOR (2 Eyl 2026 · cihaz turu).
+                        // Gerçek telefonda en büyük metinde satır "9999 Ada /
+                        // …", "100 A…", "140 A…" oluyordu: karşılaştırma
+                        // tablosunun SATIR BAŞLIĞI, yani hangi projeden
+                        // bahsedildiği okunamıyordu. Aynı ders proje
+                        // başlığında ve `financeTile`da yazılı.
                         Text(row.title)
                             .font(.manrope(12, .semiBold))
                             .foregroundColor(Palette.ink)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                            .fixedSize(horizontal: false, vertical: true)
                         // KAPSAM SATIRI. m² maliyetinin paydasına yalnızca
                         // alanı GİRİLMİŞ daireler giriyor, oysa pay projenin
                         // tamamının gideri — kapsam eksikse rakam
@@ -479,7 +488,8 @@ struct DashboardView: View {
                                 .lineLimit(1)
                         }
                     }
-                    Spacer()
+                    // Dikey düzende `Spacer()` satırı uçtan uca açardı.
+                    if !dynamicTypeSize.isAccessibilitySize { Spacer() }
                     if let margin = row.margin {
                         Text(Fmt.signedPercent(margin))
                             .font(.manrope(11, .bold))
@@ -487,10 +497,14 @@ struct DashboardView: View {
                     }
                     // Alan girilmemiş projede "—": sıfır yazmak "bedava inşa
                     // edildi" demek olurdu.
+                    // SABİT 96 pt YALNIZCA NORMAL BOYUTTA: AX'te rakam o
+                    // genişliğe sığmayıp sarılıyor ve satır bozuluyordu.
                     Text(row.perM2.map(Fmt.costPerArea) ?? "—")
                         .font(.sora(12, .bold))
                         .foregroundColor(Palette.textMuted)
-                        .frame(width: 96, alignment: .trailing)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 96,
+                               alignment: .trailing)
                 }
                 .padding(.top, 8)
             }

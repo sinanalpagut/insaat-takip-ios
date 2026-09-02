@@ -1449,6 +1449,23 @@ Ders yine aynı: **koşmamış kod okunarak doğrulanamaz** — bu sefer kod
 
 
 
+### CİHAZDA BÜYÜK METİN — üç yerde daha kesiliyordu (2 Eyl 2026)
+
+Simülatör turunda bulunanlar düzelmişti; GERÇEK cihazda en büyük metin
+boyutuyla üç yeni yer çıktı:
+· **Portföy karşılaştırma satırı** — "9999 Ada / …", "100 A…", "140 A…": yani
+  tablonun SATIR BAŞLIĞI, hangi projeden bahsedildiği okunamıyordu. Üç sütun
+  (ad · yüzde · ₺/m²) AX'te yan yana sığmıyor; satır `AdaptiveTileRow` ile
+  dikey açılıyor, ad sarılıyor, sabit 96 pt genişlik yalnızca normal boyutta
+  uygulanıyor. Dikey düzende `Spacer()` de koşullu — yoksa satırı uçtan uca
+  açardı.
+· **"Uygulama kilidi"** ayar başlığı "Uygulam…" oluyordu: ayarın ADI
+  okunamıyor, altındaki açıklama sarılıyordu.
+· Pano başlığı "Projelerim" kelime ortasından bölünüyor ("Projeleri / m") —
+  görsel olarak kötü ama bilgi kaybı yok; kayıt olarak duruyor.
+
+Normal boyutta düzenin değişmediği ayrıca doğrulandı.
+
 ### CİHAZ TURU — dosyalar cihazdan çekilip açıldı (2 Eyl 2026)
 
 `devicectl` ile uygulamanın `tmp` klasörü çekildi; PDF ve CSV'ler gerçek
