@@ -1468,10 +1468,21 @@ eklendi ve PDF yeniden üretilip cümlelerin tamamlandığı görüldü.
 Yöntem notu: PDF'i ÜRETMEK yetmiyor, AÇMAK gerekiyor. "Dosya oluştu" ile
 "dosya doğru" arasındaki fark, bu turda bulunan üç kusurdan ikisiydi.
 
-### AÇIK SORU — sheet içindeki metin alanları odak almıyor (31 Ağu 2026)
+### KAPANDI — sheet metin alanları GERÇEK CİHAZDA sorunsuz (2 Eyl 2026)
 
-**TANI KONULMADI; gerçek cihazda 10 saniyede kapanacak bir soru ve cevabı
-iki uçta da önemli.**
+**CEVAP: (a) — OTOMASYON ARTEFAKTI.** iPhone 13 Pro'da Fiş Ekle → MİKTAR
+alanına parmakla dokunuldu: klavye açıldı, imleç göründü, rakam yazıldı.
+Uygulamada kusur YOK; `simctl`/HID ile sentezlenen dokunuş modal olarak
+sunulmuş bir `UIHostingController` içinde ilk yanıtlayıcı atamasını
+tetiklemiyor.
+
+**BUNUN BEDELİ NEYDİ:** bu belirsizlik yüzünden simülatörde iki tur boyunca
+veri girişi gerektiren hiçbir akış uçtan uca sürülemedi (cari hareket, yeni
+proje, fiş) ve doğrulama "ekran doğru çiziliyor mu"ya indi. Bundan sonra
+kural: **simülatörde yazma gerektiren akışlar için tohum veriyi değiştir ya
+da cihaza çık; "yazamıyorum" bir kusur raporu değil, aracın sınırı.**
+
+Aşağıdaki gözlem kaydı, aynı soru bir daha sorulmasın diye duruyor.
 
 GÖZLEM: simülatörde enjekte edilen dokunuşla
 · `ApartmentsTabView` arama alanı ODAK ALIYOR — "Berk" yazıldı, liste süzüldü.
