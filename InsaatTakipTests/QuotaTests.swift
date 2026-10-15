@@ -132,6 +132,27 @@ final class QuotaTests: XCTestCase {
         XCTAssertEqual(Quota.canInvitePartner(invitedCount: davetli, entitlement: .free), .allowed)
     }
 
+    // MARK: - Sınır ile ödeme yolu birbirine bağlı
+
+    /// SINIR YÜRÜRLÜĞE GİRDİĞİ GÜN SATIN ALMA DA AÇIK OLMALI.
+    ///
+    /// Yayın günü yapılacak değişiklik TEK SATIR: `entitlement` varsayılanı
+    /// `.preLaunchUnlimited`ten `.free`e dönecek. O satır tek başına
+    /// değiştirilirse kullanıcı ikinci projesini açamaz VE ödeyerek açmanın
+    /// bir yolu da olmaz — yani ürünün yapabileceği en kötü şey, çıkışı
+    /// olmayan bir duvar.
+    ///
+    /// İki değişikliği bir araya bağlayan tek şey bu test. Bugün sessizce
+    /// geçiyor (koşul sağlanmıyor); yayın günü kotayı açan kişi, satın almayı
+    /// açmadan testi yeşil göremez.
+    func testLimitsNeedAPaymentPath() {
+        let vm = ProjectViewModel(repository: InMemoryProjectRepository())
+        guard vm.entitlement != .preLaunchUnlimited else { return }
+        XCTAssertTrue(Plan.purchasesAvailable,
+                      "Kota yürürlükte ama satın alma kapalı — "
+                      + "kullanıcı sınıra çarpar ve ödeyerek çıkamaz")
+    }
+
     /// Sınır cümlesi NE YAPACAĞINI söylüyor — burada çıkış arşivlemek değil.
     func testPartnerLimitMessagePointsToUpgrade() {
         let mesaj = Quota.partnerLimitMessage(limit: 2)

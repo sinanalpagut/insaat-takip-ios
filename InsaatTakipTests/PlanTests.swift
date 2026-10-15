@@ -83,6 +83,49 @@ final class PlanTests: XCTestCase {
         XCTAssertEqual(gorulen.count, 6, "üç pakette aylık+yıllık altı ürün bekleniyor")
     }
 
+    // MARK: - Ekrandaki vaat (paket ekranı)
+
+    /// EKRANDA YAZAN CÜMLE, SINIRIN KENDİSİNDEN ÜRETİLİYOR.
+    ///
+    /// Bu testin yakaladığı hata şu: biri `activeProjectLimit`i 3'ten 5'e
+    /// çıkarır, ekrandaki "3 aktif proje" cümlesini güncellemeyi unutur ve
+    /// kullanıcı ödediği paketin vermediği bir sayıyı okur. `highlights`
+    /// sınırdan türediği için bu imkânsız — test o türetmenin bozulmadığını
+    /// denetliyor.
+    func testHighlightsAreDerivedFromTheLimits() {
+        for plan in Plan.allCases {
+            XCTAssertEqual(plan.highlights.count, 2,
+                           "\(plan.rawValue): paketleri ayıran tam iki şey var")
+
+            if let proje = plan.activeProjectLimit {
+                XCTAssertEqual(plan.highlights[0], "\(proje) aktif proje")
+            } else {
+                XCTAssertEqual(plan.highlights[0], "Sınırsız aktif proje")
+            }
+
+            if let ortak = plan.invitedPartnerLimit {
+                XCTAssertEqual(plan.highlights[1], "\(ortak) ortak daveti")
+            } else {
+                XCTAssertEqual(plan.highlights[1], "Sınırsız ortak daveti")
+            }
+        }
+    }
+
+    /// ORTAK ÖZELLİKLER PAKET KARTLARINA SIZMAMALI.
+    ///
+    /// "Her pakette" listesi ücretsiz katmanda da geçerli olan şeyler. Bir
+    /// gün paket kartına kopyalanırsa ücretsiz kullanıcı, zaten sahip olduğu
+    /// bir şey için para ödemesi gerektiğini sanır.
+    func testCommonFeaturesAreNotPlanDifferences() {
+        XCTAssertFalse(Plan.commonFeatures.isEmpty)
+        for plan in Plan.allCases {
+            for ortak in Plan.commonFeatures {
+                XCTAssertFalse(plan.highlights.contains(ortak),
+                               "\(ortak) hem paket farkı hem ortak özellik olarak yazılmış")
+            }
+        }
+    }
+
     /// Ücretsiz katman `Entitlement.free` ile aynı şey.
     func testFreeEntitlementMapsToFreePlan() {
         XCTAssertEqual(Entitlement.free, .plan(.ucretsiz))

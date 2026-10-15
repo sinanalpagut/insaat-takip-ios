@@ -5,6 +5,10 @@ import Foundation
 // karşılaştırmaları ve ileride snapshot testleri için:
 //   xcrun simctl launch <udid> com.sinanalpagut.insaattakip \
 //       -role admin -screen project -tab apt -sheet invite
+//
+// Paket ekranı için:
+//   xcrun simctl launch <udid> com.sinanalpagut.insaattakip \
+//       -role admin -screen dashboard -plan free -sheet plans
 
 enum LaunchConfig {
     private static func value(for key: String) -> String? {
@@ -48,6 +52,31 @@ enum LaunchConfig {
     static var sheet: String? {
         #if DEBUG
         return value(for: "sheet")
+        #else
+        return nil
+        #endif
+    }
+
+    /// "-plan free|santiye|muteahhit|kurumsal" → hak enjeksiyonu (madde 87).
+    ///
+    /// NEDEN GEREKLİ: paket satırı ve paket ekranı DÖRT duruma göre farklı
+    /// görünüyor — yayın öncesi, ücretsiz, ücretsiz+sınırda, ücretli. Yayın
+    /// öncesi varsayılan `preLaunchUnlimited` olduğu için diğer üçü elle HİÇ
+    /// açılamıyordu: ekranın çoğu durumu, kod yazıldıktan sonra bile
+    /// görülmeden kalıyordu. Sınır ENJEKTE EDİLEREK test edilir ilkesinin
+    /// (QuotaTests) ekran tarafındaki karşılığı.
+    ///
+    /// YALNIZCA DEBUG: yayın sürümünde açık kalsaydı kullanıcı kendine
+    /// kurumsal paket verebilirdi.
+    static var entitlement: Entitlement? {
+        #if DEBUG
+        switch value(for: "plan") {
+        case "free":      return .plan(.ucretsiz)
+        case "santiye":   return .plan(.santiye)
+        case "muteahhit": return .plan(.muteahhit)
+        case "kurumsal":  return .plan(.kurumsal)
+        default:          return nil
+        }
         #else
         return nil
         #endif

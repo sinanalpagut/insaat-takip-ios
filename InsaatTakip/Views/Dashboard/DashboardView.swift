@@ -18,6 +18,7 @@ struct DashboardView: View {
     @State private var showRoleMenu = false
     @State private var showJoinSheet = false
     @State private var showRestorePicker = false
+    @State private var showPlans = false
     @State private var restoreSummary: ProjectViewModel.RestoreSummary?
     @State private var restoreError: String?
 
@@ -77,6 +78,12 @@ struct DashboardView: View {
 
                     archivedSection
 
+                    // PAKET SATIRI — madde 87. Yalnızca yöneticide: paket,
+                    // projeyi KURAN kişinin ödeme ilişkisi. Ortağın salt
+                    // okunur ekranında fiyat göstermek, ödemeyeceği bir şeyi
+                    // satmaya çalışmak olurdu.
+                    if isAdmin { planRow }
+
                     // Davet kartı ROLDEN BAĞIMSIZ. Eskiden `!isAdmin` koşuluyla
                     // gösteriliyordu; kimlik doğrulaması geldikten sonra her yeni
                     // hesap `.admin` açıldığı için davet edilen ortak elindeki
@@ -92,6 +99,16 @@ struct DashboardView: View {
                 }
                 .padding(.horizontal, 16)
             }
+        }
+        // "-sheet plans" → paket ekranı doğrudan açılır.
+        //
+        // `LaunchConfig.sheet` bugüne kadar YALNIZCA proje ekranında
+        // okunuyordu; pano üstünde açılabilen bir sheet yoktu. Paket ekranı
+        // ilk örnek ve dört ayrı duruma göre farklı görünüyor (yayın öncesi,
+        // ücretsiz, sınırda, ücretli) — her birini elle dolaşarak açmak,
+        // görsel karşılaştırmayı pratikte yapılmaz kılardı.
+        .onAppear {
+            if LaunchConfig.sheet == "plans" { showPlans = true }
         }
         // Çekerek yenileme — gerekçe ProjectDetailView'da.
         .refreshable { await viewModel.refresh() }
@@ -130,6 +147,9 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $showRoleMenu) {
             AccountSheet()
+        }
+        .sheet(isPresented: $showPlans) {
+            PlansSheet()
         }
     }
 
@@ -401,6 +421,103 @@ struct DashboardView: View {
         .background(Palette.surface)
         .cornerRadius(18)
         .padding(.top, 4)
+    }
+
+    // MARK: Paket satırı (madde 87)
+
+    /// Panoda SABİT duran sessiz giriş.
+    ///
+    /// NEDEN PANODA: paketlerin tek görünürlük yolu hesap kartı olsaydı,
+    /// kullanıcı avatara dokunmayı akıl etmedikçe ürünün bir sınırı olduğunu
+    /// HİÇ öğrenemezdi — ve bunu ilk kez, ikinci projesini açamadığı an
+    /// öğrenirdi. Fiyatı reddedilerek öğrenmek, satın alma kararının
+    /// verilebileceği en kötü an.
+    ///
+    /// NEDEN ARA ARA ÇIKAN BİR PENCERE DEĞİL: araya giren tanıtım, reklamın
+    /// ta kendisi. Reklamın neden reddedildiği `Plan.swift`te yazılı ve üç
+    /// gerekçesi de kendi ürününü tanıtan pencere için aynen geçerli. Bu
+    /// satır kullanıcıyı hiç kesmiyor ama her an orada.
+    ///
+    /// SINIRA ÇARPINCA SATIR DEĞİŞMİYOR, TONU DEĞİŞİYOR. Aynı yerde duruyor;
+    /// yalnızca rengi ve cümlesi durumu söylüyor. Sınıra çarpınca YENİ bir
+    /// kartın belirmesi, kullanıcının ekranda yerini kaybetmesine yol açardı.
+    private var planRow: some View {
+        Button {
+            showPlans = true
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: planAtLimit ? "exclamationmark.circle" : "square.stack.3d.up")
+                    .iconFont(14, weight: .semibold)
+                    .foregroundColor(planAtLimit ? Palette.accent : Palette.textMuted)
+                    .frame(width: 38, height: 38)
+                    .background(planAtLimit ? Palette.accentTint : Palette.fillMuted)
+                    .cornerRadius(12)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(planRowTitle)
+                        .font(.manrope(13, .bold))
+                        .foregroundColor(Palette.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(planRowDetail)
+                        .font(.manrope(11.5, .medium))
+                        .foregroundColor(Palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 4)
+
+                Image(systemName: "chevron.right")
+                    .iconFont(11, weight: .bold)
+                    .foregroundColor(Palette.textFaded)
+            }
+            .padding(13)
+            .background(Palette.surface)
+            .cornerRadius(15)
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(planAtLimit ? Palette.accent : Palette.border,
+                            lineWidth: planAtLimit ? 1.5 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Kullanıcı ŞU AN sınırda mı — kararı `Quota` veriyor, bu ekran değil.
+    ///
+    /// Sayıyı burada yeniden hesaplamak ("projects.count >= 1" gibi) iki
+    /// ayrı doğruluk kaynağı yaratırdı: arşivlenmiş projenin sayılmaması
+    /// kuralı `Quota`da yaşıyor ve burada kopyalansaydı sessizce ayrışırdı.
+    private var planAtLimit: Bool {
+        guard let user = appState.currentUser else { return false }
+        if case .wouldExceedProjects = Quota.canCreateProject(viewModel.quotaSnapshot(for: user),
+                                                              entitlement: viewModel.entitlement) {
+            return true
+        }
+        return false
+    }
+
+    private var planRowTitle: String {
+        switch viewModel.entitlement {
+        case .preLaunchUnlimited: return "Paketler"
+        case .plan(.ucretsiz):    return planAtLimit ? "Aktif proje sınırındasın" : "Ücretsiz katman"
+        case .plan(let plan):     return "\(plan.displayName) paketi"
+        }
+    }
+
+    /// SINIRDAYKEN İKİ ÇIKIŞ DA YAZILI: arşivlemek ücretsiz, paket ücretli.
+    /// Yalnızca paketi göstermek, kullanıcının zaten hakkı olan ücretsiz
+    /// çözümü saklamak olurdu.
+    private var planRowDetail: String {
+        switch viewModel.entitlement {
+        case .preLaunchUnlimited:
+            return "Yayın öncesi · tüm özellikler açık"
+        case .plan(.ucretsiz):
+            return planAtLimit
+                ? "Biten projeyi arşivle ya da paketlere bak"
+                : Plan.ucretsiz.highlights.joined(separator: " · ")
+        case .plan:
+            return "Paketini gör ya da değiştir"
+        }
     }
 
     // MARK: Davet kodu kartı

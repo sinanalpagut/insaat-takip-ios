@@ -735,7 +735,46 @@ projesi kullanılmalı — kurallar zaten yayında.
 
 ### Faz 4 — Yayın paketi
 
-- [ ] 27. KVKK aydınlatma + gizlilik politikası URL'i
+- [x] 27. KVKK aydınlatma + gizlilik politikası URL'i — **TAMAM (15 Eki 2026)**
+      · **ÜÇ METİN, ÜÇ AYRI SAYFA** — benav.com.tr/privacy altında, mevcut
+        Beje sayfalarıyla aynı iskelet: `insaat-takip.html` (gizlilik),
+        `-kvkk.html` (aydınlatma), `-kosullar.html` (kullanım koşulları).
+        Üçü de YAYINDA ve HTTP 200 doğrulandı.
+      · **KVKK AYRI SAYFA, GİZLİLİĞİN İÇİNDE DEĞİL.** Kanunun istediği
+        başlıklar (veri sorumlusu kimliği, hukuki sebep, m.11 hakları) genel
+        bir gizlilik metninin içinde erir; Türkiye'deki kullanıcı "KVKK" diye
+        arıyor ve aradığı kelimeyi ekranda bulmalı.
+      · **METİN ŞABLONDAN DEĞİL KODDAN YAZILDI.** Her iddia doğrulandı:
+        bağlı Firebase ürünleri AppCheck/Auth/Core/Firestore/Functions/
+        Storage — Analytics ve Crashlytics BAĞLI DEĞİL, yani "analitik
+        toplamıyoruz" doğrulanabilir bir cümle. `PrivacyInfo.xcprivacy`
+        `NSPrivacyTracking = false`. Sunucu bölgesi europe-west1. Hesap
+        silme uygulama içinde (madde 28). Doğrulanamayan tek madde
+        yazılmadı.
+      · **EN KRİTİK MADDE — ÜÇÜNCÜ KİŞİ VERİSİ.** Müteahhit daire
+        ALICILARININ adlarını giriyor. Metinler bu yüzden İKİ ROLLÜ kuruldu:
+        hesap verisinde (telefon, ad) veri sorumlusu benav; alıcı adlarında
+        veri sorumlusu KULLANICI, benav yalnızca veri işleyen. Tek rollü bir
+        metin, müteahhidin kendi aydınlatma yükümlülüğünü sessizce üstlenmek
+        olurdu. Alıcı adlarının ortaklara gösterilmediği de yazıldı — kısıt
+        güvenlik kurallarında, yalnızca ekranda gizlemekle değil.
+      · **KAYNAK UYGULAMA DEPOSUNDA** (`scripts/hukuki-sayfalar.py`), sayfalar
+        site deposunda. Gizlilik metni, kodun ne topladığına dair bir
+        İDDİA; kanıtı `PrivacyInfo.xcprivacy` ve kodun kendisi. Ayrı
+        depolarda dursalardı veri toplama değiştiğinde metni güncellemeyi
+        hatırlatan hiçbir şey olmazdı.
+      · **UYGULAMADAKİ KARŞILIĞI:** `AppInfo`da üç adres; AccountSheet'te
+        gizlilik + KVKK + koşullar satırları, PlansSheet'te koşullar +
+        gizlilik. Adresin boş kalmasını kilitleyen test
+        (`testPrivacyPolicyIsStillPending`) görevini yaparak düştü ve yerini
+        `testLegalURLsAreConfigured` aldı: https şartı + üç adresin
+        birbirinden farklı olması. Adreslerin CANLI olduğunu test
+        doğrulayamaz (sayfalar başka depoda, ağa çıkan test kırılgan olurdu)
+        — yayın öncesi elle açılması şart ve açıldı.
+      · **AVUKAT İNCELEMESİ EKSİK:** metinler hukukçu tarafından yazılmadı.
+        Özellikle veri sorumlusu/işleyen ayrımı yayından önce bir KVKK
+        avukatına okutulmalı. Veri sorumlusu satırında tüzel unvan değil
+        "benav" yazıyor — kullanıcının kararı (15 Eki 2026).
 - [x] 28. Hesap silme akışı (App Store 5.1.1v) — **TAMAM (19 Ağu 2026)**
       · 5.1.1(v): hesap oluşturmaya izin veren uygulama, hesabın uygulama
         İÇİNDEN silinmesine de izin vermek zorunda. Bugüne kadar silme yolu
@@ -2251,6 +2290,74 @@ verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam
       ödeme bağlantısı kuralı bölgeye göre değişiyor ve son yıllarda değişti.
       (c) parçasının tetiği: ilk ücretli yayından önce ya da Firebase
       harcaması yazılı bir eşiği geçtiğinde.
+
+      ### (d) PAKETLER GÖRÜNÜR OLDU (15 Eki 2026)
+
+      **BULUNAN KUSUR:** katalog kodda vardı ama `Plan` tipi `Views/` altında
+      TEK BİR YERDE geçmiyordu. Yani kullanıcının fiyatı öğrenebileceği tek
+      an, bir sınıra çarpıp şerit mesajı okuduğu andı — **fiyatı ancak
+      reddedilerek öğreniyordu.** Satın alma kararının verilebileceği en kötü
+      an bu; üstelik yayın öncesi `preLaunchUnlimited` olduğu için o şerit
+      bile hiç çıkmıyordu, yani ürünün ücretli olduğu HİÇ söylenmiyordu.
+
+      **`PlansSheet` (yeni ekran).** Dört paket kartı, fiyat, yıllık rakamıyla
+      ("iki ay bedava"), "her pakette olanlar" AYRI kartta, altta koşullar ve
+      gizlilik bağlantısı. Ekranda **tek bir rakam elle yazılı değil**; hepsi
+      `Plan` kataloğundan. Fiyat etiketi iki ayrı yerde dursaydı biri değişip
+      diğeri kalırdı ve kullanıcı, ekranda okuduğu sayıyı vermeyen bir pakete
+      para ödemiş olurdu.
+
+      **YALNIZCA GERÇEKTEN FARKLI OLAN İKİ ŞEY YAZIYOR.** Paketler arasında
+      özellik farkı YOK; değişen tek şey iki sayı. "Öncelikli destek" gibi
+      üçüncü bir madde uydurmak ilk destek e-postasında yalana dönerdi —
+      üstelik satın alma kararını o yalan verdirmiş olurdu. `highlights`
+      sınırın kendisinden türüyor; `PlanTests` türetmeyi kilitliyor ve
+      türetme bilerek bozulup testin ÜÇ pakette birden kırmızıya döndüğü
+      görüldü (vakum testi değil).
+
+      **ORTAK ÖZELLİKLER AYRI KARTTA.** "Sınırsız daire/gider kaydı, salt
+      okur ortaklar, rapor ve Excel, reklam yok" — bunlar ücretsiz katmanda
+      da var. Paket kartlarına kopyalansaydı ücretsiz kullanıcı, zaten sahip
+      olduğu şeyler için ödemesi gerektiğini sanırdı. Dördünün de kodda
+      karşılığı var; doğrulanamayan madde yazılmadı. Test
+      (`testCommonFeaturesAreNotPlanDifferences`) ikisinin karışmasını
+      engelliyor.
+
+      **İKİ GİRİŞ NOKTASI, İKİSİ DE SESSİZ.**
+      · *Panoda sabit satır* — kullanıcı aramadan görüyor. Tek yol hesap
+        kartı olsaydı, avatara dokunmayı akıl etmeyen kullanıcı ürünün bir
+        sınırı olduğunu hiç öğrenemezdi. Yalnızca YÖNETİCİDE: paket, projeyi
+        kuranın ödeme ilişkisi; ortağın salt okunur ekranında fiyat
+        göstermek ödemeyeceği bir şeyi satmaya çalışmak olurdu.
+      · *Hesap kartında satır* — "ne ödüyorum" sorusunun sorulduğu yer.
+      Başlıklar DURUMA göre: yayın öncesinde "Paketler", ücretsizde
+      "Ücretsiz katman · yükselt", ücretlide paket adı. Sabit "Yükselt"
+      yazmak, her şeye zaten sahip olan kullanıcıya yalan söylemek olurdu.
+
+      **"ARA ARA ÇIKAN HATIRLATMA" REDDEDİLDİ.** Araya giren tanıtım,
+      kendi ürünün için reklamın ta kendisi — ve reklamı reddetme
+      gerekçelerinin üçü de bunun için aynen geçerli. Sınıra çarpınca YENİ
+      bir kart da belirmiyor: aynı satırın tonu ve cümlesi değişiyor, yoksa
+      kullanıcı ekranda yerini kaybeder. Sınırdayken İKİ çıkış da yazılı
+      (arşivlemek bedava, paket ücretli); yalnızca paketi göstermek,
+      kullanıcının zaten hakkı olan ücretsiz çözümü saklamak olurdu.
+
+      **SATIN ALMA DÜĞMESİ YOK — `Plan.purchasesAvailable = false`.**
+      StoreKit bağlanmadan düğme koymak dead UI olurdu: bastıran kullanıcıya
+      uygulamanın bakımsız olduğunu söyler, hiç olmaması ise yalnızca "henüz
+      satışta değil" der. Ekran bugün BİLGİ ekranı.
+      **EN ÖNEMLİ KORKULUK BURADA:** yayın günü değişecek tek satır
+      `entitlement`. O satır TEK BAŞINA değiştirilirse kullanıcı ikinci
+      projesini açamaz VE ödeyerek açmanın yolu da olmaz — çıkışı olmayan bir
+      duvar, ürünün yapabileceği en kötü şey. İki değişikliği birbirine
+      bağlayan tek şey `QuotaTests.testLimitsNeedAPaymentPath`: bugün sessizce
+      geçiyor, yayın günü kotayı açan kişi satın almayı açmadan yeşil göremez.
+
+      **YAN BULGU:** AccountSheet'in gövdesi sabit yükseklikteydi ve yeni
+      bölümlerle küçük ekranlarda taşıyordu. SwiftUI taşan kısmı SESSİZCE
+      kırpar — yani "Hesabı Sil", App Store 5.1.1(v) ile zorunlu tek giriş,
+      hiç görünmeden kaybolabilirdi ve kırpılma hata vermediği için ancak
+      sahada fark edilirdi. Gövde kaydırılabilir yapıldı.
       · **KAPSAM KARARI (25 Ağu 2026): MADDE** — Tutarın KDV tabanı beyan edilsin (hesaplanmasın)
       · Dört mercek de aynı çelişkiyi bağımsız buldu ve kodda doğruladım:
         ReceiptScanner bilerek fişteki 'Ödenecek KDV Dahil Tutar'ı seçip birim

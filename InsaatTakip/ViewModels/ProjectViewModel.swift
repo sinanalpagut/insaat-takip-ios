@@ -3221,7 +3221,10 @@ final class ProjectViewModel: ObservableObject {
     /// kullanıcıyı ürünü hiç kullanamayacağı bir kapıya çarptırmak olurdu.
     /// Değişken (`var`) olmasının tek sebebi test: sınırın gerçekten
     /// uygulandığı, sınır açılmadan da kanıtlanabilsin.
-    var entitlement: Entitlement = .preLaunchUnlimited
+    /// Varsayılan yayın öncesi sınırsızlık; `-plan` argümanı verildiğinde
+    /// (yalnızca DEBUG) onun söylediği paket. Testlerde argüman olmadığı için
+    /// varsayılan değişmiyor.
+    var entitlement: Entitlement = LaunchConfig.entitlement ?? .preLaunchUnlimited
 
     /// Kotanın ölçtüğü sayılar — YALNIZCA kullanıcının SAHİBİ olduğu
     /// projelerden.

@@ -12,6 +12,7 @@ struct AccountSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showDeleteFlow = false
+    @State private var showPlans = false
 
     private var user: User? { appState.currentUser }
 
@@ -24,102 +25,157 @@ struct AccountSheet: View {
             SheetHeader(title: "Hesap",
                         subtitle: "Görünümü değiştir veya oturumu kapat") { dismiss() }
 
-            profileCard
-                .padding(.top, 18)
-
-            // Rol değiştirme yalnızca GELİŞTİRME derlemesinde. Yayın sürümünde açık
-            // kalsaydı, salt okunur olması gereken ortak kendini iki dokunuşta
-            // yönetici yapabilir; ViewModel'deki tüm yetki kontrolleri anlamsızlaşırdı.
-            // Gerçek rol, oturum açan hesaptan gelecek (Faz 2 — kimlik doğrulama).
-            #if DEBUG
-            Text("Görünüm · geliştirme")
-                .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
-                .padding(.top, 22)
-                .padding(.bottom, 10)
-
-            roleRow(role: .admin,
-                    icon: "square.and.pencil",
-                    title: "Yönetici görünümü",
-                    detail: "Malzeme, satış ve belge girişi yapabilirsin")
-
-            roleRow(role: .partner,
-                    icon: "eye",
-                    title: "Ortak görünümü",
-                    detail: "Salt okunur — ortakların gördüğü ekran")
-                .padding(.top, 9)
-            #endif
-
-            // ─── Güvenlik: uygulama kilidi (madde 78) ───
+            // GÖVDE KAYDIRILABİLİR (15 Eki 2026).
             //
-            // ROLDEN BAĞIMSIZ: ortağın gördüğü ekranlar da ciro, tahsilat ve
-            // taksit planı taşıyor. Kilidi yalnızca yöneticiye vermek,
-            // korumayı verinin yarısında bırakmak olurdu.
-            Text("Güvenlik")
-                .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
-                .padding(.top, 22)
-                .padding(.bottom, 10)
+            // Paket bölümü ve iki hukuki satır eklenince içerik küçük
+            // ekranlarda sabit yüksekliği aşıyordu: SwiftUI taşan kısmı
+            // sessizce KIRPAR — yani "Hesabı Sil" düğmesi, App Store'un
+            // 5.1.1(v) ile zorunlu kıldığı tek giriş, hiç görünmeden
+            // kaybolurdu. Kırpılma hata vermediği için de ancak sahada
+            // fark edilirdi.
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    profileCard
+                        .padding(.top, 18)
 
-            lockRow
+                    // Rol değiştirme yalnızca GELİŞTİRME derlemesinde. Yayın sürümünde açık
+                    // kalsaydı, salt okunur olması gereken ortak kendini iki dokunuşta
+                    // yönetici yapabilir; ViewModel'deki tüm yetki kontrolleri anlamsızlaşırdı.
+                    // Gerçek rol, oturum açan hesaptan gelecek (Faz 2 — kimlik doğrulama).
+                    #if DEBUG
+                    Text("Görünüm · geliştirme")
+                        .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                        .padding(.top, 22)
+                        .padding(.bottom, 10)
 
-            // ─── Destek ve sürüm (madde 72) ───
-            //
-            // Crashlytics bilinçli olarak ertelendi; o yüzden bu satırlar
-            // sahadaki bir hatanın görünebildiği TEK kanal. İkisi de yokken
-            // kullanıcı bildiremiyor, geliştirici ölçemiyordu.
-            Text("Destek")
-                .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
-                .padding(.top, 22)
-                .padding(.bottom, 10)
+                    roleRow(role: .admin,
+                            icon: "square.and.pencil",
+                            title: "Yönetici görünümü",
+                            detail: "Malzeme, satış ve belge girişi yapabilirsin")
 
-            supportRows
+                    roleRow(role: .partner,
+                            icon: "eye",
+                            title: "Ortak görünümü",
+                            detail: "Salt okunur — ortakların gördüğü ekran")
+                        .padding(.top, 9)
+                    #endif
 
-            Button {
-                dismiss()
-                appState.signOut()
-            } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .iconFont(14, weight: .semibold)
-                    Text("Oturumu Kapat")
-                        .font(.manrope(14, .bold))
+                    // ─── Paket (madde 87) ───
+                    //
+                    // NEDEN HESAP KARTINDA: ödeme ilişkisi hesabın bir özelliği,
+                    // projenin değil. Kullanıcı "ne ödüyorum" sorusunu sorduğunda
+                    // baktığı yer burası — oturum ve hesap silmenin durduğu yer.
+                    //
+                    // PANODAKİ SATIRLA ÇİFT GİRİŞ BİLİNÇLİ: panodaki satır kullanıcı
+                    // aramadan görünür, buradaki ise arayınca bulunur. Biri diğerinin
+                    // yedeği değil; ikisi iki farklı soruyu karşılıyor.
+                    Text("Paket")
+                        .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                        .padding(.top, 22)
+                        .padding(.bottom, 10)
+
+                    Button {
+                        showPlans = true
+                    } label: {
+                        infoRow(icon: "square.stack.3d.up",
+                                title: paketBasligi,
+                                detail: "Paketleri ve sınırları gör",
+                                trailing: nil)
+                    }
+                    .buttonStyle(.plain)
+                    .background(Palette.surface)
+                    .cornerRadius(15)
+
+                    // ─── Güvenlik: uygulama kilidi (madde 78) ───
+                    //
+                    // ROLDEN BAĞIMSIZ: ortağın gördüğü ekranlar da ciro, tahsilat ve
+                    // taksit planı taşıyor. Kilidi yalnızca yöneticiye vermek,
+                    // korumayı verinin yarısında bırakmak olurdu.
+                    Text("Güvenlik")
+                        .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                        .padding(.top, 22)
+                        .padding(.bottom, 10)
+
+                    lockRow
+
+                    // ─── Destek ve sürüm (madde 72) ───
+                    //
+                    // Crashlytics bilinçli olarak ertelendi; o yüzden bu satırlar
+                    // sahadaki bir hatanın görünebildiği TEK kanal. İkisi de yokken
+                    // kullanıcı bildiremiyor, geliştirici ölçemiyordu.
+                    Text("Destek")
+                        .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
+                        .padding(.top, 22)
+                        .padding(.bottom, 10)
+
+                    supportRows
+
+                    Button {
+                        dismiss()
+                        appState.signOut()
+                    } label: {
+                        HStack(spacing: 9) {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .iconFont(14, weight: .semibold)
+                            Text("Oturumu Kapat")
+                                .font(.manrope(14, .bold))
+                        }
+                        .foregroundColor(Palette.alertInk)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Palette.alertTint.opacity(0.6))
+                        .cornerRadius(14)
+                    }
+                    .padding(.top, 20)
+
+                    // HESAP SİLME — App Store 5.1.1(v) zorunluluğu.
+                    //
+                    // Apple silme girişinin uygulama İÇİNDE ve bulunabilir olmasını
+                    // istiyor; web sayfasına yönlendirme reddediliyor. Hakem hesap
+                    // ekranına bakacak, bu yüzden burada.
+                    //
+                    // Görsel olarak "Oturumu Kapat"tan AYRI ve daha sessiz: ikisi
+                    // eşit ağırlıkta dursaydı yanlışlıkla silme riski artardı.
+                    Button {
+                        showDeleteFlow = true
+                    } label: {
+                        Text("Hesabı Sil")
+                            .font(.manrope(13, .semiBold))
+                            .foregroundColor(Palette.textTertiary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                    }
+                    .padding(.top, 4)
+
+                    Spacer().frame(height: 18)
                 }
-                .foregroundColor(Palette.alertInk)
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(Palette.alertTint.opacity(0.6))
-                .cornerRadius(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.top, 20)
-
-            // HESAP SİLME — App Store 5.1.1(v) zorunluluğu.
-            //
-            // Apple silme girişinin uygulama İÇİNDE ve bulunabilir olmasını
-            // istiyor; web sayfasına yönlendirme reddediliyor. Hakem hesap
-            // ekranına bakacak, bu yüzden burada.
-            //
-            // Görsel olarak "Oturumu Kapat"tan AYRI ve daha sessiz: ikisi
-            // eşit ağırlıkta dursaydı yanlışlıkla silme riski artardı.
-            Button {
-                showDeleteFlow = true
-            } label: {
-                Text("Hesabı Sil")
-                    .font(.manrope(13, .semiBold))
-                    .foregroundColor(Palette.textTertiary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-            }
-            .padding(.top, 4)
-
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
         .background(Palette.surface)
         .fullScreenCover(isPresented: $showDeleteFlow) {
             DeleteAccountView()
         }
-        .sheetHeight(0.62)
+        .sheet(isPresented: $showPlans) {
+            PlansSheet()
+        }
+        .sheetHeight(0.86)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
+    }
+
+    /// Satırın başlığı DURUMU söylüyor, sabit bir etiket değil.
+    ///
+    /// "Yükselt" yazıp geçmek, yayın öncesi dönemde zaten her şeye sahip olan
+    /// kullanıcıya yalan söylemek olurdu; ücretli pakette ise satın almış
+    /// kişiye tekrar satmaya çalışmak olurdu.
+    private var paketBasligi: String {
+        switch viewModel.entitlement {
+        case .preLaunchUnlimited: return "Paketler"
+        case .plan(.ucretsiz):    return "Ücretsiz katman · yükselt"
+        case .plan(let plan):     return "\(plan.displayName) paketi"
+        }
     }
 
     // MARK: Profil kartı
@@ -223,6 +279,34 @@ struct AccountSheet: View {
                     infoRow(icon: "hand.raised",
                             title: "Gizlilik politikası",
                             detail: "Verilerin nasıl saklandığı",
+                            trailing: nil)
+                }
+                .buttonStyle(.plain)
+                Divider().overlay(Palette.divider).padding(.leading, 68)
+            }
+
+            // KVKK AYDINLATMA METNİ AYRI SATIR.
+            //
+            // Gizlilik politikasının içine gömülseydi, KVKK'nın istediği
+            // başlıklar (veri sorumlusu, hukuki sebep, m.11 hakları) genel
+            // metnin içinde kaybolurdu. Türkiye'deki kullanıcı "KVKK" diye
+            // arıyor; aradığı kelimeyi ekranda bulmalı.
+            if let kvkk = AppInfo.kvkkNoticeURL {
+                Link(destination: kvkk) {
+                    infoRow(icon: "doc.text",
+                            title: "KVKK aydınlatma metni",
+                            detail: "Hangi veri, hangi hukuki sebeple",
+                            trailing: nil)
+                }
+                .buttonStyle(.plain)
+                Divider().overlay(Palette.divider).padding(.leading, 68)
+            }
+
+            if let kosullar = AppInfo.termsURL {
+                Link(destination: kosullar) {
+                    infoRow(icon: "checkmark.seal",
+                            title: "Kullanım koşulları",
+                            detail: "Hizmetin sınırları ve abonelik",
                             trailing: nil)
                 }
                 .buttonStyle(.plain)

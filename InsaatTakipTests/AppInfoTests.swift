@@ -55,13 +55,34 @@ final class AppInfoTests: XCTestCase {
         XCTAssertNotEqual(kimlik, "bilinmiyor")
     }
 
-    /// GİZLİLİK POLİTİKASI ADRESİ HENÜZ YOK (madde 27) ve bu BİLİNÇLİ.
+    /// HUKUKİ ADRESLER YERİNDE — madde 27 kapandı (15 Eki 2026).
     ///
-    /// Bu test, adres eklendiği gün DÜŞECEK ve o an satırın gerçekten
-    /// gösterildiğini doğrulamayı hatırlatacak. Çalışmayan bir bağlantı, hiç
-    /// bağlantı olmamasından kötü.
-    func testPrivacyPolicyIsStillPending() {
-        XCTAssertNil(AppInfo.privacyPolicyURL,
-                     "madde 27 kapandıysa AccountSheet'teki satırı da doğrula")
+    /// Bu testin yerini aldığı `testPrivacyPolicyIsStillPending`, adresin BOŞ
+    /// kalmasını kilitliyordu ve tam da görevini yaparak adresler eklendiği
+    /// gün düştü: "satırın gerçekten gösterildiğini doğrula" diye uyardı,
+    /// doğrulandı (AccountSheet'te gizlilik + KVKK + koşullar satırları,
+    /// PlansSheet'te koşullar + gizlilik bağlantısı).
+    ///
+    /// ŞİMDİ KİLİTLENEN ŞEY ADRESİN ŞEKLİ:
+    ///   · https — App Store gizlilik adresinde http kabul etmiyor;
+    ///   · üçü BİRBİRİNDEN FARKLI — kopyala-yapıştır ile aynı sayfaya bakan
+    ///     üç satır, kullanıcının aradığı metni hiç bulamaması demek ve bu
+    ///     hata ekranda normal görünür, yalnızca dokununca anlaşılır.
+    ///
+    /// ADRESLERİN CANLI OLDUĞUNU BU TEST DOĞRULAYAMAZ: sayfalar başka bir
+    /// depoda (`scripts/hukuki-sayfalar.py` üretiyor) ve testin ağa çıkması
+    /// onu kırılgan yapardı. Yayın öncesi elle açılıp görülmeleri şart.
+    func testLegalURLsAreConfigured() throws {
+        let adresler: [(String, URL)] = [
+            ("gizlilik", try XCTUnwrap(AppInfo.privacyPolicyURL)),
+            ("kvkk", try XCTUnwrap(AppInfo.kvkkNoticeURL)),
+            ("koşullar", try XCTUnwrap(AppInfo.termsURL)),
+        ]
+        for (ad, url) in adresler {
+            XCTAssertEqual(url.scheme, "https", "\(ad) adresi https değil")
+            XCTAssertFalse(url.host?.isEmpty ?? true, "\(ad) adresinde alan adı yok")
+        }
+        XCTAssertEqual(Set(adresler.map { $0.1.absoluteString }).count, 3,
+                       "üç hukuki satırdan en az ikisi aynı sayfaya gidiyor")
     }
 }

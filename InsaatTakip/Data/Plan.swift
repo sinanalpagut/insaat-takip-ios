@@ -113,4 +113,53 @@ enum Plan: String, Codable, CaseIterable, Identifiable {
 
     /// Satın alınabilir paketler — ücretsiz katman listede yok.
     static var purchasable: [Plan] { allCases.filter { $0.monthlyPrice != nil } }
+
+    // MARK: - Ekranda gösterilen vaat (15 Eki 2026)
+
+    /// Paketi diğerlerinden AYIRAN satırlar.
+    ///
+    /// EKRANDA ELLE YAZILMIYOR, KATALOGDAN ÜRETİLİYOR. Fiyat tablosu burada,
+    /// tanıtım metni ekranda dursaydı, bir sınırı değiştirip ekrandaki vaadi
+    /// güncellemeyi unutmak serbest olurdu — ve kullanıcı, ekranda okuduğu
+    /// sayıyı vermeyen bir pakete para ödemiş olurdu.
+    ///
+    /// YALNIZCA GERÇEKTEN FARKLI OLAN İKİ ŞEY YAZIYOR. Paketler arasında
+    /// özellik farkı YOK; değişen tek şey bu iki sayı. "Öncelikli destek"
+    /// gibi üçüncü bir madde uydurmak ilk destek e-postasında yalana
+    /// dönerdi — üstelik satın alma kararını o yalan verdirmiş olurdu.
+    var highlights: [String] {
+        [activeProjectLimit.map { "\($0) aktif proje" } ?? "Sınırsız aktif proje",
+         invitedPartnerLimit.map { "\($0) ortak daveti" } ?? "Sınırsız ortak daveti"]
+    }
+
+    /// HER PAKETTE OLAN ŞEYLER — paket farkı değil, ürünün tamamının sözü.
+    ///
+    /// Paket kartlarının İÇİNDE değil ayrı duruyor: bunlar ücretsiz katmanda
+    /// da var ve kartlara kopyalansaydı ücretsiz kullanıcı, zaten sahip
+    /// olduğu şeyler için ödeme yapması gerektiğini sanırdı.
+    ///
+    /// DÖRT MADDENİN DÖRDÜ DE KODDA KARŞILIĞI OLAN ŞEYLER: daire/gider/
+    /// malzeme sayısında hiçbir sınır yok, ortak erişimi güvenlik kurallarıyla
+    /// salt okur, rapor ve Excel çıktısı mevcut, reklam SDK'sı hiç bağlı değil
+    /// (`PrivacyInfo.xcprivacy` izleme yok diyor). Buraya doğrulanamayan bir
+    /// madde eklenemez.
+    static let commonFeatures = [
+        "Sınırsız daire, gider, malzeme ve belge kaydı",
+        "Ortaklar salt okur — rakamlar herkeste aynı",
+        "Dönem raporu, PDF ve Excel çıktısı",
+        "Reklam yok, veri izleme yok",
+    ]
+
+    /// SATIN ALMA HENÜZ AÇIK DEĞİL — StoreKit bağlanmadı (madde 87/c).
+    ///
+    /// Paket ekranı bugün BİLGİ ekranı olarak çalışıyor: fiyatlar görünüyor,
+    /// "Satın Al" düğmesi görünmüyor. Çalışmayan bir düğme, bastıran
+    /// kullanıcıya uygulamanın bakımsız olduğunu söyler; hiç olmaması ise
+    /// yalnızca "henüz satışta değil" der.
+    ///
+    /// BU BAYRAK KOTAYLA BİRLİKTE AÇILMALI. Sınır yürürlüğe girip satın alma
+    /// kapalı kalırsa kullanıcı çıkışı olmayan bir duvara çarpar — ürünün
+    /// yapabileceği en kötü şey. `QuotaTests.testLimitsNeedAPaymentPath`
+    /// tam bu ikiliyi denetliyor.
+    static let purchasesAvailable = false
 }

@@ -26,13 +26,28 @@ enum AppInfo {
     /// depoya girmiyor.
     static let supportAddress = "info@benav.com.tr"
 
-    /// Gizlilik politikası adresi — madde 27'ye bağlı.
+    /// Hukuki metinlerin adresleri — madde 27 (15 Eki 2026).
     ///
-    /// `nil` olduğu sürece satır GÖSTERİLMİYOR. Çalışmayan bir bağlantı
-    /// koymak, hiç koymamaktan kötü: kullanıcı dokunur, boş sayfa görür ve
-    /// uygulamanın bakımsız olduğunu düşünür. Madde 27 kapanınca burası tek
-    /// satırlık bir değişiklik.
-    static let privacyPolicyURL: URL? = nil
+    /// SAYFALAR benav.com.tr'de, KAYNAKLARI BU DEPODA
+    /// (`scripts/hukuki-sayfalar.py`). Ayrı depolarda dursalardı, uygulamanın
+    /// ne topladığı değiştiğinde metni güncellemeyi hatırlatan hiçbir şey
+    /// olmazdı — oysa gizlilik metni tam da kodun ne yaptığına dair bir
+    /// iddia; kanıtı `PrivacyInfo.xcprivacy` ve kodun kendisi.
+    ///
+    /// ÖNCE SİTE YAYINLANMALI. Bu üç adres canlı değilken mağazaya gönderim
+    /// yapılmamalı: kullanıcı dokunur ve boş sayfa görür, App Store hakemi
+    /// ise gizlilik adresini AÇIP okuyor — açılmayan adres doğrudan ret
+    /// sebebi. Tip hâlâ `URL?`, yani adres bozulursa satır yine çizilmiyor.
+    static let privacyPolicyURL = URL(string: "https://benav.com.tr/privacy/insaat-takip.html")
+
+    /// KVKK aydınlatma metni. Gizlilik politikasından AYRI, çünkü KVKK'nın
+    /// istediği başlıklar (veri sorumlusu kimliği, hukuki sebep, m.11
+    /// hakları) genel bir gizlilik metninin içinde eriyip kaybolur.
+    static let kvkkNoticeURL = URL(string: "https://benav.com.tr/privacy/insaat-takip-kvkk.html")
+
+    /// Kullanım koşulları. Paket ekranında da bağlantısı var: Apple'ın
+    /// abonelik kuralı satın alma ekranında bu adresi istiyor.
+    static let termsURL = URL(string: "https://benav.com.tr/privacy/insaat-takip-kosullar.html")
 
     /// Destek e-postasının gövdesi — TANI BİLGİSİ ÖNCEDEN DOLU.
     ///
