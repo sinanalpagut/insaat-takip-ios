@@ -136,3 +136,37 @@ büyük metinde portföy satırı ve kilit başlığının kesilmesi.
 
 **KOŞMAYANLAR:** hesap silme (gerçek hesabı yok edeceği için bilinçli olarak
 atlandı), dolu depolama dalı, davet BAĞLANTISI (alan adı yok — madde 29).
+
+---
+
+## YAYIN ÖNCESİ BLOKE EDEN TEK TEST — App Attest gerçek cihazda (15 Eki 2026)
+
+**Bu test geçmeden TestFlight'a ya da App Store'a gönderim YAPILMAMALI.**
+
+**Neden:** App Check zorlaması 15 Eki 2026'da açıldı. Bugüne kadar üretilen
+her App Check jetonu **hata ayıklama jetonundan** geldi — `AppCheckSetup`
+App Attest'i yalnızca Release'de kuruyor, cihaz turu DEBUG derlemesiyle
+yapıldı ve tek Release koşusu simülatördeydi (App Attest simülatörde hiç
+çalışmaz). Yani App Attest'in bu uygulamada çalıştığı **hiç kanıtlanmadı.**
+Konsoldaki "Verified requests" oranı bu soruyu cevaplayamaz: o oran debug
+jetonunu ölçüyor.
+
+**Geçmezse ne olur:** mağaza derlemesi Firestore'dan tek satır okuyamaz,
+Storage'a dosya yazamaz ve kullanıcı giriş yapamaz. App Review "uygulama
+açılmıyor" diye reddeder.
+
+**Simülatör bu testi YAPAMAZ.** Fiziksel iPhone şart.
+
+- [ ] iPhone USB ile bağlı ve kilidi açık
+- [ ] **RELEASE** derlemesi (Debug DEĞİL — Debug debug jetonunu kullanır ve
+      hiçbir şey kanıtlamaz):
+      `xcodebuild -scheme InsaatTakip -configuration Release -destination 'generic/platform=iOS'`
+- [ ] Cihaza kur ve `-firedebug` ile başlat (SDK günlüğü açık)
+- [ ] Günlükte App Check jetonunun ALINDIĞI görülmeli; `App Attest` ile
+      ilgili hata YOKSA geçti
+- [ ] Asıl kanıt davranışta: uygulama açılıyor, projeler **geliyor**, bir
+      kayıt yazılabiliyor, çıkış yapıp yeniden **SMS ile giriş** yapılabiliyor.
+      Zorlama açık olduğu için bunların çalışması App Attest'in çalıştığı
+      anlamına gelir — zorlama kapalıyken aynı ekranlar hiçbir şey kanıtlamazdı.
+- [ ] Geçmezse: konsoldan zorlama geri alınır (tek düğme), callable'lar için
+      `enforceAppCheck` kaldırılıp yeniden dağıtılır (~1 dakika)

@@ -140,6 +140,20 @@ async function clearFailedAttempts(uid: string): Promise<void> {
 }
 
 export const redeemInvite = onCall<{ code?: string }, Promise<RedeemResult>>(
+  // APP CHECK ZORLAMASI (madde 71, 15 Eki 2026).
+  //
+  // Bu uç DÜZ BİR HTTPS ADRESİ: madde 68'de testlerin kendisi kanıtladı —
+  // uygulama hiç açılmadan curl ile çağrılabiliyor. `request.auth` yalnızca
+  // ÇAĞIRANIN KİM OLDUĞUNU söylüyor, NEREDEN geldiğini değil; geçerli bir
+  // oturum jetonu da uygulamanın paketinden çıkarılan API anahtarıyla
+  // doğrudan Identity Toolkit'ten alınabiliyor.
+  //
+  // `consumeAppCheckToken` AÇILMADI: o, jetonu tek kullanımlık yapıp
+  // tekrar oynatmayı (replay) engelliyor ama her çağrıda ek bir doğrulama
+  // turu getiriyor. Buradaki tehdit tekrar oynatma değil, uygulamayı hiç
+  // kullanmadan uç noktayı dövmek — onu `enforceAppCheck` kesiyor. Oran
+  // sınırı (`assertNotRateLimited`) zaten ikinci katman.
+  { enforceAppCheck: true },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) {
@@ -387,7 +401,11 @@ interface DeleteResult {
 // istemci tarafındaki bekleme süresi de buna göre ayarlandı
 // (`AccountDeletionService`).
 export const deleteAccount = onCall<unknown, Promise<DeleteResult>>(
-  { timeoutSeconds: 540, memory: "512MiB" },
+  // APP CHECK ZORLAMASI (madde 71, 15 Eki 2026) — gerekçesi `redeemInvite`
+  // ile aynı, sonucu daha ağır: bu uç VERİ YOK EDİYOR. Çağıranın kimliği
+  // doğrulansa bile isteğin bizim uygulamamızdan geldiği ayrıca
+  // kanıtlanmalı.
+  { timeoutSeconds: 540, memory: "512MiB", enforceAppCheck: true },
   async (request): Promise<DeleteResult> => {
     const uid = request.auth?.uid;
     if (!uid) {

@@ -68,14 +68,36 @@ async function newUser() {
   return { uid: j.localId, idToken: j.idToken };
 }
 
+// ── App Check jetonu (madde 71) ──
+//
+// İKİ CALLABLE DA ARTIK ZORLAMAYA TABİ (`enforceAppCheck: true`). Jetonsuz
+// çağrı 401 alıyor; bu dosyanın 39 testi zorlama açıldığı anda topluca
+// düştü ve zorlamanın GERÇEKTEN uygulandığının ilk kanıtı o oldu.
+//
+// EMÜLATÖRDE JETON DOĞRULANMIYOR, ÇÖZÜLÜYOR. Firebase Functions emülatörü
+// `skipTokenVerification` ile koşuyor, yani imzaya bakmadan JWT'yi açıp
+// `sub` alanını `app_id` yapıyor. Bu yüzden imzasız bir JWT yeterli.
+//
+// BUNUN NE KANITLADIĞI, NE KANITLAMADIĞI AÇIK OLSUN: burada kanıtlanan şey
+// işlevin jeton İSTEMESİ. Jetonun gerçekten App Attest'ten geldiği YALNIZCA
+// gerçek cihazda, Release derlemesiyle kanıtlanabilir — emülatörde App
+// Attest hiç çalışmıyor.
+// `b64url` aşağıda zaten tanımlı (eskimiş jeton üretimi için) ve işlev
+// bildirimi olduğu için modül başına yükseliyor — ikinci bir kopya
+// çıkarmaya gerek yok.
+const APP_CHECK_TOKEN =
+  `${b64url({ alg: 'none', typ: 'JWT' })}.` +
+  `${b64url({ sub: '1:0:ios:emulator', aud: [`projects/${PROJECT_ID}`] })}.imzasiz`;
+
 // ── Callable çağrısı ──
 
-async function redeem(idToken, code) {
+async function redeem(idToken, code, { appCheck = true } = {}) {
   const res = await fetch(CALLABLE, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+      ...(appCheck ? { 'X-Firebase-AppCheck': APP_CHECK_TOKEN } : {}),
     },
     body: JSON.stringify({ data: { code } }),
   });
@@ -83,12 +105,13 @@ async function redeem(idToken, code) {
   return { status: res.status, result: body.result, error: body.error };
 }
 
-async function deleteAccount(idToken) {
+async function deleteAccount(idToken, { appCheck = true } = {}) {
   const res = await fetch(DELETE_FN, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+      ...(appCheck ? { 'X-Firebase-AppCheck': APP_CHECK_TOKEN } : {}),
     },
     body: JSON.stringify({ data: {} }),
   });
@@ -690,5 +713,43 @@ describe('deleteAccount — hesap silme', () => {
     const { status } = await deleteAccount(u.idToken);
     assert.equal(status, 200);
     assert.equal(await getFields(`users/${u.uid}`), null);
+  });
+});
+
+// ── App Check zorlaması (madde 71) ──
+//
+// NEDEN AYRI BİR BÖLÜM: zorlama tek bir satırla kapatılabilir
+// (`enforceAppCheck: true` silinir) ve kapandığı HİÇBİR YERDEN anlaşılmaz —
+// diğer tüm testler yeşil kalır, uygulama çalışmaya devam eder, yalnızca
+// koruma sessizce gider. Aynı sınıf madde 79'da (davet ömrü) ve 87'de
+// (kota) yaşandı: "iddia yazılı, uygulayan yok".
+//
+// TEHDİT PARAYLA ÖLÇÜLÜ: bu iki uç düz HTTPS adresi ve madde 68'de
+// testlerin kendisi kanıtladı — uygulama hiç açılmadan curl ile
+// çağrılabiliyorlar. `deleteAccount` üstelik VERİ YOK EDİYOR.
+//
+// GÜNLÜKTEKİ YANILTICI SATIRI BİLEREK YAZIYORUM: reddedilen çağrıda bile
+// emülatör `{"verifications":{"app":"MISSING"},"message":"Callable request
+// verification passed"}` basıyor. "passed" burada gövdenin çalıştığı
+// anlamına GELMİYOR — doğrulama özeti önce loglanıyor, zorlama sonra
+// reddediyor. Kanıt iki yerde: durum kodu 401 ve işlev ~0,6 ms'de bitiyor
+// (gerçek `deleteAccount` ~11 ms). Bu satırı görüp "zorlama çalışmıyor"
+// sonucuna varmak kolay; o yüzden burada duruyor.
+describe('App Check zorlaması', () => {
+  it('redeemInvite jetonsuz çağrıyı reddediyor', async () => {
+    const u = await newUser();
+    const { status } = await redeem(u.idToken, 'ABC234', { appCheck: false });
+    assert.equal(status, 401,
+      'redeemInvite App Check jetonu olmadan çalışıyor — zorlama kapanmış');
+  });
+
+  it('deleteAccount jetonsuz çağrıyı reddediyor', async () => {
+    const u = await newUser();
+    const { status } = await deleteAccount(u.idToken, { appCheck: false });
+    assert.equal(status, 401,
+      'deleteAccount App Check jetonu olmadan çalışıyor — zorlama kapanmış');
+    // Hesabın SİLİNMEDİĞİ de denetleniyor: 401 dönüp yine de silseydi
+    // durum kodu yanıltıcı olurdu.
+    assert.equal(await authUserExists(u.uid), true, 'reddedilen çağrı hesabı silmiş');
   });
 });

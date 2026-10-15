@@ -1799,7 +1799,69 @@ gidip geldiği ve alansız ESKİ belgelerin hâlâ çözüldüğü.
         DENENDİĞİNDE ortaya çıkmıştı. Sıra: birkaç gün normal kullanım →
         App Check → Request metrics → "Verified requests" oranı → zorlama +
         callable'larda `enforceAppCheck` AYNI ANDA.
-      · **AÇIK KALAN (kullanıcının işi):** (b) ölçümlere bakıp ZORLAMAYI açmak, (c) sonra callable'larda `enforceAppCheck`i açmak. Ayrıca bütçe uyarısı harcamayı KESMİYOR — bunu kodla çözmek mümkün değil, bilinen sınır olarak duruyor.
+      · **(c) YAPILDI (15 Eki 2026) — CALLABLE'LARDA ZORLAMA AÇIK.**
+        `redeemInvite` ve `deleteAccount` artık `enforceAppCheck: true` ile
+        üretimde. `consumeAppCheckToken` AÇILMADI: o tekrar oynatmayı (replay)
+        engelliyor ve her çağrıya ek doğrulama turu getiriyor; buradaki tehdit
+        tekrar oynatma değil, uygulamayı hiç kullanmadan ucu dövmek.
+      · **ZORLAMANIN GERÇEKTEN UYGULANDIĞI KANITLANDI — ve kanıtı testlerin
+        topluca düşmesi oldu.** Bayrak eklenince emülatör paketindeki 39 test
+        birden kırmızıya döndü (401). Testler callable'ı düz HTTP ile
+        çağırıyordu, yani jeton göndermiyorlardı. Jeton eklenince 205 test
+        yeşile döndü.
+      · **ZORLAMA ARTIK TESTLE KİLİTLİ.** İki yeni test jetonsuz çağrının 401
+        aldığını denetliyor. Gerekçe: `enforceAppCheck: true` tek satırla
+        silinebilir ve silindiği HİÇBİR YERDEN anlaşılmaz — diğer tüm testler
+        yeşil kalır, uygulama çalışır, yalnızca koruma sessizce gider. Aynı
+        sınıf madde 79'da (davet ömrü) ve 87'de (kota) yaşandı.
+        `deleteAccount` testi ayrıca hesabın SİLİNMEDİĞİNİ de denetliyor:
+        401 dönüp yine de silseydi durum kodu yanıltıcı olurdu.
+      · **GÜNLÜKTEKİ TUZAK YAZILI:** reddedilen çağrıda bile emülatör
+        `{"app":"MISSING"} ... "verification passed"` basıyor. "passed"
+        gövdenin çalıştığı anlamına gelmiyor; doğrulama özeti önce loglanıyor,
+        zorlama sonra reddediyor. Kanıt iki yerde: 401 ve işlevin ~0,6 ms'de
+        bitmesi (gerçek `deleteAccount` ~11 ms).
+
+      · **BEKLENEN YÖNTEM ÇÜRÜTÜLDÜ: "ÖLÇÜMLERE BAK" SORUYU CEVAPLAYAMAZ.**
+        Plan "birkaç gün kullan → Request metrics → Verified requests oranına
+        bak → zorlamayı aç" diyordu. O oran bu soruyu cevaplayamaz, çünkü
+        **bugüne kadar üretilen HER App Check jetonu hata ayıklama
+        jetonundan geldi:**
+          · `AppCheckSetup` App Attest'i YALNIZCA `#else` dalında, yani
+            Release'de kuruyor; DEBUG'da debug sağlayıcı çalışıyor.
+          · Cihaz turu (2 Eyl) DEBUG derlemesiyle yapıldı — `CIHAZ_TURU.md`
+            bunu açıkça yazıyor (`-backend firestore` bayrağı zaten yalnızca
+            DEBUG'da anlamlı).
+          · Tek Release koşusu (25 Ağu) **SİMÜLATÖRDE** yapıldı ve App Attest
+            simülatörde hiç çalışmıyor.
+        Yani konsol yüksek bir "doğrulanmış" oranı gösterecek, o oran debug
+        jetonunun çalıştığını kanıtlayacak ve **App Attest hakkında hiçbir
+        şey söylemeyecek.** Bu, projenin avladığı sınıfın yeni bir türü:
+        "iddia yazılı, uygulayan yok" değil — **ÖLÇÜM VAR, ÖLÇTÜĞÜ ŞEY
+        BAŞKA.** Yanlış sayıya bakıp zorlama açmak, doğru hissettiren bir
+        kararla uygulamayı mağazada ölü doğurmak olurdu.
+
+      · **ZORLAMAYI ŞİMDİ AÇMAK DOĞRU, ÇÜNKÜ MALİYET ÖMRÜNÜN EN DÜŞÜĞÜNDE.**
+        Uygulama dağıtılmadı, yani kullanıcı yok; kırılırsa kırılan tek şey
+        geliştiricinin kendi cihazı ve onun debug jetonu kayıtlı. Dahası
+        zorlama AÇIKKEN Release derlemesi cihazda denendiğinde App Attest
+        çalışmıyorsa **gürültülü biçimde** başarısız olacak; zorlama kapalı
+        olsaydı aynı derleme sessizce "çalışıyor" görünür ve sorun ancak
+        mağazada ortaya çıkardı. Kota testlerinin sınırı enjekte ederek yayın
+        gününü prova etmesiyle aynı mantık.
+
+      · **YAYIN ÖNCESİ BLOKE EDEN TEK İŞ — APP ATTEST GERÇEK CİHAZDA.**
+        TestFlight ya da App Store'a gönderim yapılmadan ÖNCE: Release
+        derlemesi FİZİKSEL iPhone'a kurulacak ve App Check jetonunun
+        alındığı günlükten doğrulanacak. Geçmezse mağaza derlemesi hiçbir
+        veriye erişemez — ne okuma, ne yazma, ne giriş. Simülatör bu testi
+        YAPAMAZ. Adımlar `CIHAZ_TURU.md`'de.
+
+      · **KONSOL TARAFI (kullanıcının işi, sırayla):** App Check → APIs →
+        Cloud Firestore / Cloud Storage / Firebase Authentication için
+        zorlama. Her biri açıldıktan hemen sonra ilgili akış denenmeli;
+        kırılırsa aynı düğmeyle geri alınır. Ayrıca bütçe uyarısı harcamayı
+        KESMİYOR — kodla çözülemez, bilinen sınır olarak duruyor.
       · **DAĞITILDI VE DOĞRULANDI (25 Ağu 2026).** Kurallar ve iki callable
       üretime çıkarıldı; ardından `redeemInvite` oturumsuz çağrıldı ve
       beklenen `UNAUTHENTICATED · signed-in-required` döndü — yani yeniden
