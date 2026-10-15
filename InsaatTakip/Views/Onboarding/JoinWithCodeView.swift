@@ -199,7 +199,13 @@ struct JoinWithCodeView: View {
         }
     }
 
-    /// Panodaki "insaattakip.app/katil/X7B-9Q2" benzeri bağlantıdan kodu ayıklar.
+    /// Panodaki "benav.com.tr/katil/X7B-9Q2" benzeri bağlantıdan kodu ayıklar.
+    ///
+    /// SON BÖLÜMÜ ALIP TEMİZLİYOR, adresi ÇÖZÜMLEMİYOR. Bu bilinçli: ortak
+    /// bağlantıyı WhatsApp'tan kopyalarken başına/sonuna metin de alabiliyor
+    /// ve katı bir adres eşlemesi o durumda "çözümlenemedi" derdi. Adres
+    /// değişirse (madde 29'da değişti) burası kendiliğinden çalışmaya
+    /// devam ediyor.
     private func pasteLink() {
         guard let text = UIPasteboard.general.string else {
             viewModel.flash("Panoda bağlantı yok")

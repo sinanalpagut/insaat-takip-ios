@@ -809,7 +809,53 @@ projesi kullanılmalı — kurallar zaten yayında.
       · 162/162 test. En kritik olanı: "ORTAK silince SAHİBİN PROJESİ DURUR" —
         silme fazla geniş yazılsaydı projeden ayrılan bir ortak müteahhidin
         bütün projesini götürürdü. İşlev YAYINDA.
-- [ ] 29. Davet deep link'i (WhatsApp bağlantısı çalışsın)
+- [x] 29. Davet deep link'i (WhatsApp bağlantısı çalışsın) — **TAMAM (15 Eki 2026)**
+      · **KUSUR ORTAĞIN GÖRDÜĞÜ İLK EKRANDAYDI.** `InviteCode.link`
+        `insaattakip.app/katil/<kod>` üretiyordu; o alan adı HİÇ ALINMAMIŞTI.
+        Bağlantı WhatsApp'tan gönderiliyor ve davet edilen kişi uygulamadan
+        önce başka hiçbir şey görmüyor — gördüğü tek şey 404'tü.
+      · **ALAN ADI BEKLENMEDİ, VARSAYIM YANLIŞTI.** Madde 27 ile birlikte
+        `insaattakip.app`e bağlı sayılmıştı; kullanıcı ayrı alan adı istemedi
+        ("tüm uygulamalarım tek yerde gözüksün") ve iş `benav.com.tr/katil/`
+        ile çözüldü. Bağımlılık sanılan şey aslında bir tercihmiş.
+      · **KISA YOL SEÇİLDİ (`/katil/` — `/insaat-takip/katil/` DEĞİL) ve
+        gerekçesi ÖMÜR:** kod 48 saat yaşıyor, yani gönderilmiş hiçbir
+        bağlantı iki günden fazla geçerli değil. Adres kalıcı bir taahhüt
+        olmadığı için ileride başka bir uygulama da davet linki isterse
+        önek eklenebilir; bugün elindeki linki kıracak kimse yok. Kalıcı
+        olsaydı namespace şart olurdu.
+      · **ÜÇ YER BİRBİRİNE BAĞLI, İKİSİ BAŞKA DEPODA:** `InviteCode.link`,
+        `vercel.json` → `/katil/:kod` yazması, `katil.html`in ayrıştırması.
+        Ayrıştıkları an bağlantı yine 404 verir — yani bu maddenin kusuru
+        geri gelir. `InviteCodeLinkTests` Swift tarafını kilitliyor; en
+        değerlisi GİDİŞ-DÖNÜŞ testi (üretilen 200 kod bağlantıya çevrilip
+        `sanitize` ile geri çözülüyor), çünkü üretim ile ayrıştırma ayrı
+        yerlerde yazılmış ve aralarındaki sözleşme ancak denenerek kanıtlanır.
+      · **SAYFA KODU HİÇBİR YERE GÖNDERMİYOR VE DOĞRULAMIYOR.** Doğrulama
+        sunucuda, uygulamanın içinde (kurallar + `redeemInvite`). Burada bir
+        doğrulama ucu açmak, davet kodlarının geçerliliğini HERKESE
+        sorulabilir hâle getirirdi — deneme yanılmaya açık kapı. Sitede
+        analitik betiği de yok, yani kod üçüncü tarafa gitmiyor; bir gün
+        analitik eklenirse davet kodları URL olarak sızar ve bu uyarı
+        `katil.html` içinde yazılı.
+      · **ALFABE DENETİMİ, UZUNLUK DENETİMİ DEĞİL.** İlk hâli altı karaktere
+        bakıyordu; `/katil.html` doğrudan açılınca temizlik "KATILH" üretiyor
+        ve ziyaretçiye UYDURMA bir davet kodu gösterilecekti. Gerçek kodlar
+        I/O/S/0/1 içermeyen alfabeden geldiği için katı denetim hiçbir
+        geçerli daveti elemiyor. Yerelde yakalandı, yayına çıkmadan düzeltildi.
+      · **SAYFA BEKLENTİ DE KURUYOR:** ortaklığın salt okur olduğu ve alıcı
+        adlarının gösterilmediği yazılı. Ortak uygulamayı kurmadan ne
+        göreceğini biliyor; "neden düzenleyemiyorum" sorusu daveti kabul
+        ettikten sonra değil, önce cevaplanıyor.
+      · **UNIVERSAL LINK YAPILMADI — bilinçli ve sıralama meselesi.**
+        Bağlantıya dokununca uygulamanın doğrudan açılması için
+        `apple-app-site-association` + Associated Domains yetkisi gerekiyor.
+        (a) Yetki derlemeye eklenip App ID'de açılmazsa İMZALAMA BOZULUR,
+        yani kullanıcının derlemesini kırar; (b) asıl mesele, davet edilen
+        kişide uygulama genelde KURULU DEĞİL — davetin amacı bu. Yani web
+        sayfası her hâlükârda birincil deneyim, Universal Link üstüne
+        eklenen bir kolaylık. Tetik: App Store yayını + konsoldan Associated
+        Domains açılması. Team ID hazır (`36HVD2S94X`).
 - [~] 30. `PrivacyInfo.xcprivacy` + build numarası — **MANİFEST VE BUILD NO TAMAM**,
       Crashlytics madde 27'ye bağlandı (19 Ağu 2026)
       · **Manifest ZORUNLU hâle gelmişti:** Firebase Apple'ın "yaygın kullanılan

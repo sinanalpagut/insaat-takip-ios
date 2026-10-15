@@ -78,9 +78,27 @@ enum InviteCode {
         return "\(raw[raw.startIndex..<mid])-\(raw[mid...])"
     }
 
-    /// Davet bağlantısı.
+    /// Davet bağlantısı — ORTAĞIN GÖRDÜĞÜ İLK EKRAN.
+    ///
+    /// ALAN ADI benav.com.tr (15 Eki 2026, madde 29). Önceki adres
+    /// `insaattakip.app` HİÇ ALINMAMIŞTI: bağlantı WhatsApp'tan gönderiliyor
+    /// ve davet edilen kişinin uygulamadan önce gördüğü tek şey oluyordu —
+    /// o da 404. Kullanıcı ayrı alan adı istemedi ("tüm uygulamalarım tek
+    /// yerde gözüksün"), yani maddenin alan adına bağlı olduğu varsayımı
+    /// baştan yanlıştı.
+    ///
+    /// ÜÇ YER BİRBİRİNE BAĞLI ve üçü ayrı depoda değişebilir:
+    ///   1. buradaki adres,
+    ///   2. sitedeki `vercel.json` → `/katil/:kod` yazması,
+    ///   3. `public/katil.html`in yoldan kodu ayıklaması.
+    /// Biçimi `InviteCodeLinkTests` kilitliyor; burası değişirse test
+    /// kırmızıya döner ve diğer ikisini de güncellemeyi hatırlatır.
+    ///
+    /// ADRES İLERİDE DEĞİŞEBİLİR, çünkü kod 48 saat yaşıyor: gönderilmiş
+    /// hiçbir bağlantı iki günden fazla geçerli olmadığı için adres
+    /// değişikliği kimsenin elindeki linki kırmaz. Kalıcı bir taahhüt değil.
     static func link(_ raw: String) -> String {
-        "insaattakip.app/katil/\(formatted(raw))"
+        "benav.com.tr/katil/\(formatted(raw))"
     }
 
     /// Kullanıcı girdisini normalize eder: büyük harf, yalnız harf/rakam, en çok 6 karakter.
