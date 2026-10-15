@@ -39,7 +39,7 @@ final class QuotaTests: XCTestCase {
     /// açabilmek için kendi geçmişini silmeye iterdi.
     func testArchivedProjectsDoNotCountAgainstLimit() {
         let snapshot = QuotaSnapshot(activeProjects: 1, archivedProjects: 12)
-        XCTAssertEqual(Quota.canCreateProject(snapshot, entitlement: .subscribed(activeProjects: 3)),
+        XCTAssertEqual(Quota.canCreateProject(snapshot, entitlement: .plan(.santiye)),
                        .allowed)
     }
 
@@ -113,9 +113,9 @@ final class QuotaTests: XCTestCase {
     /// Ortak salt okur ve parayı ödeyen müteahhit; kişi başına ücret, ürünü
     /// ayıran tek şeyi (ortakla şeffaflık) vergilendirmek olurdu.
     func testPaidTiersHaveNoPartnerLimit() {
-        XCTAssertNil(Entitlement.subscribed(activeProjects: 3).invitedPartnerLimit)
+        XCTAssertNil(Entitlement.plan(.santiye).invitedPartnerLimit)
         XCTAssertEqual(Quota.canInvitePartner(invitedCount: 99,
-                                              entitlement: .subscribed(activeProjects: 3)),
+                                              entitlement: .plan(.santiye)),
                        .allowed)
     }
 

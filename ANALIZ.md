@@ -2117,6 +2117,56 @@ verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam
       aylık ücret önemsiz kalmalı. Yıllık seçenek önemli: hem Firebase
       maliyetini önden karşılar hem müteahhidin proje döngüsüne uyar.
 
+      ### FİYATLAR ONAYLANDI (15 Eki 2026)
+
+      | Paket | Aktif proje | Ortak | Aylık | Yıllık |
+      |---|---|---|---|---|
+      | Ücretsiz | 1 | 2 | — | — |
+      | Şantiye | 3 | sınırsız | 749 ₺ | 7.490 ₺ |
+      | Müteahhit | 10 | sınırsız | 1.499 ₺ | 14.990 ₺ |
+      | Kurumsal | sınırsız | sınırsız | 4.999 ₺ | 49.990 ₺ |
+
+      **YILLIK = ON AYIN FİYATI** ("iki ay bedava"). İki işi var: iletişimi
+      kolay ve Firebase maliyetini önden karşılıyor. Katalogda rakamlar ELLE
+      yazılı (`Kurus`ta çarpma operatörü bilerek yok); kuralı `PlanTests`
+      koruyor — on ayı tutmayan bir yıllık fiyat testi kırmızıya döndürür.
+
+      **ÇAPA MALİ MÜŞAVİR ÜCRETİ, BAŞKA UYGULAMA DEĞİL.** Müteahhit "şu
+      uygulama şu kadarmış" diye değil "ayda şuna şu kadar veriyorum" diye
+      düşünüyor. Değer tarafı zaten tartışma götürmüyor: projenin kendi
+      verisinde 1 m³ beton 2.450 ₺, bir daire 3,4–3,9 M ₺ — aylık ücret
+      gürültü mertebesinde. Sınırlayan şey değer değil, alışkanlık.
+
+      **İKİ KURAL BİRBİRİNİN AYNASI:** sınırlarda *dar başla, gevşet*;
+      fiyatta *yüksek başla, indir*. Sebep aynı asimetri — indirim hediyedir,
+      zam güven kaybıdır. Önerilen (henüz karar değil) uygulama **kurucu
+      fiyatı**: ilk kullanıcılara fiyatı ömür boyu sabitlemek. Üçünü birden
+      çözer: erken kullanıcıya gerçek ayrıcalık, sana zam alanı, zam gününde
+      kimsenin ihanete uğramaması.
+
+      **NET GELİR:** Apple kesintisi %15 (yıllık 1 M $ altı). 749 ₺'nin
+      ~637 ₺'si kalıyor; fiyat net rakamla düşünülmeli.
+      **ASIL DEĞİŞKEN MALİYET SMS**, kullanım değil: yeni kullanıcı bir kez
+      doğrulama SMS'i yakıyor, sonrası neredeyse bedava (fotoğraflar ~265 KB).
+      Ücretsiz katmanı taşınabilir kılan da bu.
+
+      **DOĞRULANACAK:** rakamlar Mayıs 2026 bilgisine dayanıyor, Ekim 2026
+      fiyatlarıyla teyit edilmeli. Yöntem: üç müteahhide "öder misin" DEĞİL,
+      (a) "mali müşavirine ayda ne ödüyorsun", (b) "bir günlük gecikme kaça
+      patlıyor", (c) fiyatı gösterip "pahalı mı ucuz mu" diye sor. Tehlikeli
+      cevap "pahalı" değil, **"çok ucuzmuş"**.
+
+      ### REKLAM YOK (15 Eki 2026 kararı)
+
+      Gelir modeli yalnızca abonelik. Üç sebebi de teknik:
+      1. Uygulama ciroyu, ortak payını ve alıcı adlarını gösteriyor; bu
+         ekranların yanında reklam, ürünün sattığı tek şeyi — güveni — zayıflatır.
+      2. Reklam SDK'larının tamamı izleme yapar. `PrivacyInfo.xcprivacy` bugün
+         `NSPrivacyTracking = false` diyor; reklam eklemek o BEYANI BOZAR,
+         App Store etiketini değiştirir ve verilen sözü geri alır.
+      3. Reklam geliri aboneliği zayıflatır: ödeyen kullanıcı neden hâlâ
+         reklam gördüğünü sorar, ödemeyen ödemek için sebep bulamaz.
+
       ### KATMAN KARARLARI (15 Eki 2026)
 
       **ÜCRETSİZ KATMAN DAR BAŞLIYOR: 1 aktif proje + 2 DAVETLİ ortak.**

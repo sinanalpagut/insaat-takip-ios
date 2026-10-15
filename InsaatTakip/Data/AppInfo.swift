@@ -24,7 +24,7 @@ enum AppInfo {
 
     /// Destek adresi. Alan adı kullanıcının kendi alan adı; kişisel e-posta
     /// depoya girmiyor.
-    static let supportAddress = "destek@insaattakip.app"
+    static let supportAddress = "info@benav.com.tr"
 
     /// Gizlilik politikası adresi — madde 27'ye bağlı.
     ///

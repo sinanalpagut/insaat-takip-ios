@@ -12,15 +12,13 @@ import Foundation
 // kapanan tek şey `Entitlement`.
 
 /// Kullanıcının hakkı — bugün tek bir yerden geliyor, yarın StoreKit'ten.
+/// Kullanıcının hakkı — bugün tek bir yerden geliyor, yarın StoreKit'ten.
 enum Entitlement: Equatable {
-    /// Kalıcı ücretsiz katman: 1 AKTİF proje, SINIRSIZ ortak.
-    ///
-    /// Deneme süresi DEĞİL, kalıcı. Bu uygulama veri girildikten SONRA değer
-    /// üretiyor; 14 günlük deneme dolduğunda kullanıcı henüz güveni kurmamış
-    /// oluyor ve elindeki tek şey yarım girilmiş bir şantiye kaydı.
-    case free
-    /// Abonelik: paket kaç AKTİF projeye izin veriyorsa.
-    case subscribed(activeProjects: Int)
+    /// Satın alınmış (ya da ücretsiz) paket. Sınırlar `Plan`dan okunuyor:
+    /// fiyat ve sınır ayrı dursaydı birini değiştirip diğerini unutmak
+    /// serbest olurdu.
+    case plan(Plan)
+
     /// Yayın öncesi: sınır YOK.
     ///
     /// Bugün herkes bu haktadır çünkü ödeme alacak bir yol yok ve olmayan bir
@@ -29,23 +27,17 @@ enum Entitlement: Equatable {
     /// `.free`e çevrilecek; değişecek tek satır `ProjectViewModel.entitlement`.
     case preLaunchUnlimited
 
-    /// Ücretsiz katmanda DAVET EDİLEBİLECEK ortak sayısı. `nil` = sınırsız.
+    /// Kalıcı ücretsiz katman: 1 AKTİF proje, 2 davetli ortak.
     ///
-    /// NEDEN ÜCRETSİZ KATMANDA SINIR VAR AMA ÜCRETLİDE YOK: ortak başına
-    /// ücret ALINMIYOR (madde 87) — ortak salt okur, parayı ödeyen müteahhit
-    /// ve kişi başına ücret, ürünü ayıran tek şeyi (ortakla şeffaflık)
-    /// vergilendirmek olurdu. Buradaki sınır fiyat değil, ücretsiz katmanın
-    /// GENİŞLİĞİ.
-    ///
-    /// NEDEN DAR BAŞLIYOR (15 Eki 2026 kararı): **sınırı gevşetmek bedava,
-    /// sıkmak imkânsız.** Bugün 2 ortak verip altı ay sonra "artık sınırsız"
-    /// demek hediyedir; tersi, zaten davet etmiş kullanıcıdan geri almaktır.
-    /// Aynı asimetri madde 87'nin "ilk yayının sınırsızlığı geri alınamaz"
-    /// gerekçesiyle aynı.
+    /// Deneme süresi DEĞİL, kalıcı. Bu uygulama veri girildikten SONRA değer
+    /// üretiyor; 14 günlük deneme dolduğunda kullanıcı henüz güveni kurmamış
+    /// oluyor ve elindeki tek şey yarım girilmiş bir şantiye kaydı.
+    static let free = Entitlement.plan(.ucretsiz)
+
+    /// Davet edilebilecek ortak sayısı. `nil` = sınırsız.
     var invitedPartnerLimit: Int? {
         switch self {
-        case .free:               return 2
-        case .subscribed:         return nil
+        case .plan(let plan):     return plan.invitedPartnerLimit
         case .preLaunchUnlimited: return nil
         }
     }
@@ -54,14 +46,12 @@ enum Entitlement: Equatable {
     ///
     /// ARŞİVLENMİŞ PROJE SAYILMIYOR ve bu, eksenin kendisi kadar önemli:
     /// inşaat yıllarca sürüyor, biten proje kayıtlarıyla birlikte duruyor
-    /// (madde 60: "vergi ve muhasebe için geçmiş projelerin rakamları
-    /// duruyor olmalı"). Biten projeyi saymak, kullanıcıyı kendi geçmişini
+    /// (madde 60). Biten projeyi saymak, kullanıcıyı kendi geçmişini
     /// silmeye iterdi — uygulamanın var olma sebebinin tersi.
     var activeProjectLimit: Int? {
         switch self {
-        case .free:                       return 1
-        case .subscribed(let n):          return n
-        case .preLaunchUnlimited:         return nil
+        case .plan(let plan):     return plan.activeProjectLimit
+        case .preLaunchUnlimited: return nil
         }
     }
 }
