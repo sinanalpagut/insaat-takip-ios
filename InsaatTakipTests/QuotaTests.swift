@@ -93,4 +93,50 @@ final class QuotaTests: XCTestCase {
         XCTAssertTrue(Quota.limitMessage(limit: 1).contains("arşivlersen"))
         XCTAssertTrue(Quota.limitMessage(limit: 3).contains("3 aktif proje"))
     }
+
+    // MARK: - Ortak kotası (15 Eki 2026 kararı)
+
+    /// ÜCRETSİZ KATMAN DAR BAŞLIYOR: 2 davetli ortak.
+    ///
+    /// Gerekçe asimetri: sınırı gevşetmek bedava, sıkmak imkânsız. Bugün 2
+    /// verip sonra "sınırsız" demek hediye; tersi, zaten davet etmiş
+    /// kullanıcıdan geri almak.
+    func testFreeTierAllowsTwoInvitedPartners() {
+        XCTAssertEqual(Entitlement.free.invitedPartnerLimit, 2)
+        XCTAssertEqual(Quota.canInvitePartner(invitedCount: 1, entitlement: .free), .allowed)
+        XCTAssertEqual(Quota.canInvitePartner(invitedCount: 2, entitlement: .free),
+                       .wouldExceedPartners(limit: 2))
+    }
+
+    /// ÜCRETLİ KATMANDA ORTAK SINIRSIZ — kişi başına ücret ALINMIYOR.
+    ///
+    /// Ortak salt okur ve parayı ödeyen müteahhit; kişi başına ücret, ürünü
+    /// ayıran tek şeyi (ortakla şeffaflık) vergilendirmek olurdu.
+    func testPaidTiersHaveNoPartnerLimit() {
+        XCTAssertNil(Entitlement.subscribed(activeProjects: 3).invitedPartnerLimit)
+        XCTAssertEqual(Quota.canInvitePartner(invitedCount: 99,
+                                              entitlement: .subscribed(activeProjects: 3)),
+                       .allowed)
+    }
+
+    /// KURUCU SAYILMIYOR: kendi `Partner` kaydı sınırı yemez.
+    func testFounderDoesNotCountAgainstPartnerLimit() {
+        let vm = kur()
+        vm.entitlement = .free
+        let proje = vm.projects[0]
+        // Tohum veride kurucu + davetliler var; davetliler sıfırlanınca
+        // kurucuya rağmen davet mümkün olmalı.
+        vm.partners.removeAll { $0.projectId == proje.id && !$0.isFounder }
+        let davetli = vm.partners(for: proje.id).filter { !$0.isFounder }.count
+        XCTAssertEqual(davetli, 0)
+        XCTAssertEqual(Quota.canInvitePartner(invitedCount: davetli, entitlement: .free), .allowed)
+    }
+
+    /// Sınır cümlesi NE YAPACAĞINI söylüyor — burada çıkış arşivlemek değil.
+    func testPartnerLimitMessagePointsToUpgrade() {
+        let mesaj = Quota.partnerLimitMessage(limit: 2)
+        XCTAssertTrue(mesaj.contains("2 ortak"))
+        XCTAssertTrue(mesaj.contains("yükselt"))
+    }
+
 }

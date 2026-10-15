@@ -29,6 +29,27 @@ enum Entitlement: Equatable {
     /// `.free`e çevrilecek; değişecek tek satır `ProjectViewModel.entitlement`.
     case preLaunchUnlimited
 
+    /// Ücretsiz katmanda DAVET EDİLEBİLECEK ortak sayısı. `nil` = sınırsız.
+    ///
+    /// NEDEN ÜCRETSİZ KATMANDA SINIR VAR AMA ÜCRETLİDE YOK: ortak başına
+    /// ücret ALINMIYOR (madde 87) — ortak salt okur, parayı ödeyen müteahhit
+    /// ve kişi başına ücret, ürünü ayıran tek şeyi (ortakla şeffaflık)
+    /// vergilendirmek olurdu. Buradaki sınır fiyat değil, ücretsiz katmanın
+    /// GENİŞLİĞİ.
+    ///
+    /// NEDEN DAR BAŞLIYOR (15 Eki 2026 kararı): **sınırı gevşetmek bedava,
+    /// sıkmak imkânsız.** Bugün 2 ortak verip altı ay sonra "artık sınırsız"
+    /// demek hediyedir; tersi, zaten davet etmiş kullanıcıdan geri almaktır.
+    /// Aynı asimetri madde 87'nin "ilk yayının sınırsızlığı geri alınamaz"
+    /// gerekçesiyle aynı.
+    var invitedPartnerLimit: Int? {
+        switch self {
+        case .free:               return 2
+        case .subscribed:         return nil
+        case .preLaunchUnlimited: return nil
+        }
+    }
+
     /// Aynı anda kaç AKTİF proje tutulabilir. `nil` = sınırsız.
     ///
     /// ARŞİVLENMİŞ PROJE SAYILMIYOR ve bu, eksenin kendisi kadar önemli:
@@ -51,6 +72,8 @@ enum QuotaDecision: Equatable {
     /// Sınır dolu — kaç projeye izin verildiği yazılı, çünkü kullanıcıya
     /// söylenecek cümle bu sayıyı içeriyor.
     case wouldExceedProjects(limit: Int)
+    /// Ücretsiz katmanın ortak sınırı dolu.
+    case wouldExceedPartners(limit: Int)
 }
 
 /// Kotanın ölçtüğü sayılar.
@@ -80,6 +103,23 @@ enum Quota {
                                  entitlement: Entitlement) -> QuotaDecision {
         guard let limit = entitlement.activeProjectLimit else { return .allowed }
         return snapshot.activeProjects < limit ? .allowed : .wouldExceedProjects(limit: limit)
+    }
+
+    /// Yeni ortak davet edilebilir mi?
+    ///
+    /// SAYILAN ŞEY DAVET EDİLEN ORTAKLAR, kurucu DEĞİL: proje kurucusunun
+    /// kendi `Partner` kaydı da listede duruyor ve onu saymak, ücretsiz
+    /// katmanda ilan edilen "2 ortak"ı sessizce 1'e indirirdi.
+    static func canInvitePartner(invitedCount: Int,
+                                 entitlement: Entitlement) -> QuotaDecision {
+        guard let limit = entitlement.invitedPartnerLimit else { return .allowed }
+        return invitedCount < limit ? .allowed : .wouldExceedPartners(limit: limit)
+    }
+
+    /// Ortak sınırı dolduğunda söylenen cümle. Kullanıcıya NE YAPACAĞINI
+    /// söylüyor: burada çıkış yolu arşivlemek değil, paketi yükseltmek.
+    static func partnerLimitMessage(limit: Int) -> String {
+        "Ücretsiz katmanda \(limit) ortak davet edilebilir. Daha fazlası için paketi yükselt."
     }
 
     /// Sınır dolduğunda kullanıcıya söylenen cümle.

@@ -3368,6 +3368,19 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin,
               let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
 
+        // ORTAK KOTASI (madde 87). Bugün `preLaunchUnlimited` olduğu için
+        // hiçbir şeyi durdurmuyor; ücretsiz katman açıldığında sınır TEK
+        // yerden yürürlüğe giriyor.
+        //
+        // KURUCU SAYILMIYOR: proje kurucusunun da bir `Partner` kaydı var ve
+        // onu saymak, ilan edilen "2 ortak"ı sessizce 1'e indirirdi.
+        let davetliSayisi = partners(for: projectId).filter { !$0.isFounder }.count
+        if case .wouldExceedPartners(let limit) = Quota.canInvitePartner(invitedCount: davetliSayisi,
+                                                                        entitlement: entitlement) {
+            flash(Quota.partnerLimitMessage(limit: limit))
+            return
+        }
+
         var code = InviteCode.generate()
         let activeCodes = Set(projects.compactMap { $0.invite?.isUsable == true ? $0.invite?.code : nil })
         var attempts = 0

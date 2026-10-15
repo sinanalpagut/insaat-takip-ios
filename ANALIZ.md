@@ -2117,6 +2117,34 @@ verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam
       aylık ücret önemsiz kalmalı. Yıllık seçenek önemli: hem Firebase
       maliyetini önden karşılar hem müteahhidin proje döngüsüne uyar.
 
+      ### KATMAN KARARLARI (15 Eki 2026)
+
+      **ÜCRETSİZ KATMAN DAR BAŞLIYOR: 1 aktif proje + 2 DAVETLİ ortak.**
+      Gerekçe asimetri: *sınırı gevşetmek bedava, sıkmak imkânsız.* Bugün 2
+      ortak verip altı ay sonra "artık sınırsız" demek hediyedir; tersi, zaten
+      davet etmiş kullanıcıdan geri almaktır — madde 87'nin "ilk yayının
+      sınırsızlığı geri alınamaz" gerekçesinin aynısı. Karşı risk de yazılı:
+      hedef kitlenin çoğu aynı anda tek şantiye yürütüyorsa 1 proje ücretsiz
+      demek "çoğu kullanıcı hiç ödemez" demek olabilir; dar başlamak bu riski
+      de dengeliyor.
+      ÜCRETLİ KATMANDA ORTAK SINIRSIZ — kişi başına ücret ALINMIYOR; gerekçesi
+      yukarıda (ortak salt okur, parayı müteahhit öder, kişi başına ücret
+      ürünü ayıran şeyi vergilendirir).
+      Kod: `Entitlement.invitedPartnerLimit` + `Quota.canInvitePartner`;
+      boğaz `generateInviteCode`. KURUCU SAYILMIYOR — kendi `Partner` kaydı
+      sınırı yeseydi ilan edilen "2 ortak" sessizce 1 olurdu. 4 test.
+
+      **PROJEDE TEK YÖNETİCİ KALIYOR — ÜRÜN KARARI, EKSİK DEĞİL.**
+      Bugün yetki `ownerUid`den türüyor: projeyi kuran yazar, davet edilen
+      herkes salt okur. "İkinci yönetici" rolü SORULDU ve kullanıcı kendi
+      ortaklı işlerinde kayıtları hep bir kişinin tuttuğunu söyledi (15 Eki
+      2026). Bu yüzden rol EKLENMİYOR.
+      Kararın fiyattan ÖNCE alınması gerekiyordu: sonradan eklenseydi ya söz
+      verilmemiş bir şey bedava verilmiş ya da satın alınan paketin içeriği
+      değiştirilmiş olurdu. Tetik: gerçek bir kullanıcının "ortağım da fiş
+      giriyor" demesi — o gün karar yeniden açılır ve eklenirse pakete DAHİL
+      olmalı, kişi başına ücretlendirilmemeli.
+
       **ELENENLER VE GEREKÇELERİ**
       · *Mağazadan ücretli indirme:* en kötüsü. Sunucu maliyeti SÜREKLİ (SMS
         başına ücret, fotoğraf depolama), gelir TEK SEFERLİK. Ayrıca
