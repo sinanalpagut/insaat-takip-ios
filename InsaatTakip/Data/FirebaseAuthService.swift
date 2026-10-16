@@ -114,11 +114,21 @@ final class FirebaseAuthService: AuthService {
     /// Ham `NSError.localizedDescription` arayüze sızarsa kullanıcı İngilizce
     /// bir mesaj görür — uygulamanın tamamı Türkçe olduğu için kabul edilemez.
     private static func mapped(_ error: Error) -> AuthError {
-        #if DEBUG
-        // Kullanıcıya Türkçe kısa mesaj gidiyor; geliştirici ham hatayı görmeden
-        // yanlış eşlemeyi farkedemez. Yalnızca DEBUG.
+        // TANI İKİ KADEMELİ — ve ayrımın sebebi KVKK.
+        //
+        // RELEASE'DE DE yazılan kısım: alan adı, kod ve açıklama. App Check
+        // zorlaması açıldıktan sonra (madde 71) giriş arızasının sahadaki tek
+        // görünür izi bu; `Diag`siz bir giriş hatası hiçbir yere düşmüyordu.
+        //
+        // `userInfo` YALNIZCA DEBUG'DA. Firebase Auth hataları bu sözlükte
+        // TELEFON NUMARASI taşıyabiliyor; numara KVKK kapsamında kişisel veri
+        // ve cihaz günlükleri dışarı çıkabiliyor. Teşhis değeri, kişisel
+        // veriyi günlüğe yazmayı haklı çıkarmıyor — eşleme hatası ararken
+        // zaten geliştirme derlemesi elimizde oluyor.
         let ns = error as NSError
-        print("[auth] \(ns.domain) code=\(ns.code) · \(ns.localizedDescription) · \(ns.userInfo)")
+        Diag.log("auth", "\(ns.domain) code=\(ns.code) · \(ns.localizedDescription)")
+        #if DEBUG
+        print("[auth] userInfo=\(ns.userInfo)")
         #endif
         let code = AuthErrorCode(rawValue: (error as NSError).code)
         switch code {

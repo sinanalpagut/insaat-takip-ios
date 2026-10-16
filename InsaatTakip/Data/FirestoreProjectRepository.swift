@@ -18,6 +18,10 @@ enum RepositoryError: LocalizedError, Equatable {
     /// Alt koleksiyon belgesi proje kimliği taşımıyor — geçerli bir yol kurulamaz.
     case missingProjectId(record: String)
     case decodeFailed(collection: String, documentId: String, reason: String)
+    /// Sunucu isteği REDDETTİ — kural ya da App Check. Ağ sorunu DEĞİL.
+    case accessDenied
+    /// Sunucuya ULAŞILAMADI — ağ sorunu.
+    case offline
 
     var errorDescription: String? {
         switch self {
@@ -27,6 +31,42 @@ enum RepositoryError: LocalizedError, Equatable {
             return "Kayıt bir projeye bağlı değil: \(record)"
         case .decodeFailed(let collection, let documentId, let reason):
             return "Kayıt okunamadı (\(collection)/\(documentId)): \(reason)"
+        case .accessDenied:
+            // "BAĞLANTIYI DENETLE" DEMİYOR ve sebebi önemli: bu hata ağla
+            // ilgili DEĞİL, sunucu isteği reddetti. Kullanıcıyı modeme
+            // yöneltmek, çözümü olmayan bir yerde dakikalarca oyalar.
+            // App Check zorlaması açıldığı için (madde 71) gerçek hayattaki
+            // en olası sebep ESKİ DERLEME; Firebase'in kendi zorlama uyarısı
+            // da aynı şeyi söylüyor ("ensure users have an updated version").
+            return "Erişim reddedildi · uygulamanın güncel sürümünü kullandığından emin ol"
+        case .offline:
+            return "Veriler yüklenemedi · bağlantıyı denetle"
+        }
+    }
+
+    /// Firestore hatasını SINIFLANDIRIR; tanımadığı hatada `nil` döner.
+    ///
+    /// NEDEN BURADA: `ProjectViewModel` yalnızca SwiftUI import ediyor ve
+    /// Firestore'u hiç tanımıyor — depo soyutlamasının tuttuğu yer tam da
+    /// burası. Sınıflandırmayı ViewModel'e taşımak, soyutlamayı delmek
+    /// olurdu.
+    ///
+    /// AYRIM "REDDEDİLDİ" İLE "ULAŞILAMADI" ARASINDA. Bugüne kadar İKİSİ DE
+    /// "bağlantıyı denetle" diyordu; yani kural reddi de, App Check reddi de
+    /// kullanıcıyı modeme yönlendiriyordu. App Check zorlaması açıldıktan
+    /// sonra bu, sahada en olası yanlış yönlendirme hâline geldi.
+    ///
+    /// App Check reddi ile kural reddi BURADA AYRILMIYOR, çünkü ayrılamıyor:
+    /// Firestore ikisine de `permissionDenied` döndürüyor ve açıklama metni
+    /// aynı (REST üzerinden ölçüldü, 16 Eki 2026). Ortak cümle o yüzden her
+    /// iki sebebi de kapsayacak şekilde yazıldı.
+    static func classify(_ error: Error) -> RepositoryError? {
+        let ns = error as NSError
+        guard ns.domain == FirestoreErrorDomain else { return nil }
+        switch ns.code {
+        case FirestoreErrorCode.permissionDenied.rawValue: return .accessDenied
+        case FirestoreErrorCode.unavailable.rawValue:      return .offline
+        default:                                           return nil
         }
     }
 }
@@ -69,7 +109,21 @@ final class FirestoreProjectRepository: ProjectRepository {
 
     func cachedSnapshot() -> DataSnapshot { latest }
 
+    /// Yükleme — hataları SINIFLANDIRARAK fırlatır.
+    ///
+    /// Sarmalayıcı ayrı duruyor ki `fetchAll` içindeki proje düzeyinde
+    /// yalıtım (madde 56) olduğu gibi kalsın: oradaki `catch`ler tek bir
+    /// projeyi kurtarmak için, buradaki ise TÜM yüklemeyi düşüren hatayı
+    /// kullanıcıya doğru cümleyle anlatmak için.
     func load() async throws -> DataSnapshot {
+        do {
+            return try await fetchAll()
+        } catch {
+            throw RepositoryError.classify(error) ?? error
+        }
+    }
+
+    private func fetchAll() async throws -> DataSnapshot {
         guard let uid = Auth.auth().currentUser?.uid else { throw RepositoryError.notSignedIn }
 
         var result = DataSnapshot()
