@@ -275,6 +275,38 @@ kullanıyor; kendi şifreleme uygulaması yok.
 
 ---
 
+## İLERLEME (16 Eki 2026)
+
+### Tamamlananlar
+- [x] Lisans sözleşmeleri — Free Apps + Paid Apps **Active**
+- [x] Banka hesabı ve vergi formları **Active**
+- [x] Uygulama kaydı açıldı · **Apple ID 6823613985**
+- [x] App Information — ad, alt başlık, kategoriler, Content Rights,
+      Apple standart EULA
+- [x] Age Rating → **4+** (172 ülke)
+- [x] DSA → **trader** beyanı
+- [x] Pricing → temel ülke **Türkiye (TRY)**, fiyat **ücretsiz**
+- [x] Availability → **yalnızca Türkiye**
+- [x] Mac, Vision Pro ve okul indirimi kutuları **kaldırıldı**
+      (hiçbiri test edilmedi / uyumsuz / hedef kitle değil)
+
+### 1.0 sürüm sayfasında kalanlar
+- [ ] Ekran görüntüleri (6 adet, 1320×2868)
+- [ ] Tanıtım metni · açıklama · anahtar kelimeler
+- [ ] Destek URL'i ve gizlilik politikası URL'i
+- [ ] App Review bilgileri (test numarası + bölge kısıtı notu)
+- [ ] Sürüm yayın şekli (otomatik / elle)
+
+### Metadata'dan SONRA gelenler
+- [ ] **Derleme yüklenecek** — henüz ASC'de hiç build yok. Xcode →
+      Archive → Distribute → App Store Connect.
+- [ ] **TestFlight'ta App Attest teyidi** — mağaza derlemesinde de
+      `[appcheck] jeton alındı` satırı okunacak. Bugünkü kanıt geliştirme
+      imzalı derlemenin production ortamına zorlanmasıyla alındı; mağaza
+      derlemesinde bir kez daha bakmanın maliyeti sıfır.
+- [ ] **App Privacy anketi** (6. bölüm) — manifestle birebir
+- [ ] Avukat incelemesi
+
 ## YAYINDAN ÖNCE KAPATILMASI GEREKENLER
 
 - [ ] Destek sayfası yayınlanacak (yukarıda)
