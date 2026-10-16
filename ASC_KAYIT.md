@@ -10,11 +10,30 @@
 
 | Alan | Değer |
 |---|---|
-| **Ad** (30 kr.) | `İnşaat Takip` |
+| **Ad** (30 kr.) | `İnşaat Takip: Şantiye Kaydı` — 27 kr. |
 | **Bundle ID** | `com.sinanalpagut.insaattakip` |
 | **SKU** | `insaattakip-001` |
 | **Birincil dil** | Türkçe |
 | **Sürüm** | 1.0 (build 169) |
+
+### Ad neden uzun (16 Eki 2026)
+
+Düz **`İnşaat Takip`** App Store'da BAŞKASI TARAFINDAN ALINMIŞ; uygulama
+adları global olarak benzersiz ve ASC kaydı reddetti.
+
+**TELEFONDAKİ AD DEĞİŞMEDİ.** Mağaza adı ile ana ekranda görünen ad ayrı
+alanlar: `CFBundleDisplayName` hâlâ `İnşaat Takip` ve uygulamanın kendisine
+hiç dokunulmadı. Değişen yalnızca mağaza listesindeki satır.
+
+**"Kayıt" kelimesi bilerek seçildi, "Yönetim" değil.** Kullanım
+koşullarında ve uygulama içi tanıtımda "bu bir kayıt aracıdır, vergi
+hesaplamaz, muhasebe defteri yerine geçmez" diyoruz. Adında "yönetimi"
+geçen bir uygulama, mağaza sayfasında reddettiğimiz beklentiyi adıyla
+yaratırdı.
+
+Marka her yerde **İnşaat Takip** olarak duruyor: simge, hukuki metinler,
+destek sayfası, davet sayfası. Mağaza adı onun üstüne eklenen bir
+niteleme.
 
 ### Alt başlık (30 karakter sınırı)
 
