@@ -135,6 +135,13 @@ final class ProjectViewModel: ObservableObject {
     /// verin yok. Toast da üç saniyede söndüğü için geriye hiçbir iz kalmıyordu.
     @Published private(set) var loadError: String?
 
+    /// Ortak olarak YENİ katılınan projenin adı — karşılama ekranını tetikler.
+    ///
+    /// NEDEN VIEWMODEL'DE: katılma `JoinWithCodeView`de oluyor, karşılama ise
+    /// o ekran KAPANDIKTAN sonra panoda gösterilmeli. İki ekranın arasında
+    /// duran tek yer burası.
+    @Published var joinedAsPartner: String?
+
     /// Yüklenebilen ama İÇERİĞİ okunamayan projeler (madde 56).
     /// Listeden sessizce eksilmemeleri için taşınıyor.
     @Published private(set) var failedProjects: [ProjectLoadFailure] = []

@@ -8,6 +8,7 @@ struct WelcomeView: View {
     @EnvironmentObject private var appState: AppState
     @State private var showJoin = false
     @State private var showPhoneSignIn = false
+    @State private var showIntro = false
 
     /// Ne yapıldığını SAYIYLA söyler: "silindi" tek başına doğrulanabilir bir
     /// bilgi taşımıyor.
@@ -85,6 +86,26 @@ struct WelcomeView: View {
             // Davet girişi buradan KALDIRILDI: projeye katılmak için önce
             // kimlik gerekiyor (memberUids'e yazılacak bir uid olmalı). Ortak da
             // aynı telefon girişinden geçiyor, koda dashboard'dan ulaşıyor.
+            // "NASIL ÇALIŞIR?" — tanıtıma GERİ DÖNÜŞ YOLU.
+            //
+            // Tanıtım bir kez gösteriliyor ve atlanabiliyor; atlayan ya da
+            // aceleyle geçen kullanıcı için başka bir kapı yoktu. Bu ekranın
+            // metnini uzatmak yerine (açıklama işini tanıtım yapıyor) oraya
+            // dönüş veriliyor — METİN DEĞİL, YOL ekleniyor.
+            //
+            // Giriş düğmesinin ALTINDA ve sessiz: birincil eylem giriş yapmak,
+            // tanıtım ikincil. Üstte dursaydı acelesi olanı yavaşlatırdı.
+            Button {
+                showIntro = true
+            } label: {
+                Text("Nasıl çalışır?")
+                    .font(.manrope(13, .semiBold))
+                    .foregroundColor(.white.opacity(0.78))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+            }
+            .padding(.top, 6)
+
             Text("Ortak olarak davet edildiysen de telefonunla giriş yap; davet kodunu girişten sonra kullanacaksın.")
                 .font(.manrope(11, .medium))
                 .foregroundColor(.white.opacity(0.62))
@@ -102,6 +123,9 @@ struct WelcomeView: View {
         }
         .fullScreenCover(isPresented: $showPhoneSignIn) {
             PhoneSignInView()
+        }
+        .fullScreenCover(isPresented: $showIntro) {
+            IntroView { showIntro = false }
         }
         .onAppear {
             // DEBUG: "-screen join" ile kod ekranını doğrudan aç

@@ -180,7 +180,10 @@ struct JoinWithCodeView: View {
             switch await viewModel.joinProject(code: code, user: user) {
             case .success(let projectTitle):
                 dismiss()
-                viewModel.flash("\(projectTitle) · salt okunur erişim")
+                // ŞERİT DEĞİL KARŞILAMA EKRANI (gerekçe `PartnerWelcomeSheet`):
+                // "salt okunur erişim" 2,6 saniyede sönüyordu ve ortağın
+                // bilmesi gerekenler o şeride sığmıyordu.
+                viewModel.joinedAsPartner = projectTitle
             case .notFound:
                 showInvalid = true
                 // Gerçek neden ağ/bozuk davet olabilir; o durumda ViewModel

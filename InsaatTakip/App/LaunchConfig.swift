@@ -30,7 +30,11 @@ enum LaunchConfig {
         #endif
     }
 
-    /// "-screen dashboard|project|activity|photos|report"
+    /// "-screen dashboard|project|activity|photos|report|intro"
+    ///
+    /// `intro` BİR KEZ gösterilen tanıtımı zorla açar. Onsuz tanıtım yalnızca
+    /// temiz kurulumda görülebilirdi; her denemede uygulamayı silmek gerekirdi
+    /// ve görsel karşılaştırma pratikte yapılamazdı.
     static var screen: String? {
         #if DEBUG
         return value(for: "screen")
@@ -48,7 +52,7 @@ enum LaunchConfig {
         #endif
     }
 
-    /// "-sheet log|receipt|invite|apt|sale|upload"
+    /// "-sheet log|receipt|invite|apt|sale|upload|plans|partner"
     static var sheet: String? {
         #if DEBUG
         return value(for: "sheet")

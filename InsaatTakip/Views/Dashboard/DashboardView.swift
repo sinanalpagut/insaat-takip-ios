@@ -109,6 +109,13 @@ struct DashboardView: View {
         // görsel karşılaştırmayı pratikte yapılmaz kılardı.
         .onAppear {
             if LaunchConfig.sheet == "plans" { showPlans = true }
+            // "-sheet partner" → ortak karşılaması. Onsuz bu ekran yalnızca
+            // GERÇEK bir davet kodu kullanılarak görülebilirdi: kod üretmek,
+            // ikinci bir hesapla girmek ve kodu harcamak gerekirdi. Görsel
+            // doğrulama pratikte yapılamaz olurdu.
+            if LaunchConfig.sheet == "partner" {
+                viewModel.joinedAsPartner = "1224 Ada / 1 Parsel"
+            }
         }
         // Çekerek yenileme — gerekçe ProjectDetailView'da.
         .refreshable { await viewModel.refresh() }
@@ -150,6 +157,14 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $showPlans) {
             PlansSheet()
+        }
+        // ORTAK KARŞILAMASI — katılma ekranı kapandıktan SONRA panoda açılıyor.
+        // Katılma ekranının içinde gösterilemezdi: o ekran kendini kapatıyor.
+        .sheet(isPresented: Binding(get: { viewModel.joinedAsPartner != nil },
+                                    set: { if !$0 { viewModel.joinedAsPartner = nil } })) {
+            PartnerWelcomeSheet(projectTitle: viewModel.joinedAsPartner ?? "") {
+                viewModel.joinedAsPartner = nil
+            }
         }
     }
 

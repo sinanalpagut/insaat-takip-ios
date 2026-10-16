@@ -48,12 +48,23 @@ struct RootView: View {
             }
     }
 
+    /// Tanıtımın görülüp görülmediği. `@State` olarak tutuluyor ki tanıtım
+    /// kapandığında ağaç yeniden çizilsin — `UserDefaults` tek başına
+    /// SwiftUI'ı tetiklemiyor ve kullanıcı kapatınca ekran takılı kalırdı.
+    @State private var introGoruldu = IntroView.gorulduMu
+
     private var content: some View {
         Group {
             if appState.pendingNameSession != nil {
                 // Telefon doğrulandı, isim bekleniyor: bu adım atlanırsa ortak
                 // listesinde ve hareket akışında telefon numarası görünürdü.
                 NameStepView()
+            } else if appState.currentUser == nil
+                        && (!introGoruldu || LaunchConfig.screen == "intro") {
+                // TANITIM GİRİŞTEN ÖNCE ve yalnızca BİR KEZ (gerekçe
+                // `IntroView`). Oturum açıkken hiç gösterilmiyor: mevcut
+                // kullanıcıya ürünü tanıtmak, zaten bildiği şeyi anlatmaktır.
+                IntroView { introGoruldu = true }
             } else if appState.currentUser == nil {
                 WelcomeView()
                     .toastOverlay(viewModel.toast)
