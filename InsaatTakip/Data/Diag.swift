@@ -33,11 +33,29 @@ enum Diag {
     /// Günlükte aranabilir olması için sabit tutulmalı.
     static func log(_ etiket: String, _ error: Error) {
         let ns = error as NSError
-        print("[\(etiket)] HATA · \(ns.domain) · kod \(ns.code) · \(ns.localizedDescription)")
+        yaz("[\(etiket)] HATA · \(ns.domain) · kod \(ns.code) · \(ns.localizedDescription)")
     }
 
     /// Serbest metinli tanı satırı — RELEASE'DE DE.
     static func log(_ etiket: String, _ mesaj: String) {
-        print("[\(etiket)] \(mesaj)")
+        yaz("[\(etiket)] \(mesaj)")
+    }
+
+    /// STDERR'E YAZIYOR, `print` DEĞİL — ve sebebi ölçülerek bulundu.
+    ///
+    /// `print` stdout'a yazıyor; stdout bir TTY'ye değil BORUYA bağlandığında
+    /// (ki `devicectl ... --console` tam olarak öyle) satır bazlı değil BLOK
+    /// bazlı tamponlanıyor. Sonuç: satır üretiliyor ama tampon dolana kadar
+    /// dışarı çıkmıyor. Cihazda birebir yaşandı — uygulama çalışıyordu,
+    /// jeton alınmıştı, günlük BOŞTU.
+    ///
+    /// TEHLİKESİ KUSURUN KENDİSİNDEN BÜYÜK: tanı aracı sessiz kalınca
+    /// sessizliği "sorun yok" diye okuyoruz. Bugün üç kez bu tuzağın
+    /// kıyısından dönüldü; güvenilmez bir teşhis, hiç teşhis olmamasından
+    /// kötü çünkü yanlış güven veriyor.
+    ///
+    /// stderr tamponlanmıyor, yazılan anda çıkıyor.
+    private static func yaz(_ satir: String) {
+        FileHandle.standardError.write(Data((satir + "\n").utf8))
     }
 }

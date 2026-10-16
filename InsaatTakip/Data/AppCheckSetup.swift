@@ -70,10 +70,12 @@ enum AppCheckSetup {
     /// "ilk Release kurulumu"nda tam olarak istediğimiz şeyi ölçüyor.
     static func probe() {
         AppCheck.appCheck().token(forcingRefresh: false) { _, hata in
+            // `Diag` üzerinden: tek yazma yolu olsun. `print` kullanıldığında
+            // satır tamponda kalıp hiç görünmeyebiliyor (gerekçe `Diag.yaz`).
             if let hata {
-                print("[appcheck] JETON ALINAMADI — \(hata.localizedDescription)")
+                Diag.log("appcheck", "JETON ALINAMADI — \(hata.localizedDescription)")
             } else {
-                print("[appcheck] jeton alındı")
+                Diag.log("appcheck", "jeton alındı")
             }
         }
     }
