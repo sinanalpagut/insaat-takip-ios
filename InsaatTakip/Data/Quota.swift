@@ -118,9 +118,13 @@ enum Quota {
     /// bırakır. Arşivleme zaten var ve biten projeyi arşivlemek doğru
     /// davranış; cümle onu gösteriyor.
     static func limitMessage(limit: Int) -> String {
+        // İKİ ÇIKIŞ DA YAZILI: arşivlemek bedava, paket ücretli. Yalnızca
+        // paketi söylemek, kullanıcının zaten hakkı olan ücretsiz çözümü
+        // saklamak olurdu; yalnızca arşivi söylemek ise satın almaya en
+        // yakın anda ürünü susturuyordu. Sıra önemli — bedava olan önce.
         limit == 1
-            ? "Ücretsiz katmanda aynı anda 1 aktif proje tutulabilir. Biten projeyi arşivlersen yenisini açabilirsin."
-            : "Paketinde aynı anda \(limit) aktif proje var. Biten projeyi arşivlersen yenisini açabilirsin."
+            ? "Ücretsiz katmanda aynı anda 1 aktif proje tutulabilir. Biten projeyi arşivlersen yenisini açabilirsin; daha fazlası için paketlere bakabilirsin."
+            : "Paketinde aynı anda \(limit) aktif proje var. Biten projeyi arşivlersen yenisini açabilirsin; daha fazlası için paketlere bakabilirsin."
     }
 }
 

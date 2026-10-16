@@ -19,6 +19,13 @@ import SwiftUI
 // ödemiş olurdu.
 
 struct PlansSheet: View {
+    /// Ekran bir SINIRA ÇARPILARAK açıldıysa dolu gelir.
+    ///
+    /// NEDEN PARAMETRE: aynı ekran iki ayrı sebeple açılıyor — kullanıcı
+    /// merak edip baktığında ve duvara çarptığında. İkisinde aynı cümleyi
+    /// göstermek, duvara çarpanı "sen zaten bakıyordun" yerine koymak olurdu.
+    var sinirdaki: Bool = false
+
     @EnvironmentObject private var viewModel: ProjectViewModel
     @Environment(\.dismiss) private var dismiss
 
@@ -75,6 +82,7 @@ struct PlansSheet: View {
     }
 
     private var durumBasligi: String {
+        if sinirdaki { return "Aktif proje sınırındasın" }
         switch current {
         case .preLaunchUnlimited: return "Yayın öncesi · tüm özellikler açık"
         case .plan(let plan):     return "Paketin: \(plan.displayName)"
@@ -87,6 +95,17 @@ struct PlansSheet: View {
     /// kullanıcıya verilen sözün geri alındığını düşündürürdü. Bugünden "bu
     /// dönem böyle" demek, beklentiyi en başta doğru kuruyor.
     private var durumAciklamasi: String {
+        // SINIRDAYKEN ÜCRETSİZ ÇIKIŞ ÖNCE SÖYLENİYOR.
+        //
+        // Kullanıcının zaten hakkı olan çözümü (arşivlemek) saklayıp yalnızca
+        // ödemeyi göstermek, bu ürünün bugüne kadarki dürüstlüğüne aykırı
+        // olurdu. Arşiv kayıtları silmiyor, yalnızca kontenjanı boşaltıyor —
+        // yani gerçekten bedava bir çıkış ve önce o yazılı.
+        if sinirdaki {
+            return "Biten projeyi arşivlemek ücretsiz: kayıtları durur, "
+                 + "kontenjanın boşalır. Aynı anda daha fazla proje tutmak "
+                 + "için paket seçebilirsin."
+        }
         switch current {
         case .preLaunchUnlimited:
             return "Bu dönemde ücret alınmıyor ve hiçbir sınır uygulanmıyor. "

@@ -18,7 +18,18 @@ struct DashboardView: View {
     @State private var showRoleMenu = false
     @State private var showJoinSheet = false
     @State private var showRestorePicker = false
-    @State private var showPlans = false
+    /// Paketler ekranının sunum taşıyıcısı.
+    ///
+    /// `.sheet(isPresented:)` DEĞİL `.sheet(item:)` ve sebebi ölçülerek
+    /// bulundu: iki `@State`i aynı blokta değiştirince (önce bağlam, sonra
+    /// bayrak) sheet içeriği bağlamın ESKİ değerini yakalıyordu — ekran
+    /// açılıyor ama sınır metni yerine genel metin çıkıyordu. Taşıyıcı
+    /// değerle birlikte sunulduğu için böyle bir yarış kalmıyor.
+    private struct PaketSunumu: Identifiable {
+        let id = UUID()
+        let sinirdaki: Bool
+    }
+    @State private var paketSunumu: PaketSunumu?
     @State private var restoreSummary: ProjectViewModel.RestoreSummary?
     @State private var restoreError: String?
 
@@ -108,7 +119,7 @@ struct DashboardView: View {
         // ücretsiz, sınırda, ücretli) — her birini elle dolaşarak açmak,
         // görsel karşılaştırmayı pratikte yapılmaz kılardı.
         .onAppear {
-            if LaunchConfig.sheet == "plans" { showPlans = true }
+            if LaunchConfig.sheet == "plans" { paketSunumu = PaketSunumu(sinirdaki: false) }
             // "-sheet partner" → ortak karşılaması. Onsuz bu ekran yalnızca
             // GERÇEK bir davet kodu kullanılarak görülebilirdi: kod üretmek,
             // ikinci bir hesapla girmek ve kodu harcamak gerekirdi. Görsel
@@ -143,8 +154,23 @@ struct DashboardView: View {
         }
         .background(Palette.page.ignoresSafeArea())
         .navigationBarHidden(true)
+        // KOTA DENETİMİ FORMDAN ÖNCE (16 Eki 2026).
+        //
+        // Önceden form sonuna kadar açılıyordu: kullanıcı ada, parsel, ilçe,
+        // il, kat ve daire sayısını giriyor, "Projeyi Oluştur"a basıyor ve
+        // ANCAK O ZAMAN reddediliyordu — üstelik 2,6 saniyede sönen bir
+        // şeritle. Emek boşa gidiyor, mesaj kayboluyor ve satın almaya en
+        // yakın anda ürün susuyordu.
+        //
+        // `addProject` içindeki boğaz KALDIRILMADI: orası son savunma ve
+        // proje açmanın başka bir yolu eklenirse onu da yakalar. Buradaki
+        // denetim kullanıcıyı korumak için, kuralı uygulamak için değil.
         .floatingActionButton("Yeni Proje", visible: isAdmin) {
-            showNewProject = true
+            if planAtLimit {
+                paketSunumu = PaketSunumu(sinirdaki: true)
+            } else {
+                showNewProject = true
+            }
         }
         .sheet(isPresented: $showNewProject) {
             NewProjectSheet()
@@ -155,8 +181,8 @@ struct DashboardView: View {
         .sheet(isPresented: $showRoleMenu) {
             AccountSheet()
         }
-        .sheet(isPresented: $showPlans) {
-            PlansSheet()
+        .sheet(item: $paketSunumu) { sunum in
+            PlansSheet(sinirdaki: sunum.sinirdaki)
         }
         // ORTAK KARŞILAMASI — katılma ekranı kapandıktan SONRA panoda açılıyor.
         // Katılma ekranının içinde gösterilemezdi: o ekran kendini kapatıyor.
@@ -458,7 +484,7 @@ struct DashboardView: View {
     /// kartın belirmesi, kullanıcının ekranda yerini kaybetmesine yol açardı.
     private var planRow: some View {
         Button {
-            showPlans = true
+            paketSunumu = PaketSunumu(sinirdaki: planAtLimit)
         } label: {
             HStack(spacing: 13) {
                 Image(systemName: planAtLimit ? "exclamationmark.circle" : "square.stack.3d.up")

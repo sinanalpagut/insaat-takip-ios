@@ -94,6 +94,28 @@ final class QuotaTests: XCTestCase {
         XCTAssertTrue(Quota.limitMessage(limit: 3).contains("3 aktif proje"))
     }
 
+    /// SINIR CÜMLESİ İKİ ÇIKIŞI DA SÖYLÜYOR — ve BEDAVA OLAN ÖNCE.
+    ///
+    /// Yalnızca paketi söylemek, kullanıcının zaten hakkı olan ücretsiz
+    /// çözümü (arşivlemek) saklamak olurdu. Yalnızca arşivi söylemek ise
+    /// satın almaya en yakın anda ürünü susturuyordu — 16 Eki 2026'ya kadarki
+    /// hâli buydu.
+    ///
+    /// SIRA DA TESTTE: arşiv cümlesi pakete göre ÖNCE geçmeli. Ücretsiz
+    /// çıkışı ikinci plana atmak, dürüstlüğü biçimsel olarak korurken fiilen
+    /// kaybetmek olur.
+    func testLimitMessageNamesBothExitsFreeFirst() {
+        for sinir in [1, 3, 10] {
+            let mesaj = Quota.limitMessage(limit: sinir)
+            guard let arsivYeri = mesaj.range(of: "arşivlersen"),
+                  let paketYeri = mesaj.range(of: "paket") else {
+                return XCTFail("sınır \(sinir): iki çıkıştan biri cümlede yok — \(mesaj)")
+            }
+            XCTAssertTrue(arsivYeri.lowerBound < paketYeri.lowerBound,
+                          "sınır \(sinir): ücretsiz çıkış paketten SONRA geçiyor")
+        }
+    }
+
     // MARK: - Ortak kotası (15 Eki 2026 kararı)
 
     /// ÜCRETSİZ KATMAN DAR BAŞLIYOR: 2 davetli ortak.
