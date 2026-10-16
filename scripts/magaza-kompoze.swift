@@ -259,6 +259,98 @@ case "ekran":
     yaz(ctx, cikti)
     print("ekran: \(cikti)")
 
+// ──────────────── MAĞAZA EKRANI · CİHAZ ÇERÇEVELİ (1320x2868) ────────────────
+//
+// `ekran` komutundan tek farkı: ekran görüntüsü çıplak bir halka yerine
+// GERÇEK BİR TELEFON gövdesinin içine oturuyor — titanyum kasa, ince çerçeve,
+// yan tuşlar.
+//
+// NEDEN AYRI KOMUT: ikisi de geçerli bir tercih. Çerçeve "bu bir telefon
+// uygulaması" mesajını bir bakışta veriyor; çerçevesiz hâl ise ekrana daha
+// çok yer bırakıyor ve rakamlar büyük kalıyor. Hangisinin daha iyi sattığı
+// zevke bağlı, o yüzden biri diğerinin yerine geçmiyor.
+//
+// ÇERÇEVE BEDELİ PİKSEL: aynı tuvalde gövde ve çerçeve yer kapladığı için
+// ekran alanı ~%4 küçülüyor. Rakamların okunabilirliği sınırda olduğundan
+// (ölçüldü) gövde bilerek İNCE tutuldu.
+case "cerceve":
+    fontlariKaydet()
+    let ekranYolu = argv[2], cikti = argv[3]
+    let yazi = argv.count > 4 ? argv[4] : ""
+    let W = 1320, H = 2868
+
+    let ctx = baglam(W, H)
+    if let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                          colors: [ink, inkAlt] as CFArray, locations: [0, 1]) {
+        ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: CGFloat(H)),
+                               end: CGPoint(x: CGFloat(W), y: 0), options: [])
+    }
+
+    let yanBosluk: CGFloat = 108
+    metin(ctx, yazi, x: yanBosluk, ustY: CGFloat(H) - 196,
+          genislik: CGFloat(W) - yanBosluk * 2,
+          punto: 92, agirlik: .bold, renk: beyaz, satirAraligi: 1.14,
+          fontAdi: "Sora-Bold", ortala: true)
+
+    if let ekran = gorselYukle(ekranYolu) {
+        let oran = CGFloat(ekran.height) / CGFloat(ekran.width)
+        let cerceveKalinlik: CGFloat = 20          // ince: piksel pahalı
+        let ekranW: CGFloat = 1084
+        let ekranH = ekranW * oran
+        let govdeW = ekranW + cerceveKalinlik * 2
+        let govdeH = ekranH + cerceveKalinlik * 2
+        let govdeX = (CGFloat(W) - govdeW) / 2
+        let ustY: CGFloat = 626
+        let govdeY = CGFloat(H) - ustY - govdeH     // alttan taşar
+
+        let govde = CGRect(x: govdeX, y: govdeY, width: govdeW, height: govdeH)
+        let ekranKutu = govde.insetBy(dx: cerceveKalinlik, dy: cerceveKalinlik)
+
+        // YAN TUŞLAR GÖVDENİN ALTINDA ÇİZİLİYOR ki kasa onları kısmen örtsün
+        // ve dışarı taşan kısım gerçek bir tuş gibi görünsün.
+        let titanyum = CGColor(red: 0.42, green: 0.42, blue: 0.45, alpha: 1)
+        ctx.setFillColor(titanyum)
+        // Sol: eylem tuşu + ses aç/kıs
+        for (yOran, boy) in [(0.80, 86.0), (0.705, 150.0), (0.615, 150.0)] {
+            let ty = govde.minY + govde.height * CGFloat(yOran)
+            ctx.addPath(CGPath(roundedRect: CGRect(x: govde.minX - 7, y: ty,
+                                                   width: 14, height: CGFloat(boy)),
+                               cornerWidth: 6, cornerHeight: 6, transform: nil))
+        }
+        // Sağ: güç tuşu
+        ctx.addPath(CGPath(roundedRect: CGRect(x: govde.maxX - 7,
+                                               y: govde.minY + govde.height * 0.66,
+                                               width: 14, height: 230),
+                           cornerWidth: 6, cornerHeight: 6, transform: nil))
+        ctx.fillPath()
+
+        // Kasa — metalik his için eğimli dolgu
+        let govdeYol = CGPath(roundedRect: govde, cornerWidth: 104, cornerHeight: 104,
+                              transform: nil)
+        ctx.saveGState()
+        ctx.addPath(govdeYol); ctx.clip()
+        let kasaAcik = CGColor(red: 0.50, green: 0.50, blue: 0.54, alpha: 1)
+        let kasaKoyu = CGColor(red: 0.18, green: 0.18, blue: 0.21, alpha: 1)
+        if let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                              colors: [kasaAcik, kasaKoyu, kasaAcik] as CFArray,
+                              locations: [0, 0.5, 1]) {
+            ctx.drawLinearGradient(g, start: CGPoint(x: govde.minX, y: 0),
+                                   end: CGPoint(x: govde.maxX, y: 0), options: [])
+        }
+        ctx.restoreGState()
+
+        // Ekran
+        ctx.saveGState()
+        ctx.addPath(CGPath(roundedRect: ekranKutu, cornerWidth: 88, cornerHeight: 88,
+                           transform: nil))
+        ctx.clip()
+        ctx.draw(ekran, in: ekranKutu)
+        ctx.restoreGState()
+    }
+
+    yaz(ctx, cikti)
+    print("çerçeveli: \(cikti)")
+
 default:
     fatalError("bilinmeyen komut: \(komut)")
 }
