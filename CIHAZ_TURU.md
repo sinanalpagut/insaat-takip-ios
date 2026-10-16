@@ -297,3 +297,40 @@ xcrun devicectl device process launch --device <UDID> --console <BUNDLE>
 
 **KURAL:** boş günlük bir kanıt DEĞİLDİR. Ya soğuk başlatıp tekrar bak, ya
 da kanıtı başka yerden al (ekran, konsol metrikleri).
+
+---
+
+## DEBUG DERLEMESİ ZORLAMA ALTINDA ÇALIŞIYOR (16 Eki 2026)
+
+App Check zorlaması açıldıktan sonra "Debug derlemeleri artık cihazda
+çalışmaz mı?" sorusu açıktı. **Denendi: çalışıyor.**
+
+```
+[appcheck] jeton alındı
+[load] proje=4 önbellekten=false
+```
+
+Sebebi, bu cihazın hata ayıklama jetonunun konsolda KAYITLI olması (2 Eyl).
+Kayıtlı olmayan bir istemci için aynı şey geçerli DEĞİL — nitekim test
+simülatöründe `[appcheck] JETON ALINAMADI` düşüyor, çünkü onun jetonu
+kaydedilmedi. Yani kural şu: **jetonu kayıtlı cihaz çalışır, kayıtsız olan
+çalışmaz.** Yeni bir cihaz ya da temiz kurulum jetonu yenilerse konsola
+eklenmesi gerekir.
+
+### devicectl: LAUNCH ARGÜMANLARI `--` SONRASINA
+
+`-auth firebase` doğrudan verilince devicectl onu KENDİ seçeneği sanıyor
+(`-a -u -t` diye ayrıştırıp `-t <seconds>` bekliyor) ve başlatmayı
+reddediyor. Aynı tuzağın ikinci yüzü — birincisi `-firelog`du.
+
+**Çözüm ayırıcı:**
+```sh
+xcrun devicectl device process launch --device <UDID> --console <BUNDLE> \
+    -- -backend firestore -auth firebase
+```
+
+### DEBUG DERLEMESİNİ CİHAZDA BIRAKMA
+
+Ana ekrandan açılınca launch argümanları gitmiyor; DEBUG derlemesi bellek
+içi demo verisine düşüyor ve kullanıcı gerçek hesabında **"projelerim
+kayboldu"** görüyor. Test bitince Release geri kurulmalı.
