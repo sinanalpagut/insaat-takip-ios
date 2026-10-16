@@ -1911,8 +1911,13 @@ gidip geldiği ve alansız ESKİ belgelerin hâlâ çözüldüğü.
       · **ÜÇ ZORLAMA DA AÇIK VE DÖRDÜ DE DOĞRULANDI (16 Eki 2026).**
         Firestore (projeler geliyor) · Storage (fiş yüklendi, 19/19
         doğrulanmış, sıfır kirli istek) · Authentication (çıkış yapılıp SMS
-        ile yeniden girildi) · callable'lar (koddan, iki test kilitliyor).
-        **MADDE 71 KAPANDI.**
+        ile yeniden girildi, metrik **4/4 · %100 doğrulanmış**, doğrulanmamış
+        hiçbir kategoride kayıt yok) · callable'lar (koddan, iki test
+        kilitliyor). **MADDE 71 KAPANDI.**
+        Authentication'ın kanıtı en temizi oldu çünkü sayaç SIFIRDAN
+        başlıyordu: dört isteğin dördü de tek bir testten geldi, karıştıracak
+        geçmiş trafik yoktu. Ölçümü temiz sayaçla yapmak, Firestore'daki
+        "127 testi"nin aynı dersi.
       · **AUTHENTICATION TESTİ NEDEN AYRI ÖNEMLİYDİ:** kırıldığında yalnızca
         YENİ girişler ölür, mevcut oturum çalışmaya devam eder. Yani
         "uygulama açılıyor, veri geliyor" demek hiçbir şey kanıtlamaz —
