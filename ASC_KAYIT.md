@@ -184,6 +184,38 @@ projeye davet edilen ortaklarla paylaşılıyor. Açık uçlu bir topluluk
 
 ---
 
+## 7b · Dağıtım: YALNIZCA TÜRKİYE (16 Eki 2026 kararı)
+
+**DSA beyanı: "This is a trader app"** — doğru beyan, abonelik satılacak.
+"Non-trader" demek yanlış beyan olurdu.
+
+**Ama trader beyanının bedeli var:** Apple, geliştirici hesabındaki
+DOĞRULANMIŞ ADRESİ App Store'da AB'de herkese açık yayımlıyor. Hesap şahıs
+hesabı olduğu için bu, EV ADRESİ demek.
+
+**Çözüm dağıtımı Türkiye ile sınırlamak oldu** ve bu karar ürünün
+gerçeğiyle zaten uyumlu:
+
+- **SMS bölge politikası yalnızca +90 numaralara izin veriyor** (madde 71).
+  Avrupa'daki bir kullanıcı uygulamayı indirse bile GİRİŞ YAPAMIYOR.
+  172 ülkede listelenmek kimseye fayda sağlamıyor, yalnızca indirip
+  giremeyen ve tek yıldız bırakan kullanıcı üretiyor.
+- Arayüz tek dilde (Türkçe), hedef kitle Türkiye'deki müteahhit.
+- Türkiye AB dışında olduğu için adres yayımlanması devreye girmiyor.
+
+**ASİMETRİ, ÜCRETSİZ KATMANDAKİNİN AYNISI:** dağıtımı genişletmek bedava,
+daraltmak imkânsız. Bugün Türkiye ile başlayıp yarın ülke eklemek tek tık;
+tersi, indirmiş kullanıcıyı kaybetmek.
+
+**AÇIK KALAN:** yurt dışında yaşayan, +90 numarası olan kullanıcılar. Onlar
+Türkiye App Store hesabı kullanıyorlarsa erişebilir. Gerçek talep görülürse
+ülke eklenir — tetik bu.
+
+**BAĞLANTILI KARAR:** şirket kurulup adres onunla değiştirilirse hem bu
+sorun hem KVKK metnindeki "veri sorumlusu" satırı birlikte çözülür. O soru
+15 Eki'de soruldu, cevabı "benav kalsın" oldu; şirket kurulursa ikisi de
+yeniden ele alınacak.
+
 ## 8 · Fiyatlandırma
 
 **Ücretsiz.** Uygulama içi satın alma **henüz yok** — StoreKit bağlanmadı
