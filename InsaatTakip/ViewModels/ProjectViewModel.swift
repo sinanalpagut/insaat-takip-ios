@@ -158,11 +158,11 @@ final class ProjectViewModel: ObservableObject {
             }
         } catch {
             loadError = Self.loadFailureMessage(for: error)
-            #if DEBUG
-            // Ham hata görünmezse "yüklenemedi" mesajının NEDENİ hiçbir yerde
-            // okunamaz. Kural reddi mi, indeks mi, ağ mı — ayırt etmek şart.
-            print("[refresh] yükleme başarısız: \(error)")
-            #endif
+            // RELEASE'DE DE YAZIYOR (gerekçesi `Diag`): "yüklenemedi"
+            // mesajının NEDENİ başka hiçbir yerde okunamıyor. Kural reddi,
+            // App Check reddi, eksik indeks ve ağ hatası aynı ekranı
+            // üretiyor ama çözümleri ayrı.
+            Diag.log("refresh", error)
             flash(Self.loadFailureMessage(for: error))
         }
     }
@@ -490,9 +490,7 @@ final class ProjectViewModel: ObservableObject {
                     }
                 }
             } catch {
-                #if DEBUG
-                print("[image] yükleme başarısız \(bucket.rawValue)/\(id): \(error)")
-                #endif
+                Diag.log("image", error)
                 // Yeniden deneme yalnızca piksel elde kaldıysa mümkün: diskte
                 // dosya ya da bellekte kare. İkisi de yoksa söz verilemez.
                 if self.pixels(bucket, id) != nil {
@@ -3417,9 +3415,7 @@ final class ProjectViewModel: ObservableObject {
                     self.projects[i].invite = Invite(code: serverCode, createdAt: Date())
                 }
             } catch {
-                #if DEBUG
-                print("[invite] üretilemedi: \(error)")
-                #endif
+                Diag.log("invite", error)
                 // Yerel kodu geri al: ekranda kullanılamayacak bir kod
                 // göstermek, kod göstermemekten kötü.
                 if let i = self.projects.firstIndex(where: { $0.id == projectId }) {
