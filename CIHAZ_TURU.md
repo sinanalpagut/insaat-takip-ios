@@ -170,3 +170,76 @@ açılmıyor" diye reddeder.
       anlamına gelir — zorlama kapalıyken aynı ekranlar hiçbir şey kanıtlamazdı.
 - [ ] Geçmezse: konsoldan zorlama geri alınır (tek düğme), callable'lar için
       `enforceAppCheck` kaldırılıp yeniden dağıtılır (~1 dakika)
+
+---
+
+## KOŞTURULDU (16 Eki 2026) — **DÜŞTÜ. YAYIN BLOKE.**
+
+Test tam da koyulma sebebini yaptı: **App Attest bu uygulamada çalışmıyor** ve
+bu, mağazaya gönderilmeden önce öğrenildi.
+
+### Kanıt
+
+Release derlemesi iPhone 13 Pro'ya kuruldu, teşhis satırı günlüğe düştü:
+
+```
+[appcheck] JETON ALINAMADI — The server responded with an error:
+ - URL: .../apps/<APP-ID>:exchangeAppAttestAttestation
+ - HTTP status code: 403
+ - Response body: { "error": { "code": 403,
+     "message": "App attestation failed.", "status": "PERMISSION_DENIED" } }
+```
+
+### KESİN OLANLAR (yerel kanıtla)
+
+1. Derleme **geliştirme imzalı**: `codesign -d --entitlements` çıktısında
+   `aps-environment = development` ve `get-task-allow = true`.
+2. Derlemede `com.apple.developer.devicecheck.appattest-environment`
+   yetkisi **YOK**.
+3. App Attest doğrulama takası **403 PERMISSION_DENIED** dönüyor.
+4. O yetki eklendiğinde **imzalama düşüyor**:
+   `Provisioning profile ... doesn't include the App Attest capability`
+   — yani **App ID'de App Attest yeteneği AÇIK DEĞİL.**
+
+### VARSAYIM (doğrulanmadı, öyle sunulmamalı)
+
+403'ün sebebi muhtemelen ortam uyuşmazlığı: geliştirme imzalı derleme
+Apple'ın *development* App Attest ortamında doğrulama üretir, Firebase ise
+*production* ortamını doğrular. **Web araması bu teoriyi DOĞRULAMADI**;
+üstelik bir geliştirici yeteneği açıkken de 403 aldığını bildiriyor. Yani
+yetenek açıldıktan sonra test YENİDEN koşturulmalı — "açtık, düzelmiştir"
+denmemeli.
+
+### SIRADAKİ ADIM (kullanıcının işi — Apple geliştirici portalı)
+
+1. developer.apple.com → Certificates, Identifiers & Profiles → **Identifiers**
+2. `com.sinanalpagut.insaattakip` → Capabilities listesinde **App Attest**
+   işaretle → Save
+3. Haber ver: Claude profili yeniler, yetkiyi geri koyar, Release'i yeniden
+   derleyip kurar ve teşhis satırını tekrar okur.
+
+**App ID'de App Attest yeteneği, Firebase konsolundaki App Check kaydından
+AYRI bir şey.** Firebase tarafı 2 Eyl 2026'da yapılmıştı; Apple tarafı
+yapılmamış. İkisinin aynı şey sanılması bu maddeyi altı hafta geciktirdi.
+
+### Geri konacak XML (yetenek açılınca)
+
+```xml
+<key>com.apple.developer.devicecheck.appattest-environment</key>
+<string>production</string>
+```
+
+Gerekçesi: bu yetki olmadan App Attest yayın öncesi **hiç** denenemiyor —
+mağaza derlemesi production imzalı olduğu için orada çalışması muhtemel ama
+"muhtemel" yeterli değil; çalışmazsa uygulama mağazada tek satır veri
+okuyamaz. Mağaza derlemesinde zararsız: App Store ve TestFlight zaten
+production ortamını kullanıyor.
+
+### Bu turda kalıcı olarak eklenen
+
+`AppCheckSetup.probe()` — jetonun alınıp alınamadığını her açılışta günlüğe
+yazıyor, **`#if DEBUG` YOK**. App Attest zaten yalnızca Release'de çalışıyor;
+teşhisi DEBUG'a koymak tam da ölçülemeyen yeri ölçüsüz bırakmak olurdu.
+Jetonun kendisi asla yazılmıyor (kimlik bilgisi), yalnızca sonuç ve hata.
+Bu satır olmasaydı bugünkü bulgu görünmezdi: uygulama hiçbir şey söylemeden
+açılıyordu.

@@ -44,6 +44,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // açıldığında, yani üretimde görünür.
         AppCheckSetup.install()
         FirebaseApp.configure()
+        // Jeton gerçekten alınabiliyor mu — sonucu günlüğe yazar.
+        // `configure()`DAN SONRA olmak zorunda: sağlayıcı fabrikası önce
+        // kurulur ama jeton istemek yapılandırılmış bir uygulama gerektirir.
+        AppCheckSetup.probe()
         Self.connectEmulatorIfRequested()
         // Hesap silindiyse Firestore'un disk önbelleği (alıcı adları dahil)
         // BURADA temizleniyor: `clearPersistence()` yalnızca istemci

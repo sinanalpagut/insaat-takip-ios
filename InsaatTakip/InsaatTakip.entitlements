@@ -2,7 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- APNs. Xcode mağaza derlemesinde bunu "production"a kendisi çeviriyor. -->
 	<key>aps-environment</key>
 	<string>development</string>
+
+	<!--
+	  BURAYA `com.apple.developer.devicecheck.appattest-environment` = production
+	  GELECEK — ama App ID'de App Attest yeteneği AÇILDIKTAN SONRA (16 Eki 2026).
+	  Şimdi eklenirse imzalama düşüyor:
+	      "Provisioning profile ... doesn't include the App Attest capability"
+	  Tam XML ve gerekçe `CIHAZ_TURU.md` sonunda duruyor; derlemeyi yeşil
+	  bırakmak için buradan çıkarıldı, UNUTULMASIN diye oraya yazıldı.
+	-->
 </dict>
 </plist>

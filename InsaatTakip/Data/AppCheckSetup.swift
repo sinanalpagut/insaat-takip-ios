@@ -50,6 +50,33 @@ enum AppCheckSetup {
         AppCheck.setAppCheckProviderFactory(AppAttestProviderFactory())
         #endif
     }
+
+    /// Jetonun GERÇEKTEN alınabildiğini sınar ve SONUCU günlüğe yazar.
+    ///
+    /// NEDEN ÜRETİMDE DE ÇALIŞIYOR (`#if DEBUG` YOK): App Check sessizce
+    /// başarısız olan bir mekanizma. Jeton alınamazsa uygulama hiçbir şey
+    /// söylemez — yalnızca her istek reddedilir ve kullanıcı "veriler
+    /// gelmiyor" der. Crashlytics bilerek ertelendiği için (madde 30) sahada
+    /// bunu görmenin BAŞKA YOLU YOK. Teşhisi yalnızca DEBUG'a koymak, tam da
+    /// ölçülemeyen yeri ölçüsüz bırakmak olurdu: App Attest zaten SADECE
+    /// Release'de çalışıyor.
+    ///
+    /// JETONUN KENDİSİ ASLA YAZILMIYOR — o bir kimlik bilgisi ve günlükler
+    /// cihazdan dışarı çıkabiliyor. Yalnızca alınıp alınamadığı ve hata metni.
+    ///
+    /// `forcingRefresh: false` BİLİNÇLİ: önbellekte jeton varsa ağa çıkmıyor,
+    /// yani her açılışta bedel yok. Taze kurulumda önbellek boş olduğu için
+    /// gerçek bir doğrulama turu koşuyor — yani kanıt istediğimiz an olan
+    /// "ilk Release kurulumu"nda tam olarak istediğimiz şeyi ölçüyor.
+    static func probe() {
+        AppCheck.appCheck().token(forcingRefresh: false) { _, hata in
+            if let hata {
+                print("[appcheck] JETON ALINAMADI — \(hata.localizedDescription)")
+            } else {
+                print("[appcheck] jeton alındı")
+            }
+        }
+    }
 }
 
 /// App Attest sağlayıcı fabrikası.

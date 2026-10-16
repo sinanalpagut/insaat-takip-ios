@@ -1850,6 +1850,27 @@ gidip geldiği ve alansız ESKİ belgelerin hâlâ çözüldüğü.
         mağazada ortaya çıkardı. Kota testlerinin sınırı enjekte ederek yayın
         gününü prova etmesiyle aynı mantık.
 
+      · **KOŞTURULDU VE DÜŞTÜ (16 Eki 2026) — APP ATTEST ÇALIŞMIYOR.**
+        Release derlemesi iPhone 13 Pro'ya kuruldu ve doğrulama takası
+        **403 PERMISSION_DENIED · "App attestation failed"** döndü. Yani
+        madde 71'in korkulan hâli GERÇEKmiş; mağazaya gönderilseydi uygulama
+        tek satır veri okuyamazdı. Test tam da bu yüzden konmuştu.
+        KÖK SEBEP ZİNCİRİNİN SON HALKASI KANITLANDI: yetki eklenince
+        imzalama `Provisioning profile ... doesn't include the App Attest
+        capability` ile düşüyor — yani **App ID'de App Attest yeteneği açık
+        değil.** Firebase konsolundaki App Check kaydı (2 Eyl) AYRI bir şey;
+        ikisinin aynı sanılması maddeyi altı hafta geciktirdi.
+        403'ün ortam uyuşmazlığından geldiği VARSAYIM ve doğrulanmadı —
+        bir geliştirici yetenek açıkken de 403 aldığını bildiriyor, bu yüzden
+        yetenek açıldıktan sonra test YENİDEN koşturulacak.
+        Ayrıntı, geri konacak XML ve adımlar `CIHAZ_TURU.md` sonunda.
+      · **BULGUYU GÖRÜNÜR KILAN ŞEY KALICI OLARAK EKLENDİ:**
+        `AppCheckSetup.probe()` her açılışta jetonun alınıp alınamadığını
+        günlüğe yazıyor, `#if DEBUG` YOK. App Attest zaten yalnızca
+        Release'de çalıştığı için teşhisi DEBUG'a koymak, ölçülemeyen yeri
+        ölçüsüz bırakmak olurdu. Jetonun kendisi asla yazılmıyor. Bu satır
+        olmasaydı uygulama hiçbir şey söylemeden açılıyordu — App Check'in
+        sessizce başarısız olma huyu maddenin ta kendisi.
       · **YAYIN ÖNCESİ BLOKE EDEN TEK İŞ — APP ATTEST GERÇEK CİHAZDA.**
         TestFlight ya da App Store'a gönderim yapılmadan ÖNCE: Release
         derlemesi FİZİKSEL iPhone'a kurulacak ve App Check jetonunun
