@@ -227,6 +227,11 @@ struct ReceiptSheet: View {
                                 .background(receiptImage == nil ? Palette.accentTint : Palette.success)
                                 .cornerRadius(13)
                         }
+                        // ÇIPA DÜĞMEDE (gerekçe `receiptSource` içinde).
+                        .receiptSource(isPresented: $showSource, image: $receiptImage) { picked in
+                            receiptCleared = false
+                            scanReceipt(picked)
+                        }
                     }
                     .padding(.top, 8)
 
@@ -419,10 +424,6 @@ struct ReceiptSheet: View {
         .onChange(of: viewModel.receiptImages[editingLogId ?? UUID()]) { incoming in
             guard receiptImage == nil, !receiptCleared, let incoming else { return }
             receiptImage = incoming
-        }
-        .receiptSource(isPresented: $showSource, image: $receiptImage) { picked in
-            receiptCleared = false
-            scanReceipt(picked)
         }
         .sheet(isPresented: $showNewMaterial) {
             NewMaterialSheet(projectId: projectId) { created in

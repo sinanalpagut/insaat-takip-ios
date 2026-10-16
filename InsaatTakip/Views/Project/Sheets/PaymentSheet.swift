@@ -122,6 +122,8 @@ struct PaymentSheet: View {
                             .background(receiptImage == nil ? Palette.accentTint : Palette.success)
                             .cornerRadius(13)
                         }
+                        // ÇIPA DÜĞMEDE (gerekçe `receiptSource` içinde).
+                        .receiptSource(isPresented: $showSource, image: $receiptImage)
                         if receiptImage != nil {
                             Button { receiptImage = nil } label: {
                                 Image(systemName: "xmark")
@@ -158,7 +160,6 @@ struct PaymentSheet: View {
         .onAppear { prefill() }
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)
-        .receiptSource(isPresented: $showSource, image: $receiptImage)
     }
 
     // MARK: Parçalar

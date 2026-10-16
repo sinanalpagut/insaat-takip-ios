@@ -496,6 +496,22 @@ extension View {
 ///
 /// TEK YERDE: üç ekrana ayrı ayrı yazılsaydı biri unutulur ve tam o ekranda
 /// galeri seçeneği eksik kalırdı — bekleyen yazma şeridinde öğrenilen ders.
+///
+/// ═══ DÜĞMEYE BAĞLANMAK ZORUNDA — SHEET'İN KÖKÜNE DEĞİL (16 Eki 2026) ═══
+///
+/// `.confirmationDialog` iOS 26'da KAYNAK GÖRÜNÜME ÇIPALANIYOR. Üç ekranda da
+/// bu değiştirici sheet'in KÖKÜNE (`.onAppear`, `.sheet` ile aynı seviyeye)
+/// takılıydı; çıpa koca sheet olduğu için menü EKRANIN TEPESİNDE, proje
+/// başlığının üzerinde açılıyordu — oysa kullanıcının bastığı kamera düğmesi
+/// en altta. Gerçek cihazda bildirildi, simülatörde birebir yeniden üretildi.
+///
+/// Belirti yalnızca "çirkin" değil: menü, basılan düğmeden 600 punto uzakta
+/// beliriyor ve kullanıcı dokunuşunun işe yaramadığını sanıyor.
+///
+/// BU YÜZDEN ÜÇ ÇAĞRI YERİNİN ÜÇÜ DE DÜĞMEYE TAKIYOR. Yukarıdaki "düğme değil
+/// davranış" kararı hâlâ geçerli — paylaşılan şey mantık, düğme görünümü
+/// değil — ama BAĞLANMA NOKTASI düğme olmak zorunda. Biri bunu tekrar köke
+/// taşırsa kusur aynen geri gelir ve testle yakalanmaz (görsel bir kusur).
 private struct ReceiptSourceModifier: ViewModifier {
     @Binding var isPresented: Bool
     @Binding var image: UIImage?
