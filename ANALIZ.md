@@ -1888,10 +1888,30 @@ gidip geldiği ve alansız ESKİ belgelerin hâlâ çözüldüğü.
         veriye erişemez — ne okuma, ne yazma, ne giriş. Simülatör bu testi
         YAPAMAZ. Adımlar `CIHAZ_TURU.md`'de.
 
-      · **KONSOL TARAFI (kullanıcının işi, sırayla):** App Check → APIs →
-        Cloud Firestore / Cloud Storage / Firebase Authentication için
-        zorlama. Her biri açıldıktan hemen sonra ilgili akış denenmeli;
-        kırılırsa aynı düğmeyle geri alınır. Ayrıca bütçe uyarısı harcamayı
+      · **FIRESTORE ZORLAMASI AÇILDI VE DOĞRULANDI (16 Eki 2026).**
+        Konsol "Enforced" diyor, telefonda projeler geliyor. Zorlama altında
+        doğrulanmamış istek reddedileceği için bu, App Attest'in ZORLAMA
+        ALTINDA çalıştığının kanıtı — madde 71'in en ağır parçası kapandı.
+      · **AÇMADAN ÖNCE YAPILAN DENEY — "127 testi".** Metrikte doğrulanmamış
+        %20 vardı ve körlemesine açmak isteklerin beşte birini kesmek
+        olurdu. Kırılım bakıldı: `outdated client` ve `unknown origin`
+        SIFIR, tamamı `invalid` (yani jeton gönderilmiş ama reddedilmiş) ve
+        sayı tam **127**. Uygulama kullanıldı, 248 yeni istek üretildi ve
+        **127 kıpırdamadı** — 248'in tamamı doğrulandı. Yani o %20 bugünkü
+        bozuk Release derlemesinin bıraktığı ÖLÜ kayıttı, canlı istemci
+        değil. Oranla değil SABİT BİR SAYIYLA ölçmek kararı tartışmasız
+        kıldı: yüzde her yeni istekte kayıyor, 127 ya artar ya artmaz.
+      · **ÖLÇÜM YÖNTEMİ OLARAK BAŞARISIZ OLAN ŞEY DE YAZILSIN:** zorlamanın
+        indiğini uygulamadan bağımsız doğrulamak için Firestore REST'e
+        jetonsuz istek atıldı. İşe YARAMADI — Google App Check reddi için de
+        kuralların reddiyle aynı genel mesajı (`Missing or insufficient
+        permissions.`) dönüyor, yani bu yoldan ayırt edilemiyor. Deney
+        ayrıca metriklere 11 `unknown origin` isteği olarak düştü ve o
+        satırın kaynağını açıkladı.
+      · **KONSOLDA KALAN:** Storage (açıldı, fotoğraf yüklemesiyle
+        doğrulanacak) ve Authentication (PREVIEW; açılınca bilerek çıkış
+        yapıp SMS ile girilmeli — kırılırsa yalnızca YENİ girişler ölür ve
+        başka türlü fark edilmez). Kırılırsa aynı düğmeyle geri alınır. Ayrıca bütçe uyarısı harcamayı
         KESMİYOR — kodla çözülemez, bilinen sınır olarak duruyor.
       · **DAĞITILDI VE DOĞRULANDI (25 Ağu 2026).** Kurallar ve iki callable
       üretime çıkarıldı; ardından `redeemInvite` oturumsuz çağrıldı ve
