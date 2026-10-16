@@ -141,7 +141,7 @@ hazır gelir.
 | Alan | Adres | Durum |
 |---|---|---|
 | Gizlilik politikası | `https://benav.com.tr/privacy/insaat-takip.html` | ✅ yayında |
-| **Destek** | `https://benav.com.tr/destek/insaat-takip.html` | ⚠️ **YAPILACAK** |
+| **Destek** | `https://benav.com.tr/destek/insaat-takip.html` | ✅ yayında (HTTP 200, 16 Eki) |
 | Pazarlama (isteğe bağlı) | boş bırakılabilir | — |
 
 **Destek URL'i ZORUNLU ve hakem açıp bakıyor.** Çalışmayan ya da içeriği
@@ -309,7 +309,7 @@ kullanıyor; kendi şifreleme uygulaması yok.
 
 ## YAYINDAN ÖNCE KAPATILMASI GEREKENLER
 
-- [ ] Destek sayfası yayınlanacak (yukarıda)
+- [x] Destek sayfası yayında — 16 Eki'de HTTP 200 doğrulandı
 - [ ] Hukuki metinler avukat incelemesinden geçecek
 - [ ] İlk TestFlight derlemesinde `[appcheck]` satırı okunacak — App
       Attest'in mağaza derlemesinde de çalıştığı teyit edilecek
