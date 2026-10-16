@@ -58,3 +58,4 @@ functions/node_modules/
 # (APP_REVIEW.md) repoda, gerçek değerler yalnızca burada ve App Store
 # Connect'te durur.
 *.local.md
+.build-magaza/

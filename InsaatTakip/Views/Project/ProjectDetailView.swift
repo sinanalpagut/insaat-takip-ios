@@ -155,6 +155,10 @@ struct ProjectDetailView: View {
         case "apt": tab = .daireler
         case "ptn": tab = .ortaklar
         case "doc": tab = .belgeler
+        // "exp" GİDERLER — mağaza görselleri turunda eksik olduğu görüldü
+        // (16 Eki 2026). Argümanla açılamayan ekran, görsel karşılaştırmada
+        // da ekran görüntüsü turunda da elle dolaşmayı gerektiriyor.
+        case "exp": tab = .giderler
         default: break
         }
 
@@ -179,6 +183,8 @@ struct ProjectDetailView: View {
                 }
             case "sale":    activeSheet = .saleForm(apartmentId: nil)
             case "upload":  activeSheet = .upload
+            case "expense": activeSheet = .expense
+            case "progress": activeSheet = .progress
             default: break
             }
         }

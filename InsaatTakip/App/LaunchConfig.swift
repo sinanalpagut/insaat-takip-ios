@@ -43,7 +43,7 @@ enum LaunchConfig {
         #endif
     }
 
-    /// "-tab mat|apt|ptn|doc"
+    /// "-tab mat|exp|apt|ptn|doc"
     static var tab: String? {
         #if DEBUG
         return value(for: "tab")
@@ -52,7 +52,7 @@ enum LaunchConfig {
         #endif
     }
 
-    /// "-sheet log|receipt|invite|apt|sale|upload|plans|partner"
+    /// "-sheet log|receipt|invite|apt|sale|upload|expense|progress|plans|partner"
     static var sheet: String? {
         #if DEBUG
         return value(for: "sheet")
