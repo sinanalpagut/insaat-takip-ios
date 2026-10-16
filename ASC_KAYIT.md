@@ -237,23 +237,30 @@ Kurumsal 4.999 ₺/ay (yıllıklar on ayın fiyatı).
 
 ### Review notlarına yazılacaklar
 
+**İNGİLİZCE YAZILIYOR.** Uygulamanın Türkçe olması sorun değil, hakem
+yerelleştirmeyi test etmeye alışkın. Sorun, hakeme verilen TALİMATIN
+anlaşılmaması olurdu: bölge kısıtını okuyamayan hakem kendi numarasını
+dener, giremez ve uygulamayı bozuk sanar.
+
+Numara ve kod ayrıca metne yazılmıyor — User name / Password alanları
+zaten taşıyor. İki yere yazılan değer, biri güncellenmeyince yanlış
+olur.
+
 ```
-Giriş telefon numarası + SMS kodu ile yapılıyor. Aşağıdaki test
-numarası Firebase test numarasıdır; gerçek SMS gönderilmez, verilen
-kodu doğrudan girebilirsiniz.
+Sign-in uses a phone number plus an SMS verification code.
 
-Numara: [APP_REVIEW.local.md]
-Kod: [APP_REVIEW.local.md]
+The number in the User name field is a Firebase test number, so no real
+SMS is sent. Enter the code from the Password field directly on the
+verification screen.
 
-Uygulama yalnızca Türkiye (+90) numaralarını kabul eder; bu, ücretli SMS
-kötüye kullanımını önlemek için sunucu tarafında uygulanan bir
-kısıtlamadır.
+The app only accepts Turkish (+90) phone numbers. This is enforced
+server-side to prevent paid-SMS abuse, so any other country code is
+rejected at sign-in by design. Distribution is limited to Turkey and the
+interface is Turkish-only.
 
-Hesap silme: Hesap ekranı → Hesabı Sil (App Store 5.1.1(v)).
+Account deletion is available in the app: Account tab -> "Hesabı Sil"
+(Delete Account), per App Store Review Guideline 5.1.1(v).
 ```
-
-**Bölge kısıtını yazmak önemli:** hakem +90 dışı bir numara denerse
-giriş yapamaz ve uygulamayı bozuk sanır.
 
 ---
 
