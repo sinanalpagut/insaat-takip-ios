@@ -7,12 +7,29 @@
 	<string>development</string>
 
 	<!--
-	  BURAYA `com.apple.developer.devicecheck.appattest-environment` = production
-	  GELECEK — ama App ID'de App Attest yeteneği AÇILDIKTAN SONRA (16 Eki 2026).
-	  Şimdi eklenirse imzalama düşüyor:
-	      "Provisioning profile ... doesn't include the App Attest capability"
-	  Tam XML ve gerekçe `CIHAZ_TURU.md` sonunda duruyor; derlemeyi yeşil
-	  bırakmak için buradan çıkarıldı, UNUTULMASIN diye oraya yazıldı.
+	  APP ATTEST ORTAMI — "production", Xcode'un yazdığı "development" DEĞİL.
+	  (madde 71 · 16 Eki 2026)
+
+	  XCODE VARSAYILANI BURADA YANLIŞ ÇALIŞIYOR. Yeteneği eklediğinde
+	  "development" yazıyor; o değerle geliştirme imzalı derleme Apple'ın
+	  DEVELOPMENT App Attest ortamında doğrulama üretiyor, Firebase App Check
+	  sunucusu ise PRODUCTION ortamını doğruluyor ve reddediyor. Cihazda
+	  birebir yaşandı, kanıtı günlükte:
+	      [appcheck] JETON ALINAMADI — exchangeAppAttestAttestation
+	      HTTP 403 · "App attestation failed" · PERMISSION_DENIED
+
+	  MAĞAZA DERLEMESİNDE HİÇBİR ŞEYİ DEĞİŞTİRMİYOR: Apple'ın dokümantasyonu
+	  TestFlight/App Store ile dağıtılan uygulamanın bu yetkiyi YOK SAYIP
+	  zaten production ortamını kullandığını söylüyor. Yani bu satırın tek
+	  işlevi GELİŞTİRME derlemesini de aynı ortama sokmak — App Attest'i
+	  yayından önce denenebilir kılmak.
+
+	  BU SATIR XCODE TARAFINDAN GERİ "development"A ÇEVRİLEBİLİR: capability
+	  arayüzünden oynanırsa Xcode dosyayı yeniden yazıyor. Değer bozulursa
+	  belirti sessiz — uygulama açılır, hiçbir şey demez, her istek reddedilir.
+	  `AppCheckSetup.probe()` tam da bunu görünür kılmak için var.
 	-->
+	<key>com.apple.developer.devicecheck.appattest-environment</key>
+	<string>production</string>
 </dict>
 </plist>

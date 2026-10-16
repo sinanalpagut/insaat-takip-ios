@@ -173,7 +173,36 @@ açılmıyor" diye reddeder.
 
 ---
 
-## KOŞTURULDU (16 Eki 2026) — **DÜŞTÜ. YAYIN BLOKE.**
+## GEÇTİ (16 Eki 2026, ikinci deneme) — **YAYIN BLOKAJI KALKTI**
+
+```
+[appcheck] jeton alındı
+```
+
+Günlükte başka hiçbir satır yok. App Attest bu uygulamada **çalışıyor.**
+
+**ÇÖZÜM İKİ PARÇAYDI ve ikisi de ayrı ayrı gerekliydi:**
+1. **App ID'de App Attest yeteneği açıldı** (Xcode → Signing & Capabilities
+   → + Capability → App Attest). Apple portalındaki bu yetenek, Firebase
+   konsolundaki App Check kaydından AYRI bir şey — Firebase tarafı 2 Eyl'de
+   yapılmıştı, Apple tarafı hiç yapılmamıştı.
+2. **Yetki değeri `production` yapıldı.** Xcode yeteneği eklerken
+   `development` yazıyor ve O DEĞERLE 403 DEVAM EDERDİ: geliştirme ortamında
+   üretilen doğrulamayı Firebase production ortamında doğrulayıp reddediyor.
+   Yani Xcode'un varsayılanı burada yanlış çalışıyor.
+
+**DOĞRULANDI, VARSAYILMADI** — imzalı pakette dört şey tek tek okundu:
+`appattest-environment = production`, `CFBundleDevelopmentRegion = tr`
+(Xcode göçü sırasında düşmediği denetlendi), kamera ve Face ID metinleri.
+
+**AÇIK KALAN:** bu kanıt geliştirme imzalı bir derlemenin production
+ortamına zorlanmasıyla alındı. Mağaza derlemesi o ortamı zaten kendiliğinden
+kullandığı için doğru kanıt budur; yine de ilk TestFlight derlemesinde
+`[appcheck]` satırı bir kez daha okunmalı — bedeli sıfır.
+
+---
+
+## İLK DENEME (16 Eki 2026) — DÜŞTÜ, kayıt olarak duruyor
 
 Test tam da koyulma sebebini yaptı: **App Attest bu uygulamada çalışmıyor** ve
 bu, mağazaya gönderilmeden önce öğrenildi.

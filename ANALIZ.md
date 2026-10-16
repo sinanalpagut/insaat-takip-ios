@@ -1850,7 +1850,17 @@ gidip geldiği ve alansız ESKİ belgelerin hâlâ çözüldüğü.
         mağazada ortaya çıkardı. Kota testlerinin sınırı enjekte ederek yayın
         gününü prova etmesiyle aynı mantık.
 
-      · **KOŞTURULDU VE DÜŞTÜ (16 Eki 2026) — APP ATTEST ÇALIŞMIYOR.**
+      · **ÇÖZÜLDÜ (16 Eki 2026) — APP ATTEST ÇALIŞIYOR, YAYIN BLOKAJI KALKTI.**
+        Günlük: `[appcheck] jeton alındı`, başka satır yok. Çözüm İKİ
+        parçaydı ve tek başına hiçbiri yetmezdi: (1) App ID'de **App Attest
+        yeteneği** açıldı — Apple portalındaki bu yetenek Firebase
+        konsolundaki App Check kaydından AYRI şey; (2) yetki değeri
+        **`production`** yapıldı — Xcode yeteneği eklerken `development`
+        yazıyor ve o değerle 403 DEVAM EDERDİ. Yani Xcode'un varsayılanı
+        burada yanlış çalışıyor ve belirtisi sessiz.
+        İmzalı pakette dört şey tek tek okunarak doğrulandı (yetki değeri,
+        `tr` bölgesinin Xcode göçünde düşmediği, kamera ve Face ID metinleri).
+      · **İLK DENEME DÜŞTÜ (aynı gün) — kayıt olarak duruyor.**
         Release derlemesi iPhone 13 Pro'ya kuruldu ve doğrulama takası
         **403 PERMISSION_DENIED · "App attestation failed"** döndü. Yani
         madde 71'in korkulan hâli GERÇEKmiş; mağazaya gönderilseydi uygulama

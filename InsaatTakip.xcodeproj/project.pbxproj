@@ -364,6 +364,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "İnşaat Takip";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Fiş ve irsaliyeleri fotoğraflayarak malzeme hareketine eklemek için kamera kullanılır.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Uygulama kilidini açmak için Face ID kullanılır. Proje kayıtları, alıcı bilgileri ve dekontlar bu kilidin arkasında durur.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -394,6 +397,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "İnşaat Takip";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Fiş ve irsaliyeleri fotoğraflayarak malzeme hareketine eklemek için kamera kullanılır.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Uygulama kilidini açmak için Face ID kullanılır. Proje kayıtları, alıcı bilgileri ve dekontlar bu kilidin arkasında durur.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
