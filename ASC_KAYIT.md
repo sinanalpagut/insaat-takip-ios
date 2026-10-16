@@ -266,11 +266,43 @@ Account deletion is available in the app: Account tab -> "Hesabı Sil"
 
 ## 10 · Ekran görüntüleri
 
-6,9" (1320×2868) · 6 adet · sırasıyla:
-pano, daireler, ortaklar, dönem raporu, giderler, malzemeler
+**BOYUT 1206×2622, 1320×2868 DEĞİL (16 Eki düzeltmesi).** ASC'nin yeni
+ürün sayfasında iPhone yuvası tek: "iPhone with Dynamic Island (medium
+display)" ve yalnızca 6,1"/6,3" kabul ediyor. 6,9" dosyalar "File
+dimensions are invalid" ile reddedildi. Apple tek iPhone setini diğer
+cihazlara kendisi ölçeklüyor.
 
-Kalan dört görsel (daire detay, ortak görünümü, hareket akışı, fiş ekle)
-hazır, sonra eklenecek.
+AppMockUp'ın bu projedeki cihaz listesinde 6,3" yok; çıktılar 1320×2868
+alınıp yerelde 1206×2622'ye küçültüldü (`~/Desktop/InsaatTakip-ASC/
+magaza-6.3/`). Küçültme olduğu için netlik korundu; en boy farkı binde
+0,7, dikeyde 2 piksel zorlandı — dolgu koyup zemin dikişi riski almaktan
+iyi.
+
+### Sıralama (10'luk nihai)
+
+| # | Bant yazısı | Ham ekran |
+|---|---|---|
+| 1 | Tüm şantiyeler tek ekranda | `01-pano` |
+| 2 | Ortak görür, değiştiremez | `19-ortak-gorunumu` |
+| 3 | Hangi daire satıldı, hangisi boş | `04-daireler` |
+| 4 | Para nereye gitti, belli | `03-giderler` |
+| 5 | Fişi çek, tutarı kendi okusun | `10-fis-ekle` |
+| 6 | Rapor hazır gelir | `15-donem-raporu` |
+| 7 | Giren, kullanılan, kalan | `02-malzemeler` |
+| 8 | Taksit planı ve geciken vade | `07-daire-detay` |
+| 9 | Hisse payı ve ortak cari hesabı | `05-ortaklar` |
+| 10 | Her kayıt iz bırakır | `17-hareket-akisi` |
+
+**1 pano:** header ve arama kartının ikisi de pano ekranını gösteriyor;
+aramada pano görüp tıklayan kişi aynı ekranla karşılaşmalı.
+**2 ortak görünümü:** rakiplerin söylemediği tek cümle, arama sonucunda
+görünen üç kareden birini hak ediyor.
+**9'un yazısı değişti:** eskiden "Ortağınla aynı tabloya bak"tı, 2 ile
+aynı şeyi vadediyordu; artık ekranda görünen şeyi söylüyor.
+
+Şu an yüklü olan **altı görsel** (2, 4, 5, 7, 8, 10). Eksik dördü
+(pano, daireler, dönem raporu, ortaklar) AppMockUp'ta üretilince
+eklenecek — **sıranın en kritik iki kutusu (1 ve 3) bunların arasında.**
 
 ---
 
@@ -298,10 +330,10 @@ kullanıyor; kendi şifreleme uygulaması yok.
       (hiçbiri test edilmedi / uyumsuz / hedef kitle değil)
 
 ### 1.0 sürüm sayfasında kalanlar
-- [ ] Ekran görüntüleri (6 adet, 1320×2868)
-- [ ] Tanıtım metni · açıklama · anahtar kelimeler
-- [ ] Destek URL'i ve gizlilik politikası URL'i
-- [ ] App Review bilgileri (test numarası + bölge kısıtı notu)
+- [x] Ekran görüntüleri — 6 adet, **1206×2622** (6,9" reddedildi)
+- [x] Tanıtım metni (155/170) · açıklama (1769/4000) · anahtar kelimeler (94/100)
+- [x] Destek URL'i ve gizlilik politikası URL'i — ikisi de HTTP 200
+- [x] App Review bilgileri — notlar İngilizce, numara/kod dosyayla doğrulandı
 - [ ] Sürüm yayın şekli (otomatik / elle)
 
 ### Metadata'dan SONRA gelenler
