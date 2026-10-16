@@ -1466,7 +1466,7 @@ Bu beşi özellik boşluğu değil; hepsi ürünün tamamını etkiliyor ve üst
 - [x] 70. **Release yapılandırması bir kez bile derlenip çalıştırılmadı.**
       Firestore'un varsayılan olduğu, launch argümanlarının kapalı olduğu,
       `aps-environment`ın production olduğu yol hiç sınanmadı.
-- [~] 71. **App Check ve oran sınırı yok.** Telefon girişi herkese açık, her SMS
+- [x] 71. **App Check ve oran sınırı yok.** — **TAMAM (16 Eki 2026)** Telefon girişi herkese açık, her SMS
       ücretli, callable'larda deneme sayacı yok. Bütçe uyarısı harcamayı
       KESMİYOR — mağazada görünür olmak kötüye kullanıma açık demek.
       · **YENİ BULGU (31 Ağu 2026) — "+90 KISITI YALNIZCA İSTEMCİDE."**
@@ -1908,10 +1908,23 @@ gidip geldiği ve alansız ESKİ belgelerin hâlâ çözüldüğü.
         permissions.`) dönüyor, yani bu yoldan ayırt edilemiyor. Deney
         ayrıca metriklere 11 `unknown origin` isteği olarak düştü ve o
         satırın kaynağını açıkladı.
-      · **KONSOLDA KALAN:** Storage (açıldı, fotoğraf yüklemesiyle
-        doğrulanacak) ve Authentication (PREVIEW; açılınca bilerek çıkış
-        yapıp SMS ile girilmeli — kırılırsa yalnızca YENİ girişler ölür ve
-        başka türlü fark edilmez). Kırılırsa aynı düğmeyle geri alınır. Ayrıca bütçe uyarısı harcamayı
+      · **ÜÇ ZORLAMA DA AÇIK VE DÖRDÜ DE DOĞRULANDI (16 Eki 2026).**
+        Firestore (projeler geliyor) · Storage (fiş yüklendi, 19/19
+        doğrulanmış, sıfır kirli istek) · Authentication (çıkış yapılıp SMS
+        ile yeniden girildi) · callable'lar (koddan, iki test kilitliyor).
+        **MADDE 71 KAPANDI.**
+      · **AUTHENTICATION TESTİ NEDEN AYRI ÖNEMLİYDİ:** kırıldığında yalnızca
+        YENİ girişler ölür, mevcut oturum çalışmaya devam eder. Yani
+        "uygulama açılıyor, veri geliyor" demek hiçbir şey kanıtlamaz —
+        bilerek çıkış yapmadan arıza görünmez. Sayaç sıfırdan başladığı için
+        testten sonra orada görünen her şey yalnızca o teste ait oldu.
+      · **ARAÇ KUSURU DA DÜZELTİLDİ:** cihaz günlüğü bazen boş geliyordu.
+        İki ayrı sebep bulundu — (a) `print` stdout'a yazıyor ve stdout
+        boruya bağlıyken BLOK tamponlanıyor (çözüm: `Diag` artık stderr'e
+        yazıyor, tamponsuz), (b) süreç ZATEN ÇALIŞIRKEN `--console` ile
+        bağlanınca açılıştaki satır kaçırılıyor (çözüm: soğuk başlatma —
+        önce `process terminate`, sonra launch). İkincisi yöntem bilgisi,
+        kod kusuru değil. Ayrıca bütçe uyarısı harcamayı
         KESMİYOR — kodla çözülemez, bilinen sınır olarak duruyor.
       · **DAĞITILDI VE DOĞRULANDI (25 Ağu 2026).** Kurallar ve iki callable
       üretime çıkarıldı; ardından `redeemInvite` oturumsuz çağrıldı ve

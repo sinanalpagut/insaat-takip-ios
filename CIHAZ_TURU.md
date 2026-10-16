@@ -272,3 +272,28 @@ teşhisi DEBUG'a koymak tam da ölçülemeyen yeri ölçüsüz bırakmak olurdu.
 Jetonun kendisi asla yazılmıyor (kimlik bilgisi), yalnızca sonuç ve hata.
 Bu satır olmasaydı bugünkü bulgu görünmezdi: uygulama hiçbir şey söylemeden
 açılıyordu.
+
+---
+
+## CİHAZ GÜNLÜĞÜNÜ GÜVENİLİR OKUMAK (16 Eki 2026)
+
+Günlük bazen boş geliyordu ve bu, bulguları yanlış okumaya en yakın
+olduğumuz an oldu: **sessizliği "sorun yok" sanmak.** İki ayrı sebep vardı.
+
+**1. Tampon (kod kusuruydu, düzeltildi).** `print` stdout'a yazıyor; stdout
+bir TTY'ye değil boruya bağlandığında satır değil BLOK bazlı tamponlanıyor.
+`Diag` artık `stderr`'e yazıyor — tamponsuz, yazıldığı anda çıkıyor.
+
+**2. Bağlanma yarışı (yöntem bilgisi, kod kusuru değil).** Uygulama ZATEN
+ÇALIŞIRKEN `--console` ile bağlanılırsa açılıştaki satırlar kaçırılıyor;
+`probe()` jetonu önbellekten alıp anında yazdığında konsol henüz bağlanmamış
+oluyor. **Çözüm soğuk başlatma:**
+
+```sh
+xcrun devicectl device info processes --device <UDID> | grep InsaatTakip
+xcrun devicectl device process terminate --device <UDID> --pid <PID>
+xcrun devicectl device process launch --device <UDID> --console <BUNDLE>
+```
+
+**KURAL:** boş günlük bir kanıt DEĞİLDİR. Ya soğuk başlatıp tekrar bak, ya
+da kanıtı başka yerden al (ekran, konsol metrikleri).
