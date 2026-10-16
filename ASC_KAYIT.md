@@ -306,6 +306,47 @@ eklenecek — **sıranın en kritik iki kutusu (1 ve 3) bunların arasında.**
 
 ---
 
+## 10b · Arşiv öncesi denetim (16 Eki 2026)
+
+Release derlemesi alınıp **paketin içine bakılarak** doğrulandı; proje
+dosyasına bakarak varsayılmadı:
+
+| Kontrol | Sonuç | Nasıl bakıldı |
+|---|---|---|
+| `PrivacyInfo.xcprivacy` pakette | ✅ 4168 bayt | `InsaatTakip.app` içinde listelendi |
+| `CFBundleShortVersionString` | ✅ 1.0 | `plutil -extract` |
+| `CFBundleVersion` | ✅ 169 | `plutil -extract` |
+| `CFBundleDisplayName` | ✅ İnşaat Takip | mağaza adından bağımsız, değişmedi |
+| `ITSAppUsesNonExemptEncryption` | ✅ false | ASC bu soruyu sormayacak |
+| App Attest ortamı | ✅ production | entitlements |
+
+**NEDEN PAKETE BAKILDI:** `PrivacyInfo.xcprivacy` `project.pbxproj`
+içinde HİÇ GEÇMİYOR. Proje eşzamanlı klasör kullandığı için bu beklenen
+bir durum, ama "beklenen" ile "doğru" aynı şey değil. Dosyanın hedefe
+dahil olduğu ancak derlenmiş paketin içinde görülerek kanıtlanır; dahil
+olmasaydı Apple gizlilik manifestosu eksik diye reddederdi.
+
+### AÇIK: `aps-environment` = development
+
+Entitlements dosyasında push ortamı `development` yazıyor. Xcode'un App
+Store dağıtımında bunu `production`'a çevirdiği biliniyor ama **BU
+PROJEDE DOĞRULANMADI.** App Attest'te tam da bu otomatik çevirme
+çalışmamıştı ve elle `production` yazmak zorunda kalmıştık; aynı
+varsayımı push için yapmak, geçen hafta öğrendiğimiz dersi unutmak olur.
+
+Arşiv alındıktan sonra tek komutla bakılacak:
+
+```
+codesign -d --entitlements - /path/to/InsaatTakip.app
+```
+
+Çıktıda `aps-environment` `production` değilse bildirimler mağaza
+derlemesinde sessizce ölür — kullanıcı hiçbir hata görmez, sadece
+bildirim gelmez. Sessiz başarısızlık olduğu için gönderimden önce
+bakılmalı.
+
+---
+
 ## 11 · Dışa aktarım uyumluluğu
 
 `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO` derleme ayarlarında
@@ -335,6 +376,18 @@ kullanıyor; kendi şifreleme uygulaması yok.
 - [x] Destek URL'i ve gizlilik politikası URL'i — ikisi de HTTP 200
 - [x] App Review bilgileri — notlar İngilizce, numara/kod dosyayla doğrulandı
 - [ ] Sürüm yayın şekli (otomatik / elle)
+
+### NEREDE KALINDI (16 Eki 2026, akşam)
+
+1.0 sürüm sayfasının **tamamı dolduruldu ve kaydedildi**: 6 ekran
+görüntüsü, header, arama kartı, tanıtım metni, açıklama, anahtar
+kelimeler, iki URL, telif, App Review bilgileri, yayın şekli **manuel**.
+
+**SIRADAKİ: App Privacy anketi** — sol menü › Trust & Safety › App
+Privacy. Açıldı ama doldurulmadı. Cevaplar 6. bölümdeki tabloda,
+`PrivacyInfo.xcprivacy` ile birebir aynı olmak zorunda.
+
+Ondan sonra derleme yükleme.
 
 ### Metadata'dan SONRA gelenler
 - [ ] **Derleme yüklenecek** — henüz ASC'de hiç build yok. Xcode →
