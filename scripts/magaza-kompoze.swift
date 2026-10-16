@@ -3,8 +3,16 @@
 //  Mağaza görsellerini BİRLEŞTİRİR.
 //
 //      swift scripts/magaza-kompoze.swift kontak  <kaynak-dizin> <çıktı.png>
-//      swift scripts/magaza-kompoze.swift header  <ekran.png> <çıktı.png> "Başlık" "Alt satır"
-//      swift scripts/magaza-kompoze.swift arama   <ekran.png> <çıktı.png> "Başlık" "Alt satır"
+//      swift scripts/magaza-kompoze.swift header  <ekran.png> <çıktı.png> "Başlık" "Alt satır" [zemin]
+//      swift scripts/magaza-kompoze.swift arama   <ekran.png> <çıktı.png> "Başlık" "Alt satır" [zemin]
+//
+//  zemin: "koyu" (varsayılan) ya da "bakir".
+//
+//  NEDEN İKİ ZEMİN: ekran görüntüleri BAKIR zeminle üretildi. Header ve
+//  arama kartı koyu zeminde kalsaydı ürün sayfasının üstü ile ekran
+//  görüntüleri iki ayrı set gibi görünürdü. Zemin bakıra çekilince
+//  telefonun kenarı bakır halkayla kaybolacağı için orada KOYU KASA
+//  kullanılıyor: kontrast zeminden gelmiyorsa cihazdan gelmeli.
 //
 //  NEDEN SWIFT: makinede ImageMagick ve PIL yok; CoreGraphics her macOS'ta
 //  var ve `make-icon.swift` ile aynı yol. Araç kurmak, altı ay sonra bu
@@ -141,17 +149,22 @@ case "kontak":
 
 // ──────────────────── HEADER (3840x1646) / ARAMA (3840x2560) ────────────────────
 case "header", "arama":
+    fontlariKaydet()
     let ekranYolu = argv[2], cikti = argv[3]
     let baslik = argv.count > 4 ? argv[4] : "İnşaat Takip"
     let altSatir = argv.count > 5 ? argv[5] : ""
+    let bakirZemin = argv.count > 6 && argv[6] == "bakir"
     let W = 3840
     let H = komut == "header" ? 1646 : 2560
 
     let ctx = baglam(W, H)
 
-    // Zemin: koyu, hafif eğimli — uygulamanın karşılama ekranıyla aynı dil.
+    // Zemin — bakır ya da koyu; ikisi de düz renk değil hafif eğimli.
+    let bakirKoyu = CGColor(red: 0.58, green: 0.33, blue: 0.20, alpha: 1)
+    let zeminUst = bakirZemin ? bakir : ink
+    let zeminAlt = bakirZemin ? bakirKoyu : inkAlt
     if let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                          colors: [ink, inkAlt] as CFArray, locations: [0, 1]) {
+                          colors: [zeminUst, zeminAlt] as CFArray, locations: [0, 1]) {
         ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: CGFloat(H)),
                                end: CGPoint(x: CGFloat(W), y: 0), options: [])
     }
@@ -168,11 +181,13 @@ case "header", "arama":
 
     var imlec = CGFloat(H) * (komut == "header" ? 0.68 : 0.62)
     let bH = metin(ctx, baslik, x: kenar, ustY: imlec, genislik: metinGenislik,
-                   punto: baslikPunto, agirlik: .bold, renk: beyaz, satirAraligi: 1.05)
+                   punto: baslikPunto, agirlik: .bold, renk: beyaz, satirAraligi: 1.05,
+                   fontAdi: "Sora-Bold")
     imlec -= bH + (komut == "header" ? 44 : 56)
     if !altSatir.isEmpty {
         metin(ctx, altSatir, x: kenar, ustY: imlec, genislik: metinGenislik,
-              punto: altPunto, agirlik: .regular, renk: solukB, satirAraligi: 1.3)
+              punto: altPunto, agirlik: .regular, renk: solukB, satirAraligi: 1.3,
+              fontAdi: "Manrope-Medium")
     }
 
     // Telefon çerçevesi + ekran görüntüsü
@@ -191,11 +206,16 @@ case "header", "arama":
         let y = CGFloat(H) - ustBosluk - hedefH
         let kutu = CGRect(x: x, y: y, width: hedefW, height: hedefH)
 
-        // Bakır halka: ekran görüntüsünün koyu zeminde kaybolmaması için.
+        // KONTRAST ZEMİNDEN GELMİYORSA CİHAZDAN GELMELİ: koyu zeminde bakır
+        // halka ayırıyor; bakır zeminde o halka kaybolacağı için koyu
+        // titanyum kasa kullanılıyor.
         ctx.saveGState()
-        let cerceve = CGPath(roundedRect: kutu.insetBy(dx: -18, dy: -18),
-                             cornerWidth: 86, cornerHeight: 86, transform: nil)
-        ctx.addPath(cerceve); ctx.setFillColor(bakir); ctx.fillPath()
+        let cerceveRengi = bakirZemin
+            ? CGColor(red: 0.20, green: 0.20, blue: 0.23, alpha: 1)
+            : bakir
+        let cerceve = CGPath(roundedRect: kutu.insetBy(dx: -22, dy: -22),
+                             cornerWidth: 90, cornerHeight: 90, transform: nil)
+        ctx.addPath(cerceve); ctx.setFillColor(cerceveRengi); ctx.fillPath()
 
         ctx.addPath(CGPath(roundedRect: kutu, cornerWidth: 72, cornerHeight: 72, transform: nil))
         ctx.clip()
