@@ -21,6 +21,34 @@ import UniformTypeIdentifiers
 import CoreText
 import AppKit
 
+// UYGULAMANIN KENDİ FONTLARI YÜKLENİYOR.
+//
+// NEDEN: mağaza görseli sistem fontuyla konuşursa, indiren kişi uygulamayı
+// açtığında başka bir tipografiyle karşılaşıyor ve ikisi iki ayrı ürün gibi
+// görünüyor. Sora başlık, Manrope gövde — uygulamanın her ekranında olduğu
+// gibi.
+let fontKok = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent()
+    .appendingPathComponent("InsaatTakip/Resources/Fonts")
+
+func fontlariKaydet() {
+    for ad in ["Sora-Bold", "Sora-SemiBold", "Manrope-Medium", "Manrope-SemiBold"] {
+        let url = fontKok.appendingPathComponent("\(ad).ttf") as CFURL
+        CTFontManagerRegisterFontsForURL(url, .process, nil)
+    }
+}
+
+/// Kayıtlı fontu ADIYLA ister; bulunamazsa sistem fontuna düşer.
+///
+/// SESSİZCE DÜŞMÜYOR: font bulunamadığında uyarı basılıyor. Yoksa çıktı
+/// "biraz farklı" görünür ve sebebi hiçbir yerde yazmaz — tam da bu
+/// projenin avladığı sessiz sapma.
+func uygulamaFontu(_ ad: String, _ punto: CGFloat, yedekAgirlik: NSFont.Weight) -> NSFont {
+    if let f = NSFont(name: ad, size: punto) { return f }
+    FileHandle.standardError.write(Data("[font] bulunamadı, sisteme düşüldü: \(ad)\n".utf8))
+    return NSFont.systemFont(ofSize: punto, weight: yedekAgirlik)
+}
+
 func gorselYukle(_ yol: String) -> CGImage? {
     guard let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: yol) as CFURL, nil) else { return nil }
     return CGImageSourceCreateImageAtIndex(src, 0, nil)
@@ -45,10 +73,13 @@ func baglam(_ w: Int, _ h: Int) -> CGContext {
 /// Metni verilen genişlikte, satır sararak çizer; kullanılan yüksekliği döner.
 @discardableResult
 func metin(_ ctx: CGContext, _ s: String, x: CGFloat, ustY: CGFloat, genislik: CGFloat,
-           punto: CGFloat, agirlik: NSFont.Weight, renk: CGColor, satirAraligi: CGFloat = 1.18) -> CGFloat {
-    let font = NSFont.systemFont(ofSize: punto, weight: agirlik)
+           punto: CGFloat, agirlik: NSFont.Weight, renk: CGColor, satirAraligi: CGFloat = 1.18,
+           fontAdi: String? = nil, ortala: Bool = false) -> CGFloat {
+    let font = fontAdi.map { uygulamaFontu($0, punto, yedekAgirlik: agirlik) }
+               ?? NSFont.systemFont(ofSize: punto, weight: agirlik)
     let para = NSMutableParagraphStyle()
     para.lineHeightMultiple = satirAraligi
+    para.alignment = ortala ? .center : .natural
     let attr: [NSAttributedString.Key: Any] = [
         .font: font,
         .foregroundColor: NSColor(cgColor: renk) ?? .white,
@@ -174,6 +205,59 @@ case "header", "arama":
 
     yaz(ctx, cikti)
     print("\(komut): \(cikti)  (\(W)x\(H))")
+
+// ─────────────────────── MAĞAZA EKRANI (1320x2868) ───────────────────────
+//
+// TASARIM KARARI, ÖLÇÜLEREK ALINDI: cihaz BÜYÜK ve altı kadraj dışına
+// taşıyor. Küçük cihazlı şablonlar denendi ve App Store'un küçük gösterdiği
+// boyutta rakamların tamamı okunmaz hâle geliyordu — oysa bu uygulamanın
+// sattığı şey tam olarak rakamlar. Alttan taşma bedava: oradaki içerik
+// tekrar eden kartlar, kaybı yok; üstteki üçte iki neredeyse tam boyda.
+case "ekran":
+    fontlariKaydet()
+    let ekranYolu = argv[2], cikti = argv[3]
+    let yazi = argv.count > 4 ? argv[4] : ""
+    let W = 1320, H = 2868
+
+    let ctx = baglam(W, H)
+    if let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                          colors: [ink, inkAlt] as CFArray, locations: [0, 1]) {
+        ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: CGFloat(H)),
+                               end: CGPoint(x: CGFloat(W), y: 0), options: [])
+    }
+
+    // Bant yazısı — tek cümle, en çok iki satır, ortalı.
+    let yanBosluk: CGFloat = 108
+    metin(ctx, yazi, x: yanBosluk, ustY: CGFloat(H) - 196,
+          genislik: CGFloat(W) - yanBosluk * 2,
+          punto: 92, agirlik: .bold, renk: beyaz, satirAraligi: 1.14,
+          fontAdi: "Sora-Bold", ortala: true)
+
+    // Cihaz
+    if let ekran = gorselYukle(ekranYolu) {
+        let oran = CGFloat(ekran.height) / CGFloat(ekran.width)
+        let cihazW: CGFloat = 1116
+        let cihazH = cihazW * oran
+        let x = (CGFloat(W) - cihazW) / 2
+        let ustY: CGFloat = 640                      // yazının altı
+        let y = CGFloat(H) - ustY - cihazH           // alttan taşar
+
+        ctx.saveGState()
+        // Bakır halka: koyu zeminde ekranın kenarı kaybolmasın.
+        ctx.addPath(CGPath(roundedRect: CGRect(x: x - 7, y: y - 7,
+                                               width: cihazW + 14, height: cihazH + 14),
+                           cornerWidth: 78, cornerHeight: 78, transform: nil))
+        ctx.setFillColor(bakir); ctx.fillPath()
+
+        ctx.addPath(CGPath(roundedRect: CGRect(x: x, y: y, width: cihazW, height: cihazH),
+                           cornerWidth: 72, cornerHeight: 72, transform: nil))
+        ctx.clip()
+        ctx.draw(ekran, in: CGRect(x: x, y: y, width: cihazW, height: cihazH))
+        ctx.restoreGState()
+    }
+
+    yaz(ctx, cikti)
+    print("ekran: \(cikti)")
 
 default:
     fatalError("bilinmeyen komut: \(komut)")
