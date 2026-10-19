@@ -458,24 +458,30 @@ girildi.
 aktarılıp mağaza imzalı paketin yetkileri okundu; `aps-environment`
 açık maddesi orada kapandı.
 
-**SIRADAKİ:**
-1. İşlenme bitince 1.0 sayfasındaki **Build** bölümünden derlemeyi seç.
-2. **TestFlight'ta App Attest teyidi** — cihazda `[appcheck] jeton
-   alındı` satırı okunacak.
-3. Aynı kurulumda **girişin SMS ile sorunsuz** olduğu görülecek;
-   reCAPTCHA ekranı ÇIKMAMALI. Çıkarsa `aps-environment` production
-   olmasına rağmen sessiz doğrulama çalışmıyor demektir.
-4. Sonra **Add for Review**.
+**19 Eki akşamı itibarıyla teknik tarafta bekleyen iş yok:**
+derleme yüklendi, 1.0 sayfasında seçildi, TestFlight'ta kuruldu ve
+çalıştığı görüldü (giriş + proje yükleme).
 
-**Gönderimden önce hâlâ açık:** hukuki metinlerin avukat incelemesi.
+**SIRADAKİ: Add for Review.**
+
+**Gönderimden SONRA, ilk gerçek kullanıcılardan önce:** hukuki
+metinlerin avukat incelemesi. Brief hazır (`AVUKAT_BRIEFI.local.md`,
+depoya girmiyor). 19 Eki'de iki düzeltme zaten yapıldı: veri sorumlusu
+artık gerçek kişi adıyla yazılıyor ve aktarım maddesi barındırmanın
+Türkiye dışında olduğunu açıkça söylüyor. Hukuki sebebin
+adlandırılması avukatta — dayanılmayan bir mekanizmaya atıf yapmak
+boşluğu yanlış beyana çevirirdi.
 
 ### Metadata'dan SONRA gelenler
 - [x] **Derleme yüklendi** — 19 Eki 10:23 arşivi, 1.0 (169), arm64.
       Yüklemeden önce dışa aktarılıp yetkileri okundu (yukarıda).
-- [ ] **TestFlight'ta App Attest teyidi** — mağaza derlemesinde de
-      `[appcheck] jeton alındı` satırı okunacak. Bugünkü kanıt geliştirme
-      imzalı derlemenin production ortamına zorlanmasıyla alındı; mağaza
-      derlemesinde bir kez daha bakmanın maliyeti sıfır.
+- [x] **TestFlight'ta App Attest teyidi — 19 Eki, GEÇTİ.** Mağaza imzalı
+      derleme cihaza kuruldu, giriş sorunsuz yapıldı ve projeler yüklendi.
+      **Projelerin gelmesi tek başına kanıt:** Firestore'da App Check
+      zorlaması açık, geçerli jeton olmadan tek belge bile okunamazdı.
+      Mağaza derlemesinde `#if DEBUG` dalı derlenmiyor, yani jetonu üreten
+      App Attest'ti. Girişin sorunsuz olması `aps-environment = production`
+      sayesinde sessiz doğrulamanın yürüdüğünü de gösteriyor.
 - [x] **App Privacy anketi** — 19 Eki'de YAYINLANDI; beş veri türü, hepsi
       App Functionality + kimliğe bağlı, "Data Used to Track You" kutusu
       hiç görünmüyor
@@ -485,5 +491,4 @@ açık maddesi orada kapandı.
 
 - [x] Destek sayfası yayında — 16 Eki'de HTTP 200 doğrulandı
 - [ ] Hukuki metinler avukat incelemesinden geçecek
-- [ ] İlk TestFlight derlemesinde `[appcheck]` satırı okunacak — App
-      Attest'in mağaza derlemesinde de çalıştığı teyit edilecek
+- [x] App Attest mağaza derlemesinde teyit edildi (19 Eki, TestFlight)
