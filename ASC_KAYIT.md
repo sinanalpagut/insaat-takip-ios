@@ -418,11 +418,17 @@ kullanıyor; kendi şifreleme uygulaması yok.
 görüntüsü, header, arama kartı, tanıtım metni, açıklama, anahtar
 kelimeler, iki URL, telif, App Review bilgileri, yayın şekli **manuel**.
 
-**SIRADAKİ: App Privacy anketi** — sol menü › Trust & Safety › App
-Privacy. Açıldı ama doldurulmadı. Cevaplar 6. bölümdeki tabloda,
-`PrivacyInfo.xcprivacy` ile birebir aynı olmak zorunda.
+**App Privacy 19 Eki'de yayınlandı.** Gizlilik politikası adresi de o
+sayfada ayrıca isteniyordu (1.0 sayfasındakilerden farklı bir alan),
+girildi.
 
-Ondan sonra derleme yükleme.
+**SIRADAKİ: derleme yükleme.** Xcode → Any iOS Device → Product →
+Archive → Distribute App → App Store Connect → Upload. Arşiv, User ID
+eklenmiş manifestoyu taşıyan koddan alınmalı (commit 83eff8d sonrası).
+
+Yüklemeden sonra iki kontrol: arşivdeki `.app` üzerinde
+`codesign -d --entitlements` ile `aps-environment` ve TestFlight'ta
+`[appcheck] jeton alındı` satırı.
 
 ### Metadata'dan SONRA gelenler
 - [ ] **Derleme yüklenecek** — henüz ASC'de hiç build yok. Xcode →
@@ -431,7 +437,9 @@ Ondan sonra derleme yükleme.
       `[appcheck] jeton alındı` satırı okunacak. Bugünkü kanıt geliştirme
       imzalı derlemenin production ortamına zorlanmasıyla alındı; mağaza
       derlemesinde bir kez daha bakmanın maliyeti sıfır.
-- [ ] **App Privacy anketi** (6. bölüm) — manifestle birebir
+- [x] **App Privacy anketi** — 19 Eki'de YAYINLANDI; beş veri türü, hepsi
+      App Functionality + kimliğe bağlı, "Data Used to Track You" kutusu
+      hiç görünmüyor
 - [ ] Avukat incelemesi
 
 ## YAYINDAN ÖNCE KAPATILMASI GEREKENLER
