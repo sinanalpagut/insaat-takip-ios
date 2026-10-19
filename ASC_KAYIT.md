@@ -326,9 +326,12 @@ görünen üç kareden birini hak ediyor.
 **9'un yazısı değişti:** eskiden "Ortağınla aynı tabloya bak"tı, 2 ile
 aynı şeyi vadediyordu; artık ekranda görünen şeyi söylüyor.
 
-Şu an yüklü olan **altı görsel** (2, 4, 5, 7, 8, 10). Eksik dördü
-(pano, daireler, dönem raporu, ortaklar) AppMockUp'ta üretilince
-eklenecek — **sıranın en kritik iki kutusu (1 ve 3) bunların arasında.**
+**19 Eki: onunun tamamı yüklendi ve sıraya kondu, pano 1 numarada.**
+
+Yükleme sırasında bir görsel "bulut" durumunda takıldı ve `Add for
+Review` "1 or more screenshots must finish uploading" diyerek engelledi.
+Takılan kutu kaldırılıp yeniden sürüklenince çözüldü. **ASC yarım kalan
+yüklemeyi kendi başına temizlemiyor**, sayaç 10/10 gösterse bile.
 
 ---
 
@@ -438,7 +441,7 @@ kullanıyor; kendi şifreleme uygulaması yok.
       (hiçbiri test edilmedi / uyumsuz / hedef kitle değil)
 
 ### 1.0 sürüm sayfasında kalanlar
-- [x] Ekran görüntüleri — 6 adet, **1206×2622** (6,9" reddedildi)
+- [x] Ekran görüntüleri — **10 adet**, 1206×2622, pano 1 numarada
 - [x] Tanıtım metni (155/170) · açıklama (1769/4000) · anahtar kelimeler (94/100)
 - [x] Destek URL'i ve gizlilik politikası URL'i — ikisi de HTTP 200
 - [x] App Review bilgileri — notlar İngilizce, numara/kod dosyayla doğrulandı
