@@ -376,33 +376,41 @@ simülatörde düşülüyor (`#if targetEnvironment(simulator)`), orada da
 izin açıklaması aranmıyor. Eksik sanıp eklemek, istemediğimiz bir izni
 mağaza sayfasında beyan etmek olurdu.
 
-### AÇIK: `aps-environment` = development
+### KAPANDI: `aps-environment` (19 Eki)
 
-Entitlements dosyasında push ortamı `development` yazıyor. Xcode'un App
-Store dağıtımında bunu `production`'a çevirdiği biliniyor ama **BU
-PROJEDE DOĞRULANMADI.** App Attest'te tam da bu otomatik çevirme
-çalışmamıştı ve elle `production` yazmak zorunda kalmıştık; aynı
-varsayımı push için yapmak, geçen hafta öğrendiğimiz dersi unutmak olur.
+Arşivde `development` yazıyordu ve yanında `get-task-allow: true`
+duruyordu — ikisi birlikte arşivin GELİŞTİRME sertifikasıyla
+imzalandığını söylüyor. Mağaza imzası `Distribute App` adımında
+yeniden atılıyor, dolayısıyla soru arşivde değil dışa aktarılmış
+pakette cevaplanır.
 
-Arşiv alındıktan sonra tek komutla bakılacak:
+Dışa aktarılıp `.ipa` açıldı ve bakıldı:
 
-```
-codesign -d --entitlements - /path/to/InsaatTakip.app
-```
+| Yetki | Arşiv | Mağaza imzalı paket |
+|---|---|---|
+| `aps-environment` | development | **production** ✓ |
+| `get-task-allow` | true | **false** ✓ |
+| `beta-reports-active` | yok | **true** ✓ |
+| `appattest-environment` | production | production ✓ |
 
-**SONUCU 19 Eki'de DAHA DOĞRU ANLAŞILDI.** Önce "bildirimler ölür"
-yazmıştım; yanlıştı. Uygulamada kullanıcıya giden uzak bildirim YOK,
-hatırlatmalar yerel. APNs yalnızca **Firebase Auth'un sessiz telefon
-doğrulaması** için kullanılıyor.
+**NEDEN APP ATTEST'TE ÇALIŞMAMIŞTI DA BURADA ÇALIŞTI:** çalışmama diye
+bir şey olmamış. App Attest'i geliştirme imzalı, doğrudan cihaza
+kurulan bir derlemede test ediyorduk; o derleme dağıtım adımından hiç
+geçmedi. `aps-environment` dağıtımda çevriliyor; `appattest-environment`
+ise çevrilmiyor, imza türüne göre VARSAYILANI değişiyor. Elle
+`production` yazmamız geliştirme derlemesini üretim ortamına zorlamak
+içindi ve mağaza derlemesi için zaten etkisiz.
 
-Dolayısıyla yanlış ortamın bedeli şu: sessiz doğrulama başarısız olur ve
-Firebase Auth **reCAPTCHA web görünümüne** düşer. Giriş çalışmaya devam
-eder ama hakem beklemediği bir doğrulama ekranı görür. Bu, ölümcül
-değil ama gönderimden önce bakmanın maliyeti bir komut.
+Yani "Xcode'un otomatik çevirmesine güvenilmez" çıkarımı yanlıştı;
+doğrusu "geliştirme imzalı bir derlemeye bakarak mağaza derlemesi
+hakkında konuşulmaz".
 
-`setAPNSToken(type: .unknown)` kullanıldığı için SDK sandbox/production
-ayrımını kendi çözüyor; risk yalnızca yetkinin cihazı yanlış APNs
-ortamına kaydetmesinde.
+### Paketten okunan son değerler
+
+`CFBundleShortVersionString` 1.0 · `CFBundleVersion` 169 ·
+`CFBundleIconName` AppIcon · `ITSAppUsesNonExemptEncryption` false ·
+gizlilik manifestosunda beş tür (PhoneNumber, Name, PhotosorVideos,
+OtherUserContentData, UserID).
 
 ---
 
