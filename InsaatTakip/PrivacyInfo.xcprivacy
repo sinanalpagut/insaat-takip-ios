@@ -100,6 +100,34 @@
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 			</array>
 		</dict>
+
+		<dict>
+			<!-- Firebase Auth'un atadığı UID. SUNUCUDA SAKLANIYOR, dolayısıyla
+			     "toplanıyor": `projects/{id}.ownerUid`, `.memberUids` dizisi,
+			     `users/{uid}` profil belgesinin yolu ve denetim izindeki
+			     `updatedBy` alanı. Apple'ın tanımı "atanmış kullanıcı
+			     kimliği"ni açıkça kapsıyor.
+
+			     19 Eki'de EKLENDİ. Önce atlanmıştı çünkü UID'yi kullanıcı
+			     girmiyor, uygulama üretiyor — ama Apple'ın ölçütü verinin
+			     NEREDEN geldiği değil, cihazdan çıkıp saklanıp
+			     saklanmadığı. Güvenlik kuralları UID üzerinden yetki
+			     veriyor, yani saklanmaması mümkün de değil.
+
+			     APNs jetonu AKSİNE beyan edilmiyor: `setAPNSToken` ile
+			     doğrudan SDK'ya veriliyor, telefon doğrulaması bitince
+			     işimiz kalmıyor, bizim sunucumuzda hiç durmuyor. -->
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeUserID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

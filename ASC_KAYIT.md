@@ -160,6 +160,32 @@ Ayrışırlarsa Apple ikisini karşılaştırıp reddediyor.
 | Ad | Contact Info › Name | App Functionality | **Evet** | Hayır |
 | Fotoğraf | User Content › Photos or Videos | App Functionality | **Evet** | Hayır |
 | Diğer kullanıcı içeriği | User Content › Other User Content | App Functionality | **Evet** | Hayır |
+| Kullanıcı kimliği | Identifiers › User ID | App Functionality | **Evet** | Hayır |
+
+### User ID 19 Eki'de EKLENDİ
+
+Önce atlanmıştı. Sebebi, UID'yi kullanıcının GİRMEMESİ — uygulama
+üretiyor, kimse yazmıyor. Ama Apple'ın ölçütü verinin nereden geldiği
+değil, **cihazdan çıkıp saklanıp saklanmadığı.** Kodda bakıldı ve
+saklanıyor:
+
+- `projects/{id}.ownerUid`
+- `projects/{id}.memberUids` dizisi
+- `users/{uid}` profil belgesinin yolu
+- denetim izindeki `updatedBy` alanı
+
+Güvenlik kuralları yetkiyi UID üzerinden veriyor, yani saklanmaması
+mümkün de değil. `PrivacyInfo.xcprivacy` de aynı gün güncellendi;
+anketle manifesto ayrışırsa Apple ikisini karşılaştırıp reddediyor.
+
+**APNs jetonu AKSİNE beyan edilmiyor.** `setAPNSToken` ile doğrudan
+Firebase Auth SDK'sına veriliyor, telefon doğrulaması bitince işimiz
+kalmıyor, bizim sunucumuzda hiç durmuyor. Apple'ın "toplama" tanımı
+"isteği gerçek zamanlı karşılamak için gerekenden uzun süre erişilebilir
+tutmak" diyor; bu onun dışında kalıyor. Uygulamada FirebaseMessaging
+paketi de yok (pbxproj'de sıfır geçiş), kullanıcıya giden uzak bildirim
+hiç gönderilmiyor — hatırlatmalar `UNCalendarNotificationTrigger` ile
+YEREL.
 
 **"Data Used to Track You" → HİÇBİRİ.** Manifest `NSPrivacyTracking = false`
 diyor ve izleme alan adı listesi boş.
@@ -340,10 +366,19 @@ Arşiv alındıktan sonra tek komutla bakılacak:
 codesign -d --entitlements - /path/to/InsaatTakip.app
 ```
 
-Çıktıda `aps-environment` `production` değilse bildirimler mağaza
-derlemesinde sessizce ölür — kullanıcı hiçbir hata görmez, sadece
-bildirim gelmez. Sessiz başarısızlık olduğu için gönderimden önce
-bakılmalı.
+**SONUCU 19 Eki'de DAHA DOĞRU ANLAŞILDI.** Önce "bildirimler ölür"
+yazmıştım; yanlıştı. Uygulamada kullanıcıya giden uzak bildirim YOK,
+hatırlatmalar yerel. APNs yalnızca **Firebase Auth'un sessiz telefon
+doğrulaması** için kullanılıyor.
+
+Dolayısıyla yanlış ortamın bedeli şu: sessiz doğrulama başarısız olur ve
+Firebase Auth **reCAPTCHA web görünümüne** düşer. Giriş çalışmaya devam
+eder ama hakem beklemediği bir doğrulama ekranı görür. Bu, ölümcül
+değil ama gönderimden önce bakmanın maliyeti bir komut.
+
+`setAPNSToken(type: .unknown)` kullanıldığı için SDK sandbox/production
+ayrımını kendi çözüyor; risk yalnızca yetkinin cihazı yanlış APNs
+ortamına kaydetmesinde.
 
 ---
 
