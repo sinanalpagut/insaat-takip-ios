@@ -30,6 +30,12 @@ GUNCELLEME = "15 Ekim 2026"
 EPOSTA = "info@benav.com.tr"
 GELISTIRICI = "benav"
 
+# Veri sorumlusu GERÇEK veya TÜZEL KİŞİ olmak zorunda; "benav" bir marka adı,
+# tüzel kişiliği yok. KVKK metninde sorumluyu adlandıran yerlerde gerçek kişi
+# yazılıyor, marka parantez içinde kalıyor ki iki ad arasındaki bağ görünsün.
+# Şirket kurulursa burası tüzel kişi adıyla değişecek.
+VERI_SORUMLUSU = "Sinan Alpagut (&ldquo;benav&rdquo; markası ile faaliyet göstermektedir)"
+
 ISKELET = """<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -215,7 +221,7 @@ KVKK = """
         <p>6698 sayılı Kişisel Verilerin Korunması Kanunu'nun ("KVKK") 10. maddesi uyarınca, İnşaat Takip uygulamasını kullanırken kişisel verilerinizin nasıl işlendiği hakkında sizi bilgilendiriyoruz.</p>
 
         <h2>1. Veri sorumlusu</h2>
-        <p>Hesap verileriniz (telefon numaranız ve adınız) bakımından veri sorumlusu <strong>{gelistirici}</strong>'dır. İletişim: <a class="inl" href="mailto:{eposta}">{eposta}</a></p>
+        <p>Hesap verileriniz (telefon numaranız ve adınız) bakımından veri sorumlusu <strong>{veri_sorumlusu}</strong>. İletişim: <a class="inl" href="mailto:{eposta}">{eposta}</a></p>
 
         <h2>2. İki ayrı rol: ne zaman veri sorumlusu, ne zaman veri işleyen</h2>
         <p>Bu uygulamada iki farklı veri kümesi vardır ve rolümüz her birinde farklıdır. Bu ayrımın yazılı olması önemlidir:</p>
@@ -257,7 +263,8 @@ KVKK = """
 
         <h2>7. Aktarım</h2>
         <p>Verileriniz, hizmetin sunulabilmesi için Google Ireland Limited tarafından işletilen Firebase altyapısında barındırılır. Sunucu bölgesi <strong>europe-west1 (Belçika, Avrupa Birliği)</strong> olarak seçilmiştir.</p>
-        <p>Projelerinize davet ettiğiniz ortaklar, o projenin kayıtlarını görebilir; <strong>alıcı adları ortaklara aktarılmaz</strong>. Abonelik satın alınması hâlinde ödeme işlemi Apple tarafından yürütülür. Yasal olarak yetkili makamların usulüne uygun talebi hâlinde veriler paylaşılabilir. Bunun dışında yurt içinde veya yurt dışında üçüncü kişilere aktarım yapılmaz.</p>
+        <p><strong>Bu barındırma, verilerinizin Türkiye dışında tutulduğu anlamına gelir.</strong> Sunucular Avrupa Birliği içindedir ve altyapıyı işleten Google Ireland Limited bir yurt dışı hizmet sağlayıcısıdır.</p>
+        <p>Projelerinize davet ettiğiniz ortaklar, o projenin kayıtlarını görebilir; <strong>alıcı adları ortaklara aktarılmaz</strong>. Abonelik satın alınması hâlinde ödeme işlemi Apple tarafından yürütülür. Yasal olarak yetkili makamların usulüne uygun talebi hâlinde veriler paylaşılabilir. <strong>Bunların dışında</strong> verileriniz başka üçüncü kişilere aktarılmaz; reklam, pazarlama veya analiz amacıyla hiçbir tarafla paylaşılmaz.</p>
 
         <h2>8. Saklama süresi</h2>
         <p>Veriler, hesabınız silinene kadar saklanır. Hesabınızı uygulama içinden sildiğinizde verileriniz sunuculardan ve cihazınızdan silinir. Mevzuatın saklamayı zorunlu kıldığı hâller saklıdır.</p>
@@ -278,7 +285,7 @@ KVKK = """
 
         <h2>10. İletişim</h2>
         <ul>
-          <li><strong>Veri sorumlusu:</strong> {gelistirici}</li>
+          <li><strong>Veri sorumlusu:</strong> {veri_sorumlusu}</li>
           <li><strong>E-posta:</strong> <a class="inl" href="mailto:{eposta}">{eposta}</a></li>
         </ul>
 """
@@ -375,7 +382,8 @@ def main() -> int:
             baslik=baslik,
             baslik_kucuk=baslik_kucuk,
             guncelleme=GUNCELLEME,
-            govde=govde.format(eposta=EPOSTA, gelistirici=GELISTIRICI).rstrip(),
+            govde=govde.format(eposta=EPOSTA, gelistirici=GELISTIRICI,
+                               veri_sorumlusu=VERI_SORUMLUSU).rstrip(),
         )
         (hedef / dosya).write_text(html, encoding="utf-8")
         print(f"yazıldı: {hedef / dosya}")
