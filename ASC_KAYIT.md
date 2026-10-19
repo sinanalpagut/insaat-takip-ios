@@ -465,7 +465,22 @@ açık maddesi orada kapandı.
 derleme yüklendi, 1.0 sayfasında seçildi, TestFlight'ta kuruldu ve
 çalıştığı görüldü (giriş + proje yükleme).
 
-**SIRADAKİ: Add for Review.**
+## GÖNDERİLDİ — 19 Ekim 2026, 11:12
+
+| | |
+|---|---|
+| Durum | **Waiting for Review** |
+| Sürüm | 1.0 (169) |
+| Gönderim kimliği | `22da9528-1f9e-4c12-a280-4be1b3ca0b32` |
+| Yayın şekli | **Manuel** — onay gelse bile kendiliğinden çıkmaz |
+
+ASC başlığındaki uygulama simgesi gönderimden hemen sonra belirdi.
+Daha önce boş görünüyordu ve sebebi araştırıldı: kaynak simgelerde alfa
+kanalı yok, 1024×1024 doğru ve **yüklenen derlemenin `Assets.car`
+dosyasında kayıt mevcuttu**. Yani eksik bir şey yoktu, ASC çıkarmayı
+geciktirmişti. Simgenin görünmemesi gönderimi engellemiyor.
+
+**SIRADAKİ: inceleme sonucu.**
 
 **Gönderimden SONRA, ilk gerçek kullanıcılardan önce:** hukuki
 metinlerin avukat incelemesi. Brief hazır (`AVUKAT_BRIEFI.local.md`,
