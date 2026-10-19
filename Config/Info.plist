@@ -2,6 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- actool bu anahtarı YALNIZCA `CFBundleIcons` içine iç içe yazıyor;
+	     üst düzeyde bırakmıyor (hem simülatör hem cihaz derlemesinde
+	     bakıldı). App Store doğrulaması (ITMS-90713) üst düzeydekini
+	     arıyor. Reddedeceğini KANITLAMADIM — kanıtlamanın tek yolu
+	     yüklemeyi denemek. Tek satırın bedeli, başarısız bir yükleme
+	     turundan düşük; değer zaten actool'un yazdığıyla aynı, çakışmıyor. -->
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

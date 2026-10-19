@@ -352,6 +352,30 @@ bir durum, ama "beklenen" ile "doğru" aynı şey değil. Dosyanın hedefe
 dahil olduğu ancak derlenmiş paketin içinde görülerek kanıtlanır; dahil
 olmasaydı Apple gizlilik manifestosu eksik diye reddederdi.
 
+### `CFBundleIconName` elle eklendi (19 Eki)
+
+actool bu anahtarı yalnızca `CFBundleIcons › CFBundlePrimaryIcon`
+içine iç içe yazıyor, üst düzeyde bırakmıyor. **Hem simülatör hem
+cihaz hedefiyle derleyip bakıldı, ikisinde de üst düzeyde yoktu.**
+App Store doğrulaması (ITMS-90713) üst düzeydekini arıyor.
+
+Reddedeceği KANITLANMADI — kanıtlamanın tek yolu yüklemeyi denemek.
+`Config/Info.plist`'e elle eklendi; değer actool'un yazdığıyla aynı
+(`AppIcon`), çakışma yok, tek satırın bedeli başarısız bir yükleme
+turundan düşük.
+
+Cihaz derlemesinde doğrulandı: anahtar artık hem üst düzeyde hem iç
+içe, ikisi de `AppIcon`.
+
+### Fotoğraf izni GEREKMİYOR
+
+"Galeriden" düğmesi SwiftUI `PhotosPicker` kullanıyor; süreç dışı
+çalıştığı için `NSPhotoLibraryUsageDescription` istemiyor.
+`UIImagePickerController`'ın `.photoLibrary` yoluna yalnızca
+simülatörde düşülüyor (`#if targetEnvironment(simulator)`), orada da
+izin açıklaması aranmıyor. Eksik sanıp eklemek, istemediğimiz bir izni
+mağaza sayfasında beyan etmek olurdu.
+
 ### AÇIK: `aps-environment` = development
 
 Entitlements dosyasında push ortamı `development` yazıyor. Xcode'un App
