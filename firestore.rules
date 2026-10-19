@@ -245,12 +245,17 @@ service cloud.firestore {
       // Malzeme, hareket kaydı, daire, ortak, şantiye fotoğrafı, gider,
       // tahsilat, daire fotoğrafı: aynı kalıp. Ortak SALT OKUR.
       //
-      // NOT — gizlilik kapsamı: bugün üye olan biri alıcı adlarını, bedelleri ve
-      // tahsilatları görebiliyor. ANALIZ.md (madde 18 / satır 355) bunun KVKK
-      // veri minimizasyonu açısından savunulması zor olduğunu söylüyor ve
-      // finansal/kişisel veriye de `partnerVisible` benzeri bir ayrım öneriyor.
-      // O ayrım MODELDE henüz yok; kural veri modelinin taşımadığı bir ayrımı
-      // uygulayamaz. Alan eklendiğinde buradaki `read` koşulu da daralacak.
+      // NOT — gizlilik kapsamı: üye olan biri bedelleri ve tahsilatları
+      // görebiliyor. ALICI ADLARINI GÖREMİYOR — onlar aşağıdaki
+      // `buyers/{apartmentId}` belgesine taşındı ve orası yalnızca
+      // yöneticiye açık. (Bu not eskiden alıcı adlarını da sayıyordu;
+      // 19 Eki'de düzeltildi, ayrım yapıldıktan sonra güncellenmemişti.
+      // Güvenlik kuralının yanındaki yanlış yorum, sonradan bakan birine
+      // yanlış şeyi düzelttirir.)
+      //
+      // Finansal veri için ANALIZ.md (madde 18 / satır 355) hâlâ geçerli:
+      // `partnerVisible` benzeri bir ayrım öneriyor, o ayrım MODELDE yok
+      // ve kural veri modelinin taşımadığı bir ayrımı uygulayamaz.
       match /materials/{docId} {
         allow read: if isMember(pid);
         allow create, update: if ownerWrite(pid);
