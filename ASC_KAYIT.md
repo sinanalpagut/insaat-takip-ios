@@ -454,17 +454,24 @@ kelimeler, iki URL, telif, App Review bilgileri, yayın şekli **manuel**.
 sayfada ayrıca isteniyordu (1.0 sayfasındakilerden farklı bir alan),
 girildi.
 
-**SIRADAKİ: derleme yükleme.** Xcode → Any iOS Device → Product →
-Archive → Distribute App → App Store Connect → Upload. Arşiv, User ID
-eklenmiş manifestoyu taşıyan koddan alınmalı (commit 83eff8d sonrası).
+**Derleme 19 Eki'de yüklendi** — 1.0 (169). Yüklemeden önce dışa
+aktarılıp mağaza imzalı paketin yetkileri okundu; `aps-environment`
+açık maddesi orada kapandı.
 
-Yüklemeden sonra iki kontrol: arşivdeki `.app` üzerinde
-`codesign -d --entitlements` ile `aps-environment` ve TestFlight'ta
-`[appcheck] jeton alındı` satırı.
+**SIRADAKİ:**
+1. İşlenme bitince 1.0 sayfasındaki **Build** bölümünden derlemeyi seç.
+2. **TestFlight'ta App Attest teyidi** — cihazda `[appcheck] jeton
+   alındı` satırı okunacak.
+3. Aynı kurulumda **girişin SMS ile sorunsuz** olduğu görülecek;
+   reCAPTCHA ekranı ÇIKMAMALI. Çıkarsa `aps-environment` production
+   olmasına rağmen sessiz doğrulama çalışmıyor demektir.
+4. Sonra **Add for Review**.
+
+**Gönderimden önce hâlâ açık:** hukuki metinlerin avukat incelemesi.
 
 ### Metadata'dan SONRA gelenler
-- [ ] **Derleme yüklenecek** — henüz ASC'de hiç build yok. Xcode →
-      Archive → Distribute → App Store Connect.
+- [x] **Derleme yüklendi** — 19 Eki 10:23 arşivi, 1.0 (169), arm64.
+      Yüklemeden önce dışa aktarılıp yetkileri okundu (yukarıda).
 - [ ] **TestFlight'ta App Attest teyidi** — mağaza derlemesinde de
       `[appcheck] jeton alındı` satırı okunacak. Bugünkü kanıt geliştirme
       imzalı derlemenin production ortamına zorlanmasıyla alındı; mağaza
