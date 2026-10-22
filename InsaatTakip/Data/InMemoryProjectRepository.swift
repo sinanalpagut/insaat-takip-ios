@@ -49,8 +49,31 @@ final class InMemoryProjectRepository: ProjectRepository {
 
     /// Sıra korunur. Bellek içinde "atomiklik" kendiliğinden sağlanır (tek aktör,
     /// tek geçiş); Firestore uygulamasında burası bir WriteBatch olacak.
+    /// Kurulum işaretleri — kuralın `establishToken` denetiminin taklidi.
+    private var establishTokens: [UUID: String] = [:]
+
+    /// Var olup bu kullanıcının OKUYAMADIĞI projeler (başkasının). Test kancası:
+    /// kural ikisini ayırt ettirmediği için ön okuma bunlara "okunamıyor" der,
+    /// kurulum yazması ise reddedilir.
+    var foreignProjectIds: Set<UUID> = []
+
     func apply(_ changes: [DocumentChange]) async throws {
+        // KURALIN TAKLİDİ, yazmadan ÖNCE: kurulum yalnızca belge yoksa ya da
+        // AYNI işaretle yeniden gönderiliyorsa geçer. Eskiden burada düz
+        // `upsert` vardı ve birim testleri "sunucuda var, yerelde yok"
+        // durumunu hiç üretemiyordu — ezme hatası bu yüzden görünmüyordu.
+        for change in changes {
+            guard case .createProject(let p, let token) = change else { continue }
+            if foreignProjectIds.contains(p.id) { throw RepositoryError.accessDenied }
+            if projects.contains(where: { $0.id == p.id }), establishTokens[p.id] != token {
+                throw RepositoryError.accessDenied
+            }
+        }
         for change in changes { apply(change) }
+    }
+
+    func probeProject(_ id: UUID) async throws -> ProjectProbe {
+        projects.contains { $0.id == id } && !foreignProjectIds.contains(id) ? .readable : .notReadable
     }
 
     private func apply(_ change: DocumentChange) {
@@ -70,7 +93,9 @@ final class InMemoryProjectRepository: ProjectRepository {
             } else {
                 upsert(value, into: &projects)
             }
-        case .createProject(let value):  upsert(value, into: &projects)
+        case .createProject(let value, let token):
+            establishTokens[value.id] = token
+            upsert(value, into: &projects)
         case .projectMembership(let pid, let uid, let op):
             if let i = projects.firstIndex(where: { $0.id == pid }) {
                 switch op {

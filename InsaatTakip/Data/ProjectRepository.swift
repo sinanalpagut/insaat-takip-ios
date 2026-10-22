@@ -113,7 +113,18 @@ enum DocumentChange {
     /// Ayrı durum olmasının sebebi kural: `allow create` hem `ownerUid` hem
     /// `memberUids` istiyor (sahiplik ve ilk üyelik aynı yazmada, açıkça).
     /// Birleştirilecek bir sunucu durumu da yok.
-    case createProject(Project)
+    ///
+    /// `establishToken` — KURULUM YALNIZCA BELGE YOKSA (22 Eki). Kural var
+    /// olan belgede işaretin EKLENMESİNİ ya da DEĞİŞMESİNİ reddediyor, yani
+    /// bu yazma sunucuda "yalnızca yoksa yaz". Yedekten geri yükleme
+    /// kimliği dosyadan aldığı için canlı bir projenin üzerine yazabiliyordu;
+    /// koruma yalnızca yerel listeye bakıyordu.
+    ///
+    /// İşaret YALNIZCA DEPO KATMANINDA yaşıyor, `Project` modelinde YOK. Aynı
+    /// işareti taşıyan tam yazma var olan belgede GEÇER (yeniden gönderim için
+    /// bilerek); işaret sunucudan okunup bir yazmaya geri konsaydı koruma
+    /// delinirdi.
+    case createProject(Project, establishToken: String)
     /// Üyelik kapısı — TEK öğe, hep dizi işlemi.
     ///
     /// Tam liste göndermek istemciyi sunucunun bilgisine hakem yapar; bu
@@ -205,4 +216,26 @@ protocol ProjectRepository {
     /// hareket akışı satırını birlikte gönderir. Yarısı yazılıp yarısı yazılmayan
     /// bir iptal, ortağa tutarsız bir tablo gösterirdi.
     func apply(_ changes: [DocumentChange]) async throws
+
+    /// Proje belgesi SUNUCUDA okunabiliyor mu (geri yüklemeden önce).
+    ///
+    /// Yerel önbellek değil sunucu: koruma tam da yerel listenin eksik olduğu
+    /// durumlar için. Ağ yoksa `RepositoryError.offline` fırlatır — geri
+    /// yükleme sunucu onayı olmadan başlamıyor.
+    func probeProject(_ id: UUID) async throws -> ProjectProbe
+}
+
+/// Sunucudaki proje belgesinin, okuyan kullanıcı açısından durumu.
+enum ProjectProbe: Equatable {
+    /// Belge var ve bu kullanıcı onun üyesi.
+    case readable
+    /// Okunamıyor: ya YOK ya da BAŞKASININ. Kural ikisini ayırt ettirmiyor
+    /// (var olmayan belgede `resource` boş, üyelik denetimi reddediyor).
+    /// Karar kurulum yazmasında kuraldan geliyor.
+    case notReadable
+}
+
+extension ProjectRepository {
+    /// Varsayılan: okunamıyor say — karar kurala kalır. Test sahteleri için.
+    func probeProject(_ id: UUID) async throws -> ProjectProbe { .notReadable }
 }

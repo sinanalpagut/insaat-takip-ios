@@ -32,6 +32,10 @@ struct DashboardView: View {
     @State private var paketSunumu: PaketSunumu?
     @State private var restoreSummary: ProjectViewModel.RestoreSummary?
     @State private var restoreError: String?
+    /// Geri yükleme YAPILMADI — neden ve ne yapılacağı.
+    @State private var restoreRefusal: ProjectViewModel.RestoreRefusal?
+    /// Onay birkaç saniyeyi geçti mi — geçtiyse bağlantı açıklaması.
+    @State private var slowRestore = false
 
     private var isAdmin: Bool { appState.isAdmin }
 
@@ -151,6 +155,19 @@ struct DashboardView: View {
             Button("Tamam", role: .cancel) { restoreError = nil }
         } message: {
             Text(restoreError ?? "")
+        }
+        .alert(restoreRefusal?.title ?? "",
+               isPresented: Binding(get: { restoreRefusal != nil },
+                                    set: { if !$0 { restoreRefusal = nil } })) {
+            Button("Tamam", role: .cancel) { restoreRefusal = nil }
+        } message: {
+            Text(restoreRefusal?.message ?? "")
+        }
+        .task(id: viewModel.restorePending) {
+            slowRestore = false
+            guard viewModel.restorePending else { return }
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if !Task.isCancelled { slowRestore = true }
         }
         .background(Palette.page.ignoresSafeArea())
         .navigationBarHidden(true)
@@ -734,11 +751,20 @@ struct DashboardView: View {
                     Text("Yedekten geri yükle")
                         .font(.manrope(13.5, .bold))
                         .foregroundColor(Palette.ink)
-                    Text("Dışa aktardığın Yedek.json dosyasını seç")
+                    // SUNUCU ONAYI BEKLENİYOR: proje panoda ANCAK iki aşama da
+                    // onaylanınca görünüyor. Ağ arada koparsa yazma kuyrukta
+                    // bekliyor; bunu söylemek, kişinin tekrar tekrar dosya
+                    // seçmesini önlüyor.
+                    Text(viewModel.restorePending
+                         ? (slowRestore ? "Bağlantı bekleniyor · sunucu onaylamadan tamamlanmış sayılmaz"
+                                        : "Sunucuya yazılıyor…")
+                         : "Dışa aktardığın Yedek.json dosyasını seç")
                         .font(.manrope(11.5, .medium))
                         .foregroundColor(Palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
+                if viewModel.restorePending { ProgressView().tint(Palette.textTertiary) }
             }
             .padding(14)
             .background(Palette.surface)
@@ -746,6 +772,7 @@ struct DashboardView: View {
             .dashedBorder(Palette.dashed, radius: 16)
         }
         .buttonStyle(.plain)
+        .disabled(viewModel.restorePending)
         .padding(.top, 10)
     }
 
@@ -762,10 +789,18 @@ struct DashboardView: View {
             do {
                 let data = try Data(contentsOf: url)
                 let backup = try ProjectExporter.decodeBackup(data)
-                guard let ozet = viewModel.restore(from: backup, user: appState.currentUser) else {
-                    return   // sebebi `restore` kendi şeridinde söylüyor
+                // "Geri yüklendi" ANCAK sunucu onayından sonra. Eskiden geri
+                // yükleme eşzamanlıydı ve uyarı sunucuya tek bayt gitmeden
+                // açılıyordu; ret gelirse 2,6 saniyelik "kaydedilemedi"
+                // şeridi o uyarının ARKASINDA kalıyordu.
+                let kullanici = appState.currentUser
+                Task {
+                    switch await viewModel.restore(from: backup, user: kullanici) {
+                    case .restored(let ozet): restoreSummary = ozet
+                    case .refused(.busy):     break
+                    case .refused(let red):   restoreRefusal = red
+                    }
                 }
-                restoreSummary = ozet
             } catch let error as ProjectExporter.BackupError {
                 restoreError = error.errorDescription
             } catch {

@@ -275,9 +275,11 @@ final class FirestoreProjectRepository: ProjectRepository {
 
         // 1. aşama — proje KURULUMU.
         for change in changes {
-            guard case .createProject(let project) = change else { continue }
+            guard case .createProject(let project, let token) = change else { continue }
+            var fields = try encode(project)
+            fields["establishToken"] = token
             try await db.collection("projects").document(project.id.uuidString)
-                .setData(try encode(project))
+                .setData(fields)
         }
 
         // 2. aşama — geri kalan her şey tek parti.
@@ -316,7 +318,7 @@ final class FirestoreProjectRepository: ProjectRepository {
                 } else {
                     upsert(p, into: &latest.projects)
                 }
-            case .createProject(let p):  upsert(p, into: &latest.projects)
+            case .createProject(let p, _): upsert(p, into: &latest.projects)
             case .projectMembership(let pid, let uid, let op):
                 if let i = latest.projects.firstIndex(where: { $0.id == pid }) {
                     switch op {
@@ -489,6 +491,20 @@ final class FirestoreProjectRepository: ProjectRepository {
     }
 
     private var writerUid: String { Auth.auth().currentUser?.uid ?? "" }
+
+    func probeProject(_ id: UUID) async throws -> ProjectProbe {
+        do {
+            let snap = try await db.collection("projects").document(id.uuidString)
+                .getDocument(source: .server)
+            return snap.exists ? .readable : .notReadable
+        } catch {
+            switch RepositoryError.classify(error) {
+            case .accessDenied?: return .notReadable
+            case .offline?:      throw RepositoryError.offline
+            default:             throw error
+            }
+        }
+    }
 
     // MARK: - Proje belgesinin yazma yükü
 

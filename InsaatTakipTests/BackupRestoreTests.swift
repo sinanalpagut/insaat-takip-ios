@@ -1,4 +1,5 @@
 import XCTest
+import FirebaseFirestore
 @testable import InsaatTakip
 
 /// Yedekten geri yükleme — madde 75.
@@ -13,6 +14,15 @@ final class BackupRestoreTests: XCTestCase {
 
     private let eskiSahip = "eski-uid"
     private let ortakUid = "ortak-uid"
+
+    /// Geri yükleme artık SUNUCU ONAYINI bekliyor ve sonucu `RestoreOutcome`
+    /// olarak döndürüyor. Bu yardımcı yalnızca başarıda özeti verir — eski
+    /// testlerin "geri yüklendi mi" sorusunun aynısı.
+    private func geriYukle(_ model: ProjectViewModel, _ yedek: ProjectExporter.Backup,
+                           _ user: User?) async -> ProjectViewModel.RestoreSummary? {
+        if case .restored(let ozet) = await model.restore(from: yedek, user: user) { return ozet }
+        return nil
+    }
 
     private func yeniKullanici() -> User {
         User(id: "yeni-uid", name: "Geri Yükleyen", role: .admin, phone: "+905550000001")
@@ -109,9 +119,10 @@ final class BackupRestoreTests: XCTestCase {
     // MARK: Mutlu yol
 
     /// JSON'a yazılıp geri okunan yedek, kayıtlarıyla birlikte dönmeli.
-    func testRoundTripRestoresRecords() throws {
+    func testRoundTripRestoresRecords() async throws {
         let yedek = try turAt(yedekKur())
-        let ozet = try XCTUnwrap(vm().restore(from: yedek, user: yeniKullanici()))
+        let ozetSonuc = await geriYukle(vm(), yedek, yeniKullanici())
+        let ozet = try XCTUnwrap(ozetSonuc)
 
         XCTAssertEqual(ozet.projectTitle, "145 Ada / 2 Parsel")
         XCTAssertEqual(ozet.apartments, 1)
@@ -129,11 +140,11 @@ final class BackupRestoreTests: XCTestCase {
     /// Yedeğin asıl senaryosu "telefon kayboldu, yeni hesapla giriyorum".
     /// `ownerUid` eski hesapta kalsaydı kurallar geri yükleyen kişiyi de
     /// dışarıda bırakırdı: dosya elde, veri erişilemez.
-    func testOwnershipMovesToRestoringUser() throws {
+    func testOwnershipMovesToRestoringUser() async throws {
         let model = vm()
         let yedek = try turAt(yedekKur())
         let kullanici = yeniKullanici()
-        _ = model.restore(from: yedek, user: kullanici)
+        _ = await geriYukle(model, yedek, kullanici)
 
         let proje = try XCTUnwrap(model.projects.first { $0.id == yedek.proje.id })
         XCTAssertEqual(proje.ownerUid, kullanici.id)
@@ -147,10 +158,10 @@ final class BackupRestoreTests: XCTestCase {
     ///
     /// Bir dosyanın içeriğine bakarak birine erişim açmak, davet akışının tüm
     /// denetimini atlamak olurdu.
-    func testPartnerAccessIsNotRestored() throws {
+    func testPartnerAccessIsNotRestored() async throws {
         let model = vm()
         let yedek = try turAt(yedekKur())
-        _ = model.restore(from: yedek, user: yeniKullanici())
+        _ = await geriYukle(model, yedek, yeniKullanici())
 
         let ortak = try XCTUnwrap(model.partners(for: yedek.proje.id).first)
         XCTAssertEqual(ortak.name, "Serkan Aydın")
@@ -162,10 +173,10 @@ final class BackupRestoreTests: XCTestCase {
     ///
     /// Yedekteki malzeme toplamları bilerek bozuldu (999 ton / 999.999 ₺).
     /// Geri yükleme onlara güvenseydi stok ekranı ilk açılışta yalan söylerdi.
-    func testDerivedTotalsAreRecomputedNotTrusted() throws {
+    func testDerivedTotalsAreRecomputedNotTrusted() async throws {
         let model = vm()
         let yedek = try turAt(yedekKur())
-        _ = model.restore(from: yedek, user: yeniKullanici())
+        _ = await geriYukle(model, yedek, yeniKullanici())
 
         let malzeme = try XCTUnwrap(model.materials(for: yedek.proje.id).first)
         XCTAssertEqual(malzeme.totalIn, 12, "toplam giren hareketten hesaplanmalı")
@@ -173,10 +184,10 @@ final class BackupRestoreTests: XCTestCase {
     }
 
     /// Tahsil edilen tutar da ham tahsilatlardan hesaplanmalı.
-    func testCollectedAmountIsRecomputed() throws {
+    func testCollectedAmountIsRecomputed() async throws {
         let model = vm()
         let yedek = try turAt(yedekKur())
-        _ = model.restore(from: yedek, user: yeniKullanici())
+        _ = await geriYukle(model, yedek, yeniKullanici())
 
         let daire = try XCTUnwrap(model.apartments(for: yedek.proje.id).first)
         XCTAssertEqual(daire.paidAmount, Kurus.kurus(85_000_000))
@@ -190,29 +201,32 @@ final class BackupRestoreTests: XCTestCase {
     /// Üzerine yazmak, yedekten YENİ olan veriyi geri dönüşsüz yok etmek
     /// olurdu. Birleştirme de yok: iki kaydın hangisinin doğru olduğunu kimse
     /// bilemez.
-    func testExistingProjectIsNotOverwritten() throws {
+    func testExistingProjectIsNotOverwritten() async throws {
         let model = vm()
         let yedek = try turAt(yedekKur())
-        XCTAssertNotNil(model.restore(from: yedek, user: yeniKullanici()))
-        XCTAssertNil(model.restore(from: yedek, user: yeniKullanici()),
-                     "ikinci geri yükleme reddedilmeli")
+        let ilk = await geriYukle(model, yedek, yeniKullanici())
+        XCTAssertNotNil(ilk)
+        let ikinci = await model.restore(from: yedek, user: yeniKullanici())
+        XCTAssertEqual(ikinci, .refused(.alreadyLoaded), "ikinci geri yükleme reddedilmeli")
         XCTAssertEqual(model.projects.filter { $0.id == yedek.proje.id }.count, 1)
     }
 
     /// ORTAK GERİ YÜKLEYEMEZ — yazma yetkisi yönetici işi.
-    func testPartnerCannotRestore() throws {
+    func testPartnerCannotRestore() async throws {
         let yedek = try turAt(yedekKur())
         let ortak = User(id: "x", name: "Ortak", role: .partner, phone: "+905550000002")
-        XCTAssertNil(vm().restore(from: yedek, user: ortak))
+        let sonuc = await vm().restore(from: yedek, user: ortak)
+        XCTAssertEqual(sonuc, .refused(.notAdmin))
     }
 
     /// SAHİPSİZ KAYITLAR DÜŞÜRÜLÜR VE SAYILIR.
     ///
     /// Sessizce alınsalardı toplamlar hiçbir ekranda açıklanamayan bir farkla
     /// şişerdi; sessizce atılsalardı kullanıcı eksiği hiç öğrenemezdi.
-    func testOrphanRecordsAreDroppedAndCounted() throws {
+    func testOrphanRecordsAreDroppedAndCounted() async throws {
         let yedek = try turAt(yedekKur())
-        let ozet = try XCTUnwrap(vm().restore(from: yedek, user: yeniKullanici()))
+        let ozetSonuc = await geriYukle(vm(), yedek, yeniKullanici())
+        let ozet = try XCTUnwrap(ozetSonuc)
         XCTAssertEqual(ozet.droppedRecords, 2)
     }
 
@@ -220,10 +234,11 @@ final class BackupRestoreTests: XCTestCase {
     ///
     /// Yedek belgelerin kaydını taşıyor, dosyasını değil; kaydı geri yüklemek
     /// dokunulduğunda açılmayan satırlar üretirdi.
-    func testDocumentsAreReportedNotRestored() throws {
+    func testDocumentsAreReportedNotRestored() async throws {
         let model = vm()
         let yedek = try turAt(yedekKur())
-        let ozet = try XCTUnwrap(model.restore(from: yedek, user: yeniKullanici()))
+        let ozetSonuc = await geriYukle(model, yedek, yeniKullanici())
+        let ozet = try XCTUnwrap(ozetSonuc)
         XCTAssertEqual(ozet.skippedDocuments, 1)
         XCTAssertTrue(model.documents.filter { $0.projectId == yedek.proje.id }.isEmpty)
     }
@@ -275,7 +290,7 @@ final class BackupRestoreTests: XCTestCase {
     }
 
     /// Eski sürüm yedek gerçekten GERİ YÜKLENİYOR — yalnızca çözülmesi yetmez.
-    func testOlderVersionBackupRestores() throws {
+    func testOlderVersionBackupRestores() async throws {
         let pid = UUID().uuidString
         let aid = UUID().uuidString
         let eski = """
@@ -294,7 +309,8 @@ final class BackupRestoreTests: XCTestCase {
 
         let yedek = try ProjectExporter.decodeBackup(eski)
         let model = vm()
-        let ozet = try XCTUnwrap(model.restore(from: yedek, user: yeniKullanici()))
+        let ozetSonuc = await geriYukle(model, yedek, yeniKullanici())
+        let ozet = try XCTUnwrap(ozetSonuc)
         XCTAssertEqual(ozet.apartments, 1)
         XCTAssertEqual(ozet.ledgerEntries, 0, "olmayan cari hesap sıfır sayılmalı, çökmemeli")
         XCTAssertTrue(model.projects.contains { $0.id.uuidString == pid })
@@ -326,8 +342,9 @@ final class BackupRestoreTests: XCTestCase {
     /// "Geri yüklendi" deyip belgelerin gelmediğini yutmak, doğru bir cümleyle
     /// yanlış bir izlenim bırakmak olurdu — bu uygulamanın tekrar tekrar
     /// düzelttiği hatanın aynısı.
-    func testMessageStatesWhatDidNotComeBack() throws {
-        let ozet = try XCTUnwrap(vm().restore(from: turAt(yedekKur()), user: yeniKullanici()))
+    func testMessageStatesWhatDidNotComeBack() async throws {
+        let ozetSonuc = await geriYukle(vm(), try turAt(yedekKur()), yeniKullanici())
+        let ozet = try XCTUnwrap(ozetSonuc)
         let metin = ozet.message
 
         XCTAssertTrue(metin.contains("145 Ada / 2 Parsel"))
@@ -339,7 +356,7 @@ final class BackupRestoreTests: XCTestCase {
 
     /// Alıcı adı içermeyen yedek (ortak görünümünden alınmış) SÖYLENMELİ:
     /// yönetici, alıcıların neden boş olduğunu yoksa anlamaz.
-    func testMessageWarnsWhenBuyersMissing() throws {
+    func testMessageWarnsWhenBuyersMissing() async throws {
         var yedek = yedekKur()
         yedek = ProjectExporter.Backup(
             surum: yedek.surum, olusturma: yedek.olusturma, aliciDahil: false,
@@ -350,14 +367,15 @@ final class BackupRestoreTests: XCTestCase {
             ortakCari: yedek.ortakCari,
             belgeler: yedek.belgeler, alicilar: [], denetimIzi: yedek.denetimIzi)
 
-        let ozet = try XCTUnwrap(vm().restore(from: turAt(yedek), user: yeniKullanici()))
+        let ozetSonuc = await geriYukle(vm(), try turAt(yedek), yeniKullanici())
+        let ozet = try XCTUnwrap(ozetSonuc)
         XCTAssertFalse(ozet.buyersIncluded)
         XCTAssertTrue(ozet.message.contains("Alıcı adları yedeğe girmemiş"))
     }
 
     /// Temiz bir yedekte GEREKSİZ uyarı çıkmamalı — her seferinde uyaran bir
     /// özet, okunmayan bir özet olur.
-    func testMessageIsQuietWhenNothingWasLost() throws {
+    func testMessageIsQuietWhenNothingWasLost() async throws {
         let pid = UUID()
         let tarih = Date(timeIntervalSince1970: 1_750_000_000)
         let proje = Project(id: pid, blockNumber: "900", parcelNumber: "7",
@@ -375,7 +393,8 @@ final class BackupRestoreTests: XCTestCase {
             daireler: [daire], tahsilatlar: [], taksitler: [], ortaklar: [],
             ortakCari: nil, belgeler: [], alicilar: [], denetimIzi: [])
 
-        let ozet = try XCTUnwrap(vm().restore(from: turAt(temiz), user: yeniKullanici()))
+        let ozetSonuc = await geriYukle(vm(), try turAt(temiz), yeniKullanici())
+        let ozet = try XCTUnwrap(ozetSonuc)
         let metin = ozet.message
         XCTAssertFalse(metin.contains("GERİ YÜKLENMEDİ"))
         XCTAssertFalse(metin.contains("atlandı"))
@@ -410,5 +429,176 @@ final class BackupRestoreTests: XCTestCase {
     /// Oturum yoksa dosya üretilmez — sahiplik çözülemiyor.
     func testExportNeedsAUser() {
         XCTAssertTrue(vm().exportOwnedFiles(user: nil).isEmpty)
+    }
+
+    // MARK: - Canlı belge ezilmez (22 Eki 2026)
+
+    /// Kurulumu reddeden sunucu: proje kimliği BAŞKASININ projesine ait.
+    /// Kural reddini birebir taklit ediyor — geri kalan her şeyi bellek içi
+    /// depoya bırakıyor.
+    private final class KurulumuReddedenDepo: ProjectRepository {
+        let ic = InMemoryProjectRepository()
+        func cachedSnapshot() -> DataSnapshot { ic.cachedSnapshot() }
+        func load() async throws -> DataSnapshot { try await ic.load() }
+        func apply(_ changes: [InsaatTakip.DocumentChange]) async throws {
+            if changes.contains(where: { if case .createProject = $0 { return true } else { return false } }) {
+                throw RepositoryError.accessDenied
+            }
+            try await ic.apply(changes)
+        }
+    }
+
+    private func yazmaBitsin(_ model: ProjectViewModel) async {
+        for _ in 0..<200 {
+            if model.pendingWrites == 0 { return }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        XCTFail("yazma kuyruğu boşalmadı")
+    }
+
+    /// ASIL KUSUR: sahibin projesi sunucuda duruyor ama yerelde yok
+    /// (alt koleksiyonu çözülemeyip `failedProjects`e düştü, ya da soğuk
+    /// açılışta liste henüz boş). Geri yükleme o canlı belgeyi EZMEMELİ.
+    ///
+    /// Eskiden koruma yalnızca yerel listeye bakıyordu ve yazma tam setData
+    /// oluyordu: ortaklar düşüyor, ilerleme yedekteki eski değere dönüyordu.
+    func testSunucudaOlanYereldeOlmayanProjeEzilmiyor() async {
+        let repo = InMemoryProjectRepository()
+        let yedek = yedekKur()
+        var canli = yedek.proje
+        canli.ownerUid = "yeni-uid"
+        canli.memberUids = ["yeni-uid", "uid-ortak"]
+        canli.progress = 77
+        repo.projects.append(canli)
+
+        let model = ProjectViewModel(repository: repo)
+        model.projects.removeAll { $0.id == canli.id }   // yerelde YOK
+
+        let sonuc = await model.restore(from: yedek, user: yeniKullanici())
+        await yazmaBitsin(model)
+
+        XCTAssertEqual(sonuc, .refused(.existsOnServerOwn))
+        let sunucu = repo.projects.first { $0.id == canli.id }
+        XCTAssertEqual(sunucu?.memberUids.contains("uid-ortak"), true,
+                       "geri yükleme canlı belgeyi ezdi — ortak düştü")
+        XCTAssertEqual(sunucu?.progress, 77, "canlı ilerleme yedekteki eski değere döndü")
+    }
+
+    /// Sunucu kurulumu reddederse ekranda HAYALET proje kalmamalı.
+    ///
+    /// Eskiden yerel diziler yazmadan ÖNCE güncelleniyordu ve geri alınmıyordu:
+    /// proje tam etkileşimli görünüyor, her düzenleme "kaydedilemedi" veriyor,
+    /// sonraki yenilemede sessizce kayboluyordu — "Geri yüklendi" uyarısı ise
+    /// sunucuya tek bayt gitmeden açılmıştı.
+    func testSunucuReddederseHayaletProjeKalmiyor() async {
+        let model = ProjectViewModel(repository: KurulumuReddedenDepo())
+        let yedek = yedekKur()
+
+        let sonuc = await model.restore(from: yedek, user: yeniKullanici())
+        await yazmaBitsin(model)
+
+        XCTAssertEqual(sonuc, .refused(.existsOnServerOther))
+        XCTAssertFalse(model.projects.contains { $0.id == yedek.proje.id },
+                       "sunucu reddetti ama proje ekranda duruyor")
+        XCTAssertFalse(model.apartments.contains { $0.projectId == yedek.proje.id },
+                       "reddedilen geri yüklemenin daireleri ekranda kaldı")
+    }
+
+    // MARK: - Yarım kalan geri yükleme, başka hesabın projesi, ağsızlık
+
+    /// Testler arası sızmasın diye her test kendi işaret deposunu kullanıyor.
+    private func yalitilmis(_ model: ProjectViewModel) -> ProjectViewModel {
+        model.restoreTokens = ProjectViewModel.RestoreTokenStore(
+            defaults: UserDefaults(suiteName: "restore-test-\(UUID().uuidString)")!)
+        return model
+    }
+
+    /// Kayıt partisini BİR KEZ düşüren sunucu: kurulum gitti, kayıtlar gitmedi
+    /// — uygulamanın iki aşama arasında kapanmasının ya da ağın kopmasının
+    /// birebir modeli.
+    private final class KayitlariBirKezDusurenDepo: ProjectRepository {
+        let ic = InMemoryProjectRepository()
+        var dusur = true
+        func cachedSnapshot() -> DataSnapshot { ic.cachedSnapshot() }
+        func load() async throws -> DataSnapshot { try await ic.load() }
+        func apply(_ changes: [InsaatTakip.DocumentChange]) async throws {
+            let kurulum = changes.contains { if case .createProject = $0 { return true } else { return false } }
+            if !kurulum, dusur { dusur = false; throw RepositoryError.offline }
+            try await ic.apply(changes)
+        }
+        func probeProject(_ id: UUID) async throws -> ProjectProbe { try await ic.probeProject(id) }
+    }
+
+    /// YARIM KALAN GERİ YÜKLEME AYNI DOSYAYLA TAMAMLANIR.
+    ///
+    /// Eskiden geriye boş bir kabuk kalıyordu ve yeniden deneme bir daha
+    /// tamamlanamıyordu: yeni işaret, kabuğun işaretinden farklı olduğu için
+    /// kural reddederdi. İşaret diskte saklandığı için ikinci deneme AYNI
+    /// işareti gönderiyor ve kural ona izin veriyor.
+    func testYarimKalanGeriYuklemeAyniDosyaylaTamamlanir() async throws {
+        let depo = KayitlariBirKezDusurenDepo()
+        let model = yalitilmis(ProjectViewModel(repository: depo))
+        let yedek = try turAt(yedekKur())
+
+        let ilk = await model.restore(from: yedek, user: yeniKullanici())
+        XCTAssertEqual(ilk, .refused(.partial))
+        XCTAssertFalse(model.projects.contains { $0.id == yedek.proje.id },
+                       "yarım geri yükleme panoda tamamlanmış gibi görünüyor")
+        XCTAssertTrue(depo.ic.projects.contains { $0.id == yedek.proje.id },
+                      "test kurgusu: kabuk sunucuda olmalıydı")
+
+        let ikinci = await model.restore(from: yedek, user: yeniKullanici())
+        guard case .restored = ikinci else {
+            return XCTFail("aynı dosyayla devam edilemedi: \(ikinci)")
+        }
+        XCTAssertTrue(depo.ic.apartments.contains { $0.projectId == yedek.proje.id },
+                      "kayıtlar sunucuya yazılmadı")
+        XCTAssertNil(model.restoreTokens.token(for: yedek.proje.id),
+                     "başarıdan sonra işaret silinmedi")
+    }
+
+    /// BAŞKA HESABIN PROJESİ: hiçbir şey yazılmaz, işaret de tutulmaz.
+    func testBaskaHesabinProjesineYazilmiyor() async throws {
+        let repo = InMemoryProjectRepository()
+        let yedek = try turAt(yedekKur())
+        repo.foreignProjectIds = [yedek.proje.id]
+        let model = yalitilmis(ProjectViewModel(repository: repo))
+
+        let sonuc = await model.restore(from: yedek, user: yeniKullanici())
+        XCTAssertEqual(sonuc, .refused(.existsOnServerOther))
+        XCTAssertFalse(repo.apartments.contains { $0.projectId == yedek.proje.id })
+        XCTAssertNil(model.restoreTokens.token(for: yedek.proje.id),
+                     "kesin retten sonra işaret kaldı")
+    }
+
+    /// Ağ yokken geri yükleme BAŞLAMAZ — yarım kalmasın, hayalet bırakmasın.
+    private final class AgsizDepo: ProjectRepository {
+        let ic = InMemoryProjectRepository()
+        func cachedSnapshot() -> DataSnapshot { ic.cachedSnapshot() }
+        func load() async throws -> DataSnapshot { try await ic.load() }
+        func apply(_ changes: [InsaatTakip.DocumentChange]) async throws { try await ic.apply(changes) }
+        func probeProject(_ id: UUID) async throws -> ProjectProbe { throw RepositoryError.offline }
+    }
+
+    func testAgYokkenGeriYuklemeBaslamaz() async throws {
+        let depo = AgsizDepo()
+        let model = yalitilmis(ProjectViewModel(repository: depo))
+        let yedek = try turAt(yedekKur())
+
+        let sonuc = await model.restore(from: yedek, user: yeniKullanici())
+        XCTAssertEqual(sonuc, .refused(.offline))
+        XCTAssertFalse(depo.ic.projects.contains { $0.id == yedek.proje.id }, "ağsızken yazma başladı")
+        XCTAssertFalse(model.projects.contains { $0.id == yedek.proje.id })
+    }
+
+    /// İŞARET MODELE SIZMAZ. Aynı işareti taşıyan tam yazma var olan belgede
+    /// kuraldan GEÇER (yeniden gönderim için bilerek); işaret sıradan bir
+    /// düzenlemenin yüküne girseydi koruma delinirdi.
+    func testIsaretSiradanDuzenlemeYukuneGirmiyor() throws {
+        let proje = try turAt(yedekKur()).proje
+        let yuk = try FirestoreProjectRepository.projectFields(proje, writerUid: "sahip")
+        XCTAssertNil(yuk["establishToken"])
+        XCTAssertNil(try Firestore.Encoder().encode(proje)["establishToken"],
+                     "işaret Project modeline girmiş")
     }
 }

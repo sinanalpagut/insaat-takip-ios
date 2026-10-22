@@ -222,7 +222,8 @@ service cloud.firestore {
       // koymadan proje kurup sonra okuyamamak mümkün olmasın.
       allow create: if signedIn()
                     && request.resource.data.ownerUid == uid()
-                    && uid() in request.resource.data.memberUids;
+                    && uid() in request.resource.data.memberUids
+                    && establishTokenShape();
 
       // Sahiplik DEVREDİLEMEZ ve kimse kendini sahip yapamaz.
       //
@@ -234,7 +235,38 @@ service cloud.firestore {
       // yapılacak; işlev kodu doğrular ve üyeliği yönetici adına yazar.
       allow update: if isOwner(pid)
                     && request.resource.data.ownerUid == resource.data.ownerUid
-                    && uid() in request.resource.data.memberUids;
+                    && uid() in request.resource.data.memberUids
+                    && establishTokenUnchanged();
+
+      // ── KURULUM YALNIZCA BELGE YOKSA ───────────────────────────────────
+      //
+      // Kurulum yazması (`.createProject`) rastgele bir dize işaret taşıyor.
+      // Var olmayan belgeye yazma `create`: işaret yalnızca BİÇİM olarak
+      // denetleniyor. Var olan belgeye yazma `update`: işaretin EKLENMESİ ya
+      // da DEĞİŞMESİ reddediliyor. Sonuç: kurulum sunucuda "yalnızca yoksa
+      // yaz" — yedekten geri yükleme, istemci ne bilirse bilsin, canlı bir
+      // projenin üzerine yazamıyor.
+      //
+      // Create'te işaret ZORUNLU DEĞİL: derleme 169 ve Android işaret
+      // göndermiyor; zorunlu olsa kurulumları kırılırdı.
+      //
+      // `in` BİÇİMİ ŞART. 169 işareti tanımıyor ve merge'siz TAM yazması onu
+      // DÜŞÜRÜYOR; "istekte yoksa geç" koşulu bu yüzden var. `get(k, null) ==
+      // get(k, null)` biçimi düşen alanı null sayıp 169'un her düzenlemesini
+      // reddederdi (bekçi testleri: "169 işaretli projede").
+      //
+      // BİLİNEN SINIR: 169'un kendi geri yüklemesi işaret taşımadığı için
+      // sıradan bir düzenlemeden ayırt edilemiyor (testte belgelendi).
+      function establishTokenShape() {
+        return !('establishToken' in request.resource.data)
+            || (request.resource.data.establishToken is string
+                && request.resource.data.establishToken.size() <= 64);
+      }
+      function establishTokenUnchanged() {
+        return !('establishToken' in request.resource.data)
+            || ('establishToken' in resource.data
+                && request.resource.data.establishToken == resource.data.establishToken);
+      }
 
       // Proje silme henüz hiçbir ekranda yok; açıldığında alt koleksiyonların da
       // temizlenmesi gerekir (istemci bunu atomik yapamaz) → Cloud Function.

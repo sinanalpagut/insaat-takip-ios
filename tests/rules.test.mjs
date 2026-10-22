@@ -453,6 +453,64 @@ describe('derleme 169 ile uyum — istemci yazma biçimleri', () => {
     await assertSucceeds(batch.commit());
   });
 
+  it('169’un KURULUMU kabul ediliyor — işaretsiz, cihaz saatli createdAt', async () => {
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', 'k169-kurulum'), stamped(OWNER, {
+      id: 'k169-kurulum', ownerUid: OWNER, memberUids: [OWNER],
+      blockNumber: '1', parcelNumber: '1', createdAt: new Date(),
+    })));
+  });
+
+  // İŞARETLİ PROJEDE 169. 169 `establishToken`i tanımıyor ve merge'siz TAM
+  // yazma onu DÜŞÜRÜYOR. Kural "işaret istekte VARSA eşit olmalı" diyor; istekte
+  // yoksa geçer. `get(k, null) == get(k, null)` biçimi BURADA 169'u KIRARDI
+  // (düşen alan null ≠ eski değer) — bu üç test o yanlış biçimi yakalar.
+  for (const [ad, ek] of [
+    ['düzenleme (TAM set)', { progress: 55 }],
+    ['ortak çıkarma (memberUids kısalıyor)', { memberUids: [OWNER] }],
+    ['arşivden çıkarma (archivedAt yükte yok)', {}],
+  ]) {
+    it(`169 işaretli projede: ${ad}`, async () => {
+      const pid = `k169-${ad.length}`;
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'projects', pid), {
+          id: pid, ownerUid: OWNER, memberUids: [OWNER, MEMBER], establishToken: 'tok-169',
+          blockNumber: '2', parcelNumber: '2', createdAt: new Date(), archivedAt: new Date(),
+        });
+      });
+      await assertSucceeds(setDoc(doc(ownerDb, 'projects', pid), stamped(OWNER, {
+        id: pid, ownerUid: OWNER, memberUids: [OWNER, MEMBER],
+        blockNumber: '2', parcelNumber: '2', createdAt: new Date(), ...ek,
+      })));
+    });
+  }
+
+  it('işaretli projede ortak çıkarma arrayRemove ile geçiyor (güncel iOS ve Android)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'projects', 'k169-ar'), {
+        id: 'k169-ar', ownerUid: OWNER, memberUids: [OWNER, MEMBER], establishToken: 'tok-ar',
+        blockNumber: '3', parcelNumber: '3', createdAt: new Date(),
+      });
+    });
+    await assertSucceeds(updateDoc(doc(ownerDb, 'projects', 'k169-ar'),
+      stamped(OWNER, { memberUids: arrayRemove(MEMBER) })));
+  });
+
+  it('BİLİNEN AÇIK: 169’un geri yüklemesi var olan belgeyi hâlâ ezebiliyor', async () => {
+    // 169 işaret göndermediği için kural onun geri yüklemesini kendi sıradan
+    // düzenlemesinden AYIRAMIYOR. Bu test bir söz değil, sınırın belgesi:
+    // düzeltme yalnızca güncel ve sonraki istemcileri koruyor.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'projects', 'k169-acik'), {
+        id: 'k169-acik', ownerUid: OWNER, memberUids: [OWNER, MEMBER],
+        blockNumber: '4', parcelNumber: '4', createdAt: new Date(),
+      });
+    });
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', 'k169-acik'), stamped(OWNER, {
+      id: 'k169-acik', ownerUid: OWNER, memberUids: [OWNER],
+      blockNumber: '4', parcelNumber: '4', createdAt: new Date(),
+    })));
+  });
+
   it('169’un merge’siz TAM proje yazması kabul ediliyor', async () => {
     // 169 her proje düzenlemesini `setData(encode(project))` ile, merge
     // OLMADAN yazıyor (madde 1 düzeltmesi sonra geldi).
@@ -461,6 +519,84 @@ describe('derleme 169 ile uyum — istemci yazma biçimleri', () => {
       blockNumber: '145', parcelNumber: '2', createdAt: new Date(),
       progress: 50, invite: { code: 'K7BAT2', createdAt: new Date() },
     })));
+  });
+});
+
+describe('proje kurulumu YALNIZCA belge yoksa — establishToken', () => {
+
+  // ───────────────────────────────────────────────────────────────────────
+  // KUSUR: `restore()` yedekteki kimlikle `.createProject` yazıyor ve "bu
+  // proje zaten var mı" sorusunu YALNIZCA yerel listeye soruyordu. Sahibin
+  // kendi projesi yerelde yoksa (alt koleksiyonu çözülemeyip `failedProjects`e
+  // düştüyse, ya da soğuk açılışta liste henüz boşken) yazma CANLI belgeye
+  // tam setData oluyordu: ortaklar düşüyor, davet aynası, arşiv ve fotoğraf
+  // sayacı siliniyordu — ve kural reddetmiyordu, çünkü sahiplik değişmiyor.
+  //
+  // DÜZELTME KURALDA: kurulum yazması rastgele bir dize işaret taşıyor; var
+  // olan belgede işaretin EKLENMESİ ya da DEĞİŞMESİ reddediliyor. Var olmayan
+  // belgeye yazma `create` sayıldığı için geçiyor. Yani kurulum sunucuda
+  // "yalnızca yoksa yaz" oldu — istemcinin ne bildiğinden bağımsız.
+  //
+  // NEDEN DİZE, ZAMAN DAMGASI DEĞİL: onayı kaybolmuş bir yazma AYNI yükle
+  // yeniden gönderilebiliyor; zaman damgalı işaret o yeniden gönderimi
+  // reddederdi (emülatörde ölçüldü). Aynı dize ise eşit, geçiyor.
+  // ───────────────────────────────────────────────────────────────────────
+
+  before(seed);
+
+  const kur = async (pid, alanlar) => testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'projects', pid), {
+      id: pid, ownerUid: OWNER, memberUids: [OWNER, MEMBER],
+      blockNumber: '300', parcelNumber: '1', createdAt: new Date(), ...alanlar,
+    });
+  });
+  const geriYukleme = (pid, token) => stamped(OWNER, {
+    id: pid, ownerUid: OWNER, memberUids: [OWNER],
+    blockNumber: '300', parcelNumber: '1', createdAt: new Date(),
+    establishToken: token,
+  });
+
+  it('İŞARETSİZ var olan projeye işaretli kurulum REDDEDİLİR — canlı belge ezilmez', async () => {
+    await kur('et-canli', { invite: { code: 'ABC234', createdAt: new Date() } });
+    await assertFails(setDoc(doc(ownerDb, 'projects', 'et-canli'), geriYukleme('et-canli', 'tok-1')));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const d = (await getDoc(doc(ctx.firestore(), 'projects', 'et-canli'))).data();
+      if (!d.memberUids.includes(MEMBER)) throw new Error('ortak düştü — belge ezildi');
+      if (d.invite?.code !== 'ABC234') throw new Error('davet aynası silindi');
+    });
+  });
+
+  it('BAŞKA işaretle kurulmuş projeye kurulum REDDEDİLİR', async () => {
+    await kur('et-baska', { establishToken: 'tok-eski' });
+    await assertFails(setDoc(doc(ownerDb, 'projects', 'et-baska'), geriYukleme('et-baska', 'tok-yeni')));
+  });
+
+  it('AYNI işaretle yeniden gönderim GEÇER — onayı kaybolan yazma ya da yarım kalan geri yükleme', async () => {
+    await kur('et-ayni', { establishToken: 'tok-ayni', memberUids: [OWNER] });
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', 'et-ayni'), geriYukleme('et-ayni', 'tok-ayni')));
+  });
+
+  it('belge YOKKEN işaretli kurulum GEÇER', async () => {
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', 'et-yeni'), geriYukleme('et-yeni', 'tok-yeni')));
+  });
+
+  it('işaret dize değilse kurulum REDDEDİLİR', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'projects', 'et-tip'),
+      { ...geriYukleme('et-tip', 'x'), establishToken: 42 }));
+  });
+
+  it('64 karakteri aşan işaret REDDEDİLİR', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'projects', 'et-uzun'), geriYukleme('et-uzun', 'x'.repeat(65))));
+  });
+
+  it('güncel istemcinin merge düzenlemesi işareti KORUR ve geçer', async () => {
+    await kur('et-merge', { establishToken: 'tok-m' });
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', 'et-merge'),
+      stamped(OWNER, { progress: 40, memberUids: arrayUnion(OWNER) }), { merge: true }));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const d = (await getDoc(doc(ctx.firestore(), 'projects', 'et-merge'))).data();
+      if (d.establishToken !== 'tok-m') throw new Error('merge işareti düşürdü');
+    });
   });
 });
 

@@ -49,6 +49,9 @@ final class ProjectViewModel: ObservableObject {
     /// `project.invite`e yer tutucu yazmamak: eskiden yazılan yerel kod hiçbir
     /// yere kaydedilmiyordu ama kopyalanıp paylaşılabiliyordu.
     @Published private(set) var invitePending: Set<UUID> = []
+    /// Geri yükleme sunucu onayını bekliyor.
+    @Published private(set) var restorePending = false
+    var restoreTokens = RestoreTokenStore()
 
     /// Bildirim zilindeki okunmamış işareti.
     @Published var hasUnreadActivity = true
@@ -612,13 +615,13 @@ final class ProjectViewModel: ObservableObject {
                 self.verifySeam(after: failureNote)
                 #endif
             } catch {
-                #if DEBUG
                 // Kullanıcıya kısa Türkçe mesaj gidiyor; ham hata görünmezse
                 // "kaydedilemedi" toast'ının NEDENİ hiçbir yerde okunamaz —
                 // oysa bu, yorumun "en sinsi hata sınıfı" dediği şeyin tam
-                // kendisi. Yalnızca DEBUG.
-                print("[persist] \(failureNote) başarısız: \(error)")
-                #endif
+                // kendisi. `Diag` sürüm derlemesinde de yazıyor: eskiden
+                // yalnızca DEBUG `print` vardı ve sahadaki bir reddin izi
+                // kalmıyordu.
+                Diag.log("persist", error)
                 self.flash("\(failureNote) kaydedilemedi")
             }
         }
@@ -1690,20 +1693,32 @@ final class ProjectViewModel: ObservableObject {
     private func recordAudit(recordId: UUID, projectId: UUID, subject: String,
                              action: AuditEntry.Action,
                              changes: [AuditEntry.Change]) -> [DocumentChange] {
+        let (entry, activity) = makeAudit(recordId: recordId, projectId: projectId,
+                                          subject: subject, action: action, changes: changes,
+                                          projectTitle: projects.first { $0.id == projectId }?.title ?? "")
+        auditEntries.insert(entry, at: 0)
+        activities.insert(activity, at: 0)
+        hasUnreadActivity = true
+        return [.audit(entry), .activity(activity)]
+    }
+
+    /// Denetim kaydı ve hareket satırı — YAN ETKİSİZ.
+    ///
+    /// `recordAudit` yerel dizilere de ekliyor. Sunucu onayından SONRA
+    /// görünmesi gereken yazmalar (geri yükleme) için ayrı: yoksa reddedilen
+    /// bir işlem, ekranda hayalet bir denetim ve hareket satırı bırakırdı.
+    private func makeAudit(recordId: UUID, projectId: UUID, subject: String,
+                           action: AuditEntry.Action, changes: [AuditEntry.Change],
+                           projectTitle: String) -> (AuditEntry, ActivityItem) {
         let entry = AuditEntry(id: UUID(), recordId: recordId, projectId: projectId,
                                subject: subject, action: action, changes: changes,
                                user: actorName, date: Date())
-        auditEntries.insert(entry, at: 0)
-
-        let projectTitle = projects.first { $0.id == projectId }?.title ?? ""
         let activity = ActivityItem(id: UUID(), projectId: projectId, kind: .edit,
                                     title: "\(subject) \(action.rawValue)",
                                     meta: [projectTitle, entry.summary]
                                          .filter { !$0.isEmpty }.joined(separator: " · "),
                                     timestamp: entry.date)
-        activities.insert(activity, at: 0)
-        hasUnreadActivity = true
-        return [.audit(entry), .activity(activity)]
+        return (entry, activity)
     }
 
     /// Hareket akışına satır ekler; kalıcılık kaydını da döndürür.
@@ -2766,6 +2781,90 @@ final class ProjectViewModel: ObservableObject {
     /// "Geri yüklendi" tek başına doğrulanabilir bir bilgi taşımıyor. Kullanıcı
     /// telefonunu kaybetmiş ve elinde tek bir dosya var; ona kaç dairenin, kaç
     /// tahsilatın geldiğini ve NEYİN GELMEDİĞİNİ söylemek zorundayız.
+    /// Geri yüklemenin sonucu. "Geri yüklendi" ANCAK sunucu iki aşamayı da
+    /// onayladıktan sonra — eskiden uyarı sunucuya tek bayt gitmeden açılıyordu.
+    enum RestoreOutcome: Equatable {
+        case restored(RestoreSummary)
+        case refused(RestoreRefusal)
+    }
+
+    /// Geri yükleme neden YAPILMADI. Her biri kişiye ne yapacağını söylüyor.
+    enum RestoreRefusal: Equatable {
+        case notAdmin
+        /// Proje panoda zaten var.
+        case alreadyLoaded
+        /// Sunucuda var ve BU kullanıcının — ama panoda yok (yüklenemedi).
+        case existsOnServerOwn
+        /// Sunucu kurulumu reddetti: bu kimlikte BAŞKA bir hesabın projesi var.
+        case existsOnServerOther
+        case offline
+        /// Proje kuruldu, kayıtlar yazılamadı — aynı dosyayla devam edilebilir.
+        case partial
+        /// Yazmanın sunucuya ulaşıp ulaşmadığı bilinmiyor.
+        case unverified
+        /// Başka bir geri yükleme sürüyor.
+        case busy
+
+        var title: String {
+            switch self {
+            case .notAdmin:            return "Geri yükleme yapılamadı"
+            case .alreadyLoaded:       return "Bu proje zaten duruyor"
+            case .existsOnServerOwn:   return "Bu proje sunucuda zaten var"
+            case .existsOnServerOther: return "Bu proje başka bir hesapta"
+            case .offline:             return "İnternet bağlantısı gerekiyor"
+            case .partial:             return "Geri yükleme yarım kaldı"
+            case .unverified:          return "Sonuç doğrulanamadı"
+            case .busy:                return "Geri yükleme sürüyor"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .notAdmin:
+                return "Yedekten geri yükleme yalnızca proje yöneticisine açık."
+            case .alreadyLoaded:
+                return "Geri yükleme var olan bir projenin üzerine yazmaz — yedekten sonra girilen "
+                     + "kayıtlar kaybolmasın diye. Proje panoda duruyor."
+            case .existsOnServerOwn:
+                return "Hiçbir şey yazılmadı. Proje senin hesabında ama panoya yüklenemedi; panoyu "
+                     + "aşağı çekip yenile, yüklenemeyen projeler panodaki uyarıda görünür. Geri "
+                     + "yükleme var olan bir projenin üzerine yazmaz."
+            case .existsOnServerOther:
+                // "Yedeği alan hesap" DEĞİL: yedek bir ortak görünümünden de
+                // alınmış olabilir. Sahip olan hesap aranıyor.
+                return "Hiçbir şey yazılmadı. Bu kimlikte bir proje sunucuda başka bir hesaba ait "
+                     + "olabilir. Telefon numaran değiştiyse yedekteki projenin sahibi olan "
+                     + "numarayla giriş yap; numara elinde değilse operatörden aynı numaraya yeni "
+                     + "SIM alınabilir."
+            case .offline:
+                return "Geri yükleme sunucu onayı olmadan başlamıyor; hiçbir şey yazılmadı. "
+                     + "Bağlanınca aynı dosyayla tekrar dene."
+            case .partial:
+                return "Proje kuruldu ama kayıtları yazılamadı. Aynı dosyayla tekrar dene — "
+                     + "kaldığı yerden tamamlanır."
+            case .unverified:
+                return "Geri yüklemenin sunucuya ulaşıp ulaşmadığı bilinmiyor. Aynı dosyayla "
+                     + "tekrar dene; kaldığı yerden devam eder."
+            case .busy:
+                return "Önceki geri yükleme bitince tekrar dene."
+            }
+        }
+    }
+
+    /// Yarım kalan geri yükleme için kurulum işareti — DİSKTE.
+    ///
+    /// Uygulama iki aşama arasında kapanırsa sunucuda boş bir kabuk kalıyor.
+    /// Yeni işaretle yeniden deneme kuraldan reddedilir; saklanan işaret
+    /// aynı dosyayla devam etmeyi mümkün kılıyor. Başarıda ve kesin retde
+    /// siliniyor.
+    struct RestoreTokenStore {
+        var defaults: UserDefaults = .standard
+        private func anahtar(_ pid: UUID) -> String { "restore.establishToken.\(pid.uuidString)" }
+        func token(for pid: UUID) -> String? { defaults.string(forKey: anahtar(pid)) }
+        func save(_ token: String, for pid: UUID) { defaults.set(token, forKey: anahtar(pid)) }
+        func clear(_ pid: UUID) { defaults.removeObject(forKey: anahtar(pid)) }
+    }
+
     struct RestoreSummary: Equatable {
         var projectTitle = ""
         var apartments = 0
@@ -2852,13 +2951,36 @@ final class ProjectViewModel: ObservableObject {
     /// SAHİPSİZ KAYIT DÜŞÜRÜLÜR VE SAYILIR. Ait olduğu daire ya da malzeme
     /// yedekte yoksa kayıt alınmıyor; sessizce alınsaydı toplamlar hiçbir
     /// ekranda açıklanamayan bir farkla şişerdi.
-    @discardableResult
-    func restore(from backup: ProjectExporter.Backup, user: User?) -> RestoreSummary? {
-        guard let user, user.role == .admin else { return nil }
+    func restore(from backup: ProjectExporter.Backup, user: User?) async -> RestoreOutcome {
+        guard let user, user.role == .admin else { return .refused(.notAdmin) }
         let pid = backup.proje.id
-        guard !projects.contains(where: { $0.id == pid }) else {
-            flash("Bu proje zaten duruyor · geri yükleme yapılmadı")
-            return nil
+        guard !projects.contains(where: { $0.id == pid }) else { return .refused(.alreadyLoaded) }
+        // İkinci dokunuş yok sayılır: iki geri yükleme aynı kimliğe yarışırdı.
+        guard !restorePending else { return .refused(.busy) }
+        restorePending = true
+        defer { restorePending = false }
+
+        // ---- 1) Sunucuya sor ------------------------------------------------
+        //
+        // YEREL LİSTE YETMİYOR (22 Eki). Sahibin projesi yerelde olmayabilir:
+        // alt koleksiyonu çözülemeyip `failedProjects`e düşmüş, ya da soğuk
+        // açılışta liste henüz boş. Eskiden koruma yalnızca yerel listeye
+        // bakıyordu ve yazma CANLI belgeye tam setData oluyordu: ortaklar
+        // düşüyor, ilerleme yedekteki eski değere dönüyordu.
+        //
+        // Asıl sigorta KURALDA (`establishToken`): bu ön okuma yalnızca
+        // sebebi doğru söylemek ve ağ yokken yazmaya hiç başlamamak için.
+        // Okunabiliyorsa proje bu kullanıcının; ama elde bu proje için
+        // SAKLANMIŞ bir işaret varsa önceki deneme yarım kalmıştır ve devam
+        // edilir — kural aynı işarete izin veriyor.
+        let saklanan = restoreTokens.token(for: pid)
+        do {
+            if try await repository.probeProject(pid) == .readable, saklanan == nil {
+                return .refused(.existsOnServerOwn)
+            }
+        } catch {
+            Diag.log("restore", error)
+            return .refused(Self.restoreRefusal(for: error, stage: .probe))
         }
 
         var ozet = RestoreSummary()
@@ -2921,7 +3043,75 @@ final class ProjectViewModel: ObservableObject {
         // Ortakların erişimi geri VERİLMİYOR; kimlikleri kopuyor.
         for i in ortaklar.indices { ortaklar[i].userUid = nil }
 
-        // ---- Belleğe al ----------------------------------------------------
+        // ---- 2) Yazma planı — ekran HENÜZ değişmiyor ---------------------
+        var rest: [DocumentChange] = []
+        rest += malzemeler.map { .material($0) }
+        rest += daireler.map { .apartment($0) }
+        rest += hareketler.map { .materialLog($0) }
+        rest += giderler.map { .expense($0) }
+        rest += tahsilatlar.map { .payment($0) }
+        rest += taksitler.map { .installment($0) }
+        rest += ortaklar.map { .partner($0) }
+        rest += cari.map { .partnerLedger($0) }
+        rest += aliciKayitlari.map { .buyer($0) }
+        rest += denetim.map { .audit($0) }
+
+        // Geri yüklemenin KENDİSİ de denetim izine giriyor: veri bir dosyadan
+        // geldiyse bu, kaydın geçmişinin bir parçası. `makeAudit` YAN ETKİSİZ:
+        // reddedilen bir geri yükleme ekranda hayalet satır bırakmasın.
+        let (kendiDenetim, kendiHareket) = makeAudit(
+            recordId: pid, projectId: pid, subject: proje.title, action: .create,
+            changes: [.init(field: "Yedekten geri yükleme", oldValue: "—",
+                            newValue: Fmt.shortDate(backup.olusturma) + " yedeği")],
+            projectTitle: proje.title)
+        rest += [.audit(kendiDenetim), .activity(kendiHareket)]
+
+        // ---- 3) Kurulum — sunucuda YALNIZCA belge yoksa ---------------------
+        //
+        // İşaret DİSKE yazılıyor: uygulama iki aşama arasında kapanırsa geriye
+        // boş bir kabuk kalıyordu ve aynı dosyayla yeniden deneme bir daha
+        // tamamlanamıyordu (yeni işaret = kural reddi). Aynı işaret kabuğu
+        // tamamlamaya izin veriyor.
+        let isaret = saklanan ?? UUID().uuidString
+        restoreTokens.save(isaret, for: pid)
+        do {
+            try await repository.apply([.createProject(proje, establishToken: isaret)])
+        } catch {
+            Diag.log("restore", error)
+            let red = Self.restoreRefusal(for: error, stage: .establish)
+            // Kural reddi kesin: bu kimlik BAŞKA bir belgeye ait, işaret işe
+            // yaramaz. Diğerlerinde yazma gitmiş OLABİLİR; işaret kalıyor ki
+            // aynı dosyayla devam edilebilsin.
+            if red == .existsOnServerOther { restoreTokens.clear(pid) }
+            return .refused(red)
+        }
+
+        // ---- 4) Kayıtlar — tek parti ----------------------------------------
+        do {
+            try await repository.apply(rest)
+        } catch {
+            Diag.log("restore", error)
+            return .refused(.partial)
+        }
+        restoreTokens.clear(pid)
+
+        // ---- 5) Ekran — ANCAK sunucu onayından sonra ------------------------
+        //
+        // Eskiden yerel diziler yazmadan ÖNCE güncelleniyordu ve geri
+        // alınmıyordu; "Geri yüklendi" uyarısı sunucuya tek bayt gitmeden
+        // açılıyordu. Kimliğe göre yerleştiriliyor: beklerken bir yenileme
+        // kabuğu ya da kayıtları zaten getirmiş olabilir.
+        projects.removeAll { $0.id == pid }
+        materials.removeAll { $0.projectId == pid }
+        apartments.removeAll { $0.projectId == pid }
+        materialLogs.removeAll { $0.projectId == pid }
+        expenses.removeAll { $0.projectId == pid }
+        payments.removeAll { $0.projectId == pid }
+        installments.removeAll { $0.projectId == pid }
+        partners.removeAll { $0.projectId == pid }
+        partnerLedger.removeAll { $0.projectId == pid }
+        auditEntries.removeAll { $0.projectId == pid }
+
         projects.append(proje)
         materials.append(contentsOf: malzemeler)
         apartments.append(contentsOf: daireler)
@@ -2932,37 +3122,14 @@ final class ProjectViewModel: ObservableObject {
         partners.append(contentsOf: ortaklar)
         partnerLedger.append(contentsOf: cari)
         auditEntries.append(contentsOf: denetim)
-
-        // ---- Yazmalar ------------------------------------------------------
-        var writes: [DocumentChange] = [.createProject(proje)]
-        writes += malzemeler.map { .material($0) }
-        writes += daireler.map { .apartment($0) }
-        writes += hareketler.map { .materialLog($0) }
-        writes += giderler.map { .expense($0) }
-        writes += tahsilatlar.map { .payment($0) }
-        writes += taksitler.map { .installment($0) }
-        writes += ortaklar.map { .partner($0) }
-        writes += cari.map { .partnerLedger($0) }
-        writes += aliciKayitlari.map { .buyer($0) }
-        writes += denetim.map { .audit($0) }
-
-        // Geri yüklemenin KENDİSİ de denetim izine giriyor: veri bir dosyadan
-        // geldiyse bu, kaydın geçmişinin bir parçası.
-        writes += recordAudit(recordId: pid, projectId: pid,
-                              subject: proje.title, action: .create,
-                              changes: [.init(field: "Yedekten geri yükleme",
-                                              oldValue: "—",
-                                              newValue: Fmt.shortDate(backup.olusturma) + " yedeği")])
-
-        persist(writes, failureNote: "Yedekten geri yükleme")
+        auditEntries.insert(kendiDenetim, at: 0)
+        activities.insert(kendiHareket, at: 0)
+        hasUnreadActivity = true
 
         // TÜRETİLEN RAKAMLAR YEDEKTEN OKUNMUYOR, HAM KAYITTAN YENİDEN
         // HESAPLANIYOR. Stok, birikmiş maliyet ve tahsil edilen tutar
         // türetilebilir değerler; yedekteki hâllerine güvenmek, dosyanın
-        // yazıldığı andan bu yana değişmiş bir hesabı taşımak olurdu. Projenin
-        // "türetilen rakam saklanmaz, ham kayıtlardan hesaplanır" ilkesi burada
-        // da geçerli — üstelik burası ilkenin en çok işe yaradığı yer: dosya
-        // dışarıdan geliyor ve içindeki toplamlara güvenmek için sebep yok.
+        // yazıldığı andan bu yana değişmiş bir hesabı taşımak olurdu.
         for material in malzemeler { _ = recalculateMaterial(material.id) }
         for apartment in daireler { _ = recalculateCollected(for: apartment.id) }
 
@@ -2976,7 +3143,21 @@ final class ProjectViewModel: ObservableObject {
         ozet.ledgerEntries = cari.count
         ozet.buyers = aliciKayitlari.count
         ozet.auditEntries = denetim.count
-        return ozet
+        return .restored(ozet)
+    }
+
+    /// Geri yüklemenin hangi aşamada düştüğü — aynı hata farklı anlam taşıyor.
+    private enum RestoreStage { case probe, establish }
+
+    private static func restoreRefusal(for error: Error, stage: RestoreStage) -> RestoreRefusal {
+        let sinif = (error as? RepositoryError) ?? RepositoryError.classify(error)
+        switch (sinif, stage) {
+        case (.offline?, _):               return .offline
+        // Kurulum yazmasında kural reddi: bu kimlikte bir belge VAR ve bu
+        // kullanıcının değil (kendi projesi olsaydı ön okuma görürdü).
+        case (.accessDenied?, .establish): return .existsOnServerOther
+        default:                           return .unverified
+        }
     }
 
     /// Yeni proje (ada/parsel) oluşturur; daireleri boş olarak açar.
@@ -3022,7 +3203,11 @@ final class ProjectViewModel: ObservableObject {
                               createdAt: Date(),
                               invite: nil, photoCount: 0)
         projects.append(project)
-        var writes: [DocumentChange] = [.createProject(project)]
+        // İşaret yeni proje için de: kimlik taze bir UUID olduğu için çakışma
+        // pratikte imkânsız, ama her kurulumun sunucuda "yalnızca yoksa yaz"
+        // olması tek bir kural yolu demek. Dize olduğu için onayı kaybolan
+        // yazmanın yeniden gönderimi de geçiyor.
+        var writes: [DocumentChange] = [.createProject(project, establishToken: UUID().uuidString)]
 
         // Daireler boş (satılmamış) olarak oluşturulur; kat = 4 daire varsayımıyla.
         // Tip ve alan UYDURULMAZ: önceden sabit bir listeden ("2+1 / 95 m²")
