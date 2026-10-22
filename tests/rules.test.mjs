@@ -423,6 +423,47 @@ describe('projects/{pid}/apartments — yönetici yazar, ortak okur', () => {
 
 // ═══════════════════════════ Davet kodları ═══════════════════════════
 
+describe('derleme 169 ile uyum — istemci yazma biçimleri', () => {
+
+  // ───────────────────────────────────────────────────────────────────────
+  // BEKÇİ TESTLERİ. Derleme 169 App Store'da ve ESKİ istemci kodunu taşıyor;
+  // güncellenmeyen kullanıcılar bu sürümle uzun süre kalacak. Aşağıdaki
+  // yazma biçimleri 169'un BUGÜN kullandıkları ve kural bunları kabul etmek
+  // ZORUNDA. Kural sıkılaştırılırsa (ör. proje güncellemesinde damga şartı)
+  // 169 sessizce kırılır ve bunu başka hiçbir test göstermez.
+  //
+  // Madde 6'nın tasarımı bu yüzden kurala dokunmuyor: tüm değişiklik
+  // sunucuda (`redeemInvite`).
+  // ───────────────────────────────────────────────────────────────────────
+
+  const future = () => new Date(Date.now() + 48 * 3600 * 1000);
+
+  before(seed);
+
+  it('davet partisi kabul ediliyor — davet belgesi + DAMGASIZ ayna, tek partide', async () => {
+    // `FirebaseInviteService.createInvite`in biçimi (169 ve güncel aynı):
+    // aynada cihaz saati var ve damga YOK.
+    const batch = writeBatch(ownerDb);
+    batch.set(doc(ownerDb, 'invites', 'K7BAT2'), {
+      projectId: P1, createdAt: serverTimestamp(), expiresAt: future(), usedAt: null,
+    });
+    batch.update(doc(ownerDb, 'projects', P1), {
+      invite: { code: 'K7BAT2', createdAt: new Date() },
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('169’un merge’siz TAM proje yazması kabul ediliyor', async () => {
+    // 169 her proje düzenlemesini `setData(encode(project))` ile, merge
+    // OLMADAN yazıyor (madde 1 düzeltmesi sonra geldi).
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', P1), stamped(OWNER, {
+      id: P1, ownerUid: OWNER, memberUids: [OWNER, MEMBER],
+      blockNumber: '145', parcelNumber: '2', createdAt: new Date(),
+      progress: 50, invite: { code: 'K7BAT2', createdAt: new Date() },
+    })));
+  });
+});
+
 describe('invites/{KOD}', () => {
   before(seed);
 

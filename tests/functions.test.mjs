@@ -753,3 +753,158 @@ describe('App Check zorlaması', () => {
     assert.equal(await authUserExists(u.uid), true, 'reddedilen çağrı hesabı silmiş');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MADDE 6 — davet yaşam döngüsü
+//
+// (a) KULLANILAN KOD "AKTİF" GÖRÜNÜYORDU: `redeemInvite` yalnızca
+//     `invites/{KOD}` belgesine `usedAt` yazıyordu; proje belgesindeki ayna
+//     hiç değişmiyordu ve sahibin ekranı kodun kullanıldığını görmüyordu.
+// (b) "YENİ KOD" ESKİSİNİ İPTAL ETMİYORDU: eski kod kullanılana ya da 48 saat
+//     dolana kadar geçerli kalıyordu.
+//
+// GERİYE UYUM: derleme 169 incelemede ve eski istemci kodunu taşıyor.
+// Değişiklik YALNIZCA sunucuda; kural, indeks, istemci değişmiyor. Bu
+// testlerin bir kısmı davranışı, bir kısmı 169 ile uyumu koruyan sınırları
+// sabitliyor (yer tutucu ayna, aynasız proje, eşit damga).
+// ═══════════════════════════════════════════════════════════════════════════
+
+
+const mapv = (fields) => ({ mapValue: { fields } });
+
+async function seedOwnProject(pid, { mirror } = {}) {
+  const owner = await newUser();
+  const fields = {
+    id: str(pid), ownerUid: str(owner.uid), memberUids: arr([owner.uid]),
+    blockNumber: str('950'), parcelNumber: str('6'), createdAt: ts(new Date()),
+  };
+  if (mirror) fields.invite = mapv({ code: str(mirror.code), createdAt: ts(mirror.createdAt ?? new Date()) });
+  await putDoc(`projects/${pid}`, fields);
+  return owner;
+}
+
+async function seedInviteAt(code, projectId, createdAt) {
+  await putDoc(`invites/${code}`, {
+    projectId: str(projectId), createdAt: ts(createdAt),
+    expiresAt: ts(new Date(createdAt.getTime() + 48 * 3600 * 1000)),
+    usedAt: { nullValue: null },
+  });
+}
+
+describe('M6a — davet aynası', () => {
+  it('kod aynadakiyle eşleşince ayna kullanıldı olur; code/createdAt korunur, ad yazılmaz', async () => {
+    const pid = 'm6a-esles';
+    const t0 = new Date(Date.now() - 60e3);
+    await seedOwnProject(pid, { mirror: { code: 'AYNA11', createdAt: t0 } });
+    await seedInviteAt('AYNA11', pid, t0);
+    const u = await newUser();
+    await putDoc(`users/${u.uid}`, { uid: str(u.uid), name: str('Ayşe Tuna') });
+    const r = await redeem(u.idToken, 'AYNA11');
+    assert.equal(r.status, 200, JSON.stringify(r.error));
+    const inv = (await getFields(`projects/${pid}`)).invite?.mapValue?.fields;
+    assert.ok(inv, 'ayna kayboldu');
+    assert.equal(inv.code.stringValue, 'AYNA11');
+    assert.equal(inv.createdAt.timestampValue, t0.toISOString());
+    assert.ok(inv.usedAt?.timestampValue, 'ayna usedAt Timestamp değil');
+    assert.equal(inv.usedByName, undefined, 'aynaya ad yazılmamalı');
+  });
+
+  it('ayna BAŞKA (var olmayan) kodu gösteriyorsa aynaya dokunulmaz — 169 yer tutucu', async () => {
+    const pid = 'm6a-farkli';
+    const t0 = new Date(Date.now() - 60e3);
+    await seedOwnProject(pid, { mirror: { code: 'YERTUT', createdAt: t0 } });
+    await seedInviteAt('GERCK1', pid, t0);
+    const u = await newUser();
+    const r = await redeem(u.idToken, 'GERCK1');
+    assert.equal(r.status, 200, 'aynadaki koddan farklı GEÇERLİ kod reddedildi');
+    const inv = (await getFields(`projects/${pid}`)).invite.mapValue.fields;
+    assert.equal(inv.code.stringValue, 'YERTUT');
+    assert.equal(inv.usedAt, undefined, 'başka kodun aynası işaretlendi');
+  });
+
+  it('ayna YOKSA yarım harita yaratılmaz', async () => {
+    const pid = 'm6a-aynasiz';
+    await seedOwnProject(pid);
+    await seedInviteAt('AYNSZ1', pid, new Date(Date.now() - 60e3));
+    const u = await newUser();
+    assert.equal((await redeem(u.idToken, 'AYNSZ1')).status, 200);
+    assert.equal((await getFields(`projects/${pid}`)).invite, undefined, 'code/createdAt olmayan yarım invite haritası oluştu');
+  });
+
+  it('zaten üye (sahip) dalı aynaya yazmaz', async () => {
+    const owner = await newUser();
+    const pid = `m6a-sahip-${owner.uid}`;
+    const t0 = new Date(Date.now() - 60e3);
+    await putDoc(`projects/${pid}`, {
+      id: str(pid), ownerUid: str(owner.uid), memberUids: arr([owner.uid]),
+      blockNumber: str('951'), parcelNumber: str('1'), createdAt: ts(new Date()),
+      invite: mapv({ code: str('SAHIP1'), createdAt: ts(t0) }),
+    });
+    await seedInviteAt('SAHIP1', pid, t0);
+    const r = await redeem(owner.idToken, 'SAHIP1');
+    assert.equal(r.result?.alreadyMember, true);
+    assert.equal((await getFields(`projects/${pid}`)).invite.mapValue.fields.usedAt, undefined);
+  });
+});
+
+describe('M6b — yeni kod eskisini geçersiz kılar', () => {
+  it('daha yeni kod varken ESKİ kullanılmamış kod reddedilir ve harcanmaz', async () => {
+    const pid = 'm6b-eski';
+    await seedOwnProject(pid);
+    await seedInviteAt('ESKI33', pid, new Date(Date.now() - 120e3));
+    await seedInviteAt('YENI33', pid, new Date(Date.now() - 60e3));
+    const u = await newUser();
+    const r = await redeem(u.idToken, 'ESKI33');
+    assert.notEqual(r.status, 200, 'eski kod hâlâ geçerli');
+    assert.equal(r.error?.message, 'code-expired');
+    assert.equal(r.error?.details?.reason, 'replaced',
+      'sonraki istemcilerin "yerine yeni kod üretildi" diyebilmesi için ayrıntı lazım');
+    assert.equal((await getFields('invites/ESKI33')).usedAt?.nullValue, null);
+    const uyeler = (await getFields(`projects/${pid}`)).memberUids.arrayValue.values.map((v) => v.stringValue);
+    assert.ok(!uyeler.includes(u.uid), 'reddedilen kişi üye yapıldı');
+    const ok = await redeem(u.idToken, 'YENI33');
+    assert.equal(ok.status, 200, 'yeni kod çalışmadı');
+  });
+
+  it('yeni kod KULLANILMIŞ olsa bile eski kod dirilmez', async () => {
+    const pid = 'm6b-dirilme';
+    await seedOwnProject(pid);
+    await seedInviteAt('DRLA11', pid, new Date(Date.now() - 120e3));
+    await seedInviteAt('DRLB11', pid, new Date(Date.now() - 60e3));
+    const u1 = await newUser();
+    assert.equal((await redeem(u1.idToken, 'DRLB11')).status, 200);
+    const u2 = await newUser();
+    const r = await redeem(u2.idToken, 'DRLA11');
+    assert.notEqual(r.status, 200, 'yeni kod harcanınca eski kod yeniden geçerli oldu');
+  });
+
+  it('BAŞKA projenin daha yeni kodu bu projenin kodunu düşürmez', async () => {
+    await seedOwnProject('m6b-x');
+    await seedOwnProject('m6b-y');
+    await seedInviteAt('PRJX11', 'm6b-x', new Date(Date.now() - 120e3));
+    await seedInviteAt('PRJY11', 'm6b-y', new Date(Date.now() - 60e3));
+    const u = await newUser();
+    assert.equal((await redeem(u.idToken, 'PRJX11')).status, 200);
+  });
+
+  it('eşit createdAt ile üretilmiş iki kod birbirini düşürmez', async () => {
+    const pid = 'm6b-esit';
+    await seedOwnProject(pid);
+    const t = new Date(Date.now() - 60e3);
+    await seedInviteAt('ESTA11', pid, t);
+    await seedInviteAt('ESTB11', pid, t);
+    assert.equal((await redeem((await newUser()).idToken, 'ESTA11')).status, 200);
+  });
+
+  it('zaten üye olan, eskimiş koda dokununca yine başarı alır (idempotans)', async () => {
+    const pid = 'm6b-idem';
+    await seedOwnProject(pid);
+    await seedInviteAt('IDMA11', pid, new Date(Date.now() - 120e3));
+    const u = await newUser();
+    assert.equal((await redeem(u.idToken, 'IDMA11')).status, 200);
+    await seedInviteAt('IDMB11', pid, new Date(Date.now() - 60e3));
+    const r = await redeem(u.idToken, 'IDMA11');
+    assert.equal(r.status, 200);
+    assert.equal(r.result.alreadyMember, true);
+  });
+});

@@ -243,10 +243,72 @@ async function redeemTransaction(
         throw new HttpsError("deadline-exceeded", "code-expired");
       }
 
+      // ── MADDE 6(b) — YENİ KOD ESKİSİNİ GEÇERSİZ KILAR ───────────────────
+      //
+      // Eskiden "Yeni Kod" eskisini iptal etmiyordu: eski kod kullanılana ya
+      // da 48 saat dolana kadar geçerliydi. İstemci `invites`e yazamadığı
+      // (kural `update/delete: false`) için iptal burada, KULLANIM anında.
+      //
+      // OTORİTE `invites/`, AYNA DEĞİL. Derleme 169 çevrimdışıyken aynaya
+      // hiç var olmayan bir yer tutucu kod yazabiliyor (bayat tam setData);
+      // "kod aynadakiyle eşleşmiyorsa reddet" GEÇERLİ kodu reddederdi.
+      // `createdAt` kural gereği sunucu damgası (`== request.time`), yani
+      // sıralama manipüle edilemez.
+      //
+      // `usedAt == null` SÜZGECİ BİLEREK YOK: olsaydı yeni kod B kullanıldığı
+      // an eski A "daha yeni kullanılmamış kod yok" diye DİRİLİRDİ.
+      //
+      // Tek alanlı eşitlik sorgusu: bileşik indeks gerektirmiyor
+      // (`deleteAccount` aynı sorguyu kullanıyor).
+      //
+      // ANAHTAR YENİDEN KULLANILIYOR — `code-expired`. Yeni bir anahtar
+      // seçilseydi 169 yedek eşlemede `.expired` gösterirdi ama güncel iOS
+      // `.timedOut`, Android ağ hatası gösterirdi. `code-expired` üç istemcide
+      // de "süresi doldu · yöneticiden yeni kod iste" diyor — ki doğru eylem
+      // bu. `reason` ayrıntısını eski istemciler yok sayıyor; sonraki sürümler
+      // "yerine yeni kod üretildi" diyebilir.
+      const kardesler = await tx.get(
+        db.collection("invites").where("projectId", "==", projectId));
+      const benimAnim = invite.get("createdAt");
+      const dahaYeni = (t: unknown): boolean => {
+        if (!(t instanceof Timestamp)) return false;
+        if (!(benimAnim instanceof Timestamp)) return true;
+        // KESİN büyüklük: aynı damgayla üretilmiş iki kod birbirini düşürmez.
+        return t.seconds > benimAnim.seconds ||
+          (t.seconds === benimAnim.seconds && t.nanoseconds > benimAnim.nanoseconds);
+      };
+      if (kardesler.docs.some((d) => d.id !== inviteRef.id && dahaYeni(d.get("createdAt")))) {
+        throw new HttpsError("deadline-exceeded", "code-expired", { reason: "replaced" });
+      }
+
+      // ── MADDE 6(a) — AYNA "KULLANILDI" OLUR ─────────────────────────────
+      //
+      // Eskiden yalnızca `invites/{KOD}.usedAt` yazılıyordu; sahibin ekranı
+      // kodun kullanıldığını hiç görmüyordu. İKİ KOŞUL birlikte şart:
+      //
+      // 1. KOD EŞİTLİĞİ: sahip arada yeni kod ürettiyse eski kodun kullanımı
+      //    yeni kodu "kullanıldı" göstermemeli; 169'un yer tutucusu da yanlış
+      //    işaretlenmemeli.
+      // 2. TAM HARİTA: ayna yoksa (geri yükleme, aynasız eski proje) noktalı
+      //    yazma `code`u OLMAYAN bir `invite` haritası yaratır. iOS (169 ve
+      //    güncel) ile Android projeyi o zaman ÇÖZEMEZ ve proje çözümü
+      //    yalıtılmış olmadığı için o projenin TÜM ÜYELERİNDE pano boşalır.
+      //
+      // `usedByName` BİLEREK YAZILMIYOR. Proje belgesi tüm üyelere açık; ad
+      // yeni bir kişisel veri olurdu. Daha önemlisi 169'un bayat tam setData'sı
+      // hesap silmeden sonra temizlenen adı GERİ YAZABİLİR — sunucudan
+      // önlenemeyen bir KVKK dirilmesi. İstemciler adsız `usedAt`i zaten düz
+      // "Kullanıldı" diye gösteriyor; ad ortak listesinde ve hareket akışında.
+      const aynaBuKod = project.get("invite.code") === inviteRef.id &&
+        project.get("invite.createdAt") instanceof Timestamp;
+
       // Dört yazma, TEK transaction: üyelik + ortak kaydı + hareket + kodun
       // harcanması. Yarısı yazılırsa "üye oldu ama ortak listesinde yok" ya da
       // "kod harcandı ama üyelik yok" gibi bir durum kalırdı.
-      tx.update(projectRef, { memberUids: FieldValue.arrayUnion(uid) });
+      tx.update(projectRef, {
+        memberUids: FieldValue.arrayUnion(uid),
+        ...(aynaBuKod ? { "invite.usedAt": FieldValue.serverTimestamp() } : {}),
+      });
 
       const partnerId = crypto.randomUUID().toUpperCase();
       tx.set(projectRef.collection("partners").doc(partnerId), {
