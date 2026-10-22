@@ -73,7 +73,12 @@ final class InMemoryProjectRepository: ProjectRepository {
     }
 
     func probeProject(_ id: UUID) async throws -> ProjectProbe {
-        projects.contains { $0.id == id } && !foreignProjectIds.contains(id) ? .readable : .notReadable
+        guard projects.contains(where: { $0.id == id }), !foreignProjectIds.contains(id) else {
+            return .notReadable
+        }
+        let kayitVar = auditEntries.contains { $0.projectId == id }
+                    || apartments.contains { $0.projectId == id }
+        return .readable(establishToken: establishTokens[id], hasRecords: kayitVar)
     }
 
     private func apply(_ change: DocumentChange) {

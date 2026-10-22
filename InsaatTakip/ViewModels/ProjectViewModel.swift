@@ -52,6 +52,7 @@ final class ProjectViewModel: ObservableObject {
     /// Geri yükleme sunucu onayını bekliyor.
     @Published private(set) var restorePending = false
     var restoreTokens = RestoreTokenStore()
+    private var refreshAfterRestore = false
 
     /// Bildirim zilindeki okunmamış işareti.
     @Published var hasUnreadActivity = true
@@ -157,6 +158,11 @@ final class ProjectViewModel: ObservableObject {
     @Published private(set) var failedProjects: [ProjectLoadFailure] = []
 
     func refresh() async {
+        // GERİ YÜKLEME SÜRERKEN ERTELENİR. Geri yükleme üç ağ gidiş-dönüşü
+        // sürüyor; arada başlayıp sonra biten bir yenileme, az önce geri
+        // yüklenen kayıtları ekrandan siliyordu ("Geri yüklendi · 12 daire"
+        // uyarısı açıkken panoda boş kabuk). Geri yükleme bitince çalışır.
+        guard !restorePending else { refreshAfterRestore = true; return }
         // ÜST ÜSTE BİNME YOK: ön plana geçiş ile çekerek yenileme aynı anda
         // gelebiliyor ve iki tam yükleme hem pahalı hem gereksiz.
         guard !isRefreshing else { return }
@@ -2802,6 +2808,12 @@ final class ProjectViewModel: ObservableObject {
         case partial
         /// Yazmanın sunucuya ulaşıp ulaşmadığı bilinmiyor.
         case unverified
+        /// Sunucuya sorulamadı — hiçbir şey yazılmadı.
+        case probeFailed
+        /// Bu yedek daha önce geri yüklenmiş; sonuç bize ulaşmamıştı.
+        case alreadyCompleted
+        /// Proje kuruldu, kayıtları sunucu KABUL ETMEDİ (bağlantı değil).
+        case recordsRejected
         /// Başka bir geri yükleme sürüyor.
         case busy
 
@@ -2810,11 +2822,16 @@ final class ProjectViewModel: ObservableObject {
             case .notAdmin:            return "Geri yükleme yapılamadı"
             case .alreadyLoaded:       return "Bu proje zaten duruyor"
             case .existsOnServerOwn:   return "Bu proje sunucuda zaten var"
-            case .existsOnServerOther: return "Bu proje başka bir hesapta"
+            // "Olabilir": aynı ret App Check reddi de olabilir (kural reddi ile
+            // ayırt edilemiyor). Kesin hüküm kişiyi boşuna SIM almaya yollardı.
+            case .existsOnServerOther: return "Bu proje başka bir hesapta olabilir"
             case .offline:             return "İnternet bağlantısı gerekiyor"
             case .partial:             return "Geri yükleme yarım kaldı"
             case .unverified:          return "Sonuç doğrulanamadı"
             case .busy:                return "Geri yükleme sürüyor"
+            case .probeFailed:         return "Sunucuya sorulamadı"
+            case .alreadyCompleted:    return "Bu yedek zaten geri yüklenmiş"
+            case .recordsRejected:     return "Kayıtlar yazılamadı"
             }
         }
 
@@ -2824,7 +2841,7 @@ final class ProjectViewModel: ObservableObject {
                 return "Yedekten geri yükleme yalnızca proje yöneticisine açık."
             case .alreadyLoaded:
                 return "Geri yükleme var olan bir projenin üzerine yazmaz — yedekten sonra girilen "
-                     + "kayıtlar kaybolmasın diye. Proje panoda duruyor."
+                     + "kayıtlar kaybolmasın diye. Proje panoda ya da Arşiv bölümünde duruyor."
             case .existsOnServerOwn:
                 return "Hiçbir şey yazılmadı. Proje senin hesabında ama panoya yüklenemedi; panoyu "
                      + "aşağı çekip yenile, yüklenemeyen projeler panodaki uyarıda görünür. Geri "
@@ -2832,21 +2849,31 @@ final class ProjectViewModel: ObservableObject {
             case .existsOnServerOther:
                 // "Yedeği alan hesap" DEĞİL: yedek bir ortak görünümünden de
                 // alınmış olabilir. Sahip olan hesap aranıyor.
-                return "Hiçbir şey yazılmadı. Bu kimlikte bir proje sunucuda başka bir hesaba ait "
-                     + "olabilir. Telefon numaran değiştiyse yedekteki projenin sahibi olan "
-                     + "numarayla giriş yap; numara elinde değilse operatörden aynı numaraya yeni "
-                     + "SIM alınabilir."
+                return "Hiçbir şey yazılmadı. Sunucu kurulumu reddetti: bu kimlikte bir proje başka "
+                     + "bir hesaba ait olabilir ya da uygulama o an doğrulanamamış olabilir. Önce "
+                     + "bağlantını kontrol edip tekrar dene. Telefon numaran değiştiyse yedekteki "
+                     + "projenin sahibi olan numarayla giriş yap; numara elinde değilse operatörden "
+                     + "aynı numaraya yeni SIM alınabilir."
             case .offline:
                 return "Geri yükleme sunucu onayı olmadan başlamıyor; hiçbir şey yazılmadı. "
                      + "Bağlanınca aynı dosyayla tekrar dene."
             case .partial:
-                return "Proje kuruldu ama kayıtları yazılamadı. Aynı dosyayla tekrar dene — "
-                     + "kaldığı yerden tamamlanır."
+                return "Proje kuruldu ama kayıtları gönderilemedi. Bağlanınca aynı dosyayla "
+                     + "tekrar dene — kaldığı yerden tamamlanır."
             case .unverified:
                 return "Geri yüklemenin sunucuya ulaşıp ulaşmadığı bilinmiyor. Aynı dosyayla "
                      + "tekrar dene; kaldığı yerden devam eder."
             case .busy:
                 return "Önceki geri yükleme bitince tekrar dene."
+            case .probeFailed:
+                return "Hiçbir şey yazılmadı. Biraz sonra aynı dosyayla tekrar dene."
+            case .alreadyCompleted:
+                return "Proje sunucuda duruyor; geri yükleme var olan bir projenin üzerine "
+                     + "yazmaz. Pano yenileniyor — görünmezse aşağı çekip yenile."
+            case .recordsRejected:
+                return "Proje kuruldu ama sunucu kayıtları kabul etmedi; aynı dosyayla tekrar "
+                     + "denemek büyük olasılıkla aynı sonucu verir. Hesap > Geri bildirim "
+                     + "gönder'den bildir."
             }
         }
     }
@@ -2857,12 +2884,17 @@ final class ProjectViewModel: ObservableObject {
     /// Yeni işaretle yeniden deneme kuraldan reddedilir; saklanan işaret
     /// aynı dosyayla devam etmeyi mümkün kılıyor. Başarıda ve kesin retde
     /// siliniyor.
+    ///
+    /// HESAP + PROJE ile anahtarlanıyor: başka bir hesabın denemesi bu
+    /// işareti tüketip yanlış dalı seçmesin.
     struct RestoreTokenStore {
         var defaults: UserDefaults = .standard
-        private func anahtar(_ pid: UUID) -> String { "restore.establishToken.\(pid.uuidString)" }
-        func token(for pid: UUID) -> String? { defaults.string(forKey: anahtar(pid)) }
-        func save(_ token: String, for pid: UUID) { defaults.set(token, forKey: anahtar(pid)) }
-        func clear(_ pid: UUID) { defaults.removeObject(forKey: anahtar(pid)) }
+        private func anahtar(_ pid: UUID, _ uid: String) -> String {
+            "restore.establishToken.\(uid).\(pid.uuidString)"
+        }
+        func token(for pid: UUID, uid: String) -> String? { defaults.string(forKey: anahtar(pid, uid)) }
+        func save(_ token: String, for pid: UUID, uid: String) { defaults.set(token, forKey: anahtar(pid, uid)) }
+        func clear(_ pid: UUID, uid: String) { defaults.removeObject(forKey: anahtar(pid, uid)) }
     }
 
     struct RestoreSummary: Equatable {
@@ -2954,29 +2986,62 @@ final class ProjectViewModel: ObservableObject {
     func restore(from backup: ProjectExporter.Backup, user: User?) async -> RestoreOutcome {
         guard let user, user.role == .admin else { return .refused(.notAdmin) }
         let pid = backup.proje.id
-        guard !projects.contains(where: { $0.id == pid }) else { return .refused(.alreadyLoaded) }
+        let saklanan = restoreTokens.token(for: pid, uid: user.id)
+        // Saklı işaret YOKSA panodaki proje kesin "zaten var". VARSA panodaki
+        // proje yarım kalan geri yüklemenin kabuğu olabilir: bir yenileme onu
+        // getirmiş olabilir ve eskiden bu koruma devamı kalıcı olarak
+        // kilitliyordu (panoda boş bir proje kalıyordu). Karar sunucuda.
+        guard saklanan != nil || !projects.contains(where: { $0.id == pid }) else {
+            return .refused(.alreadyLoaded)
+        }
         // İkinci dokunuş yok sayılır: iki geri yükleme aynı kimliğe yarışırdı.
         guard !restorePending else { return .refused(.busy) }
         restorePending = true
-        defer { restorePending = false }
+        defer {
+            restorePending = false
+            // Beklerken istenen yenileme şimdi: uçuştaki bir yenileme geri
+            // yüklenen kayıtları ekrandan silebiliyordu.
+            if refreshAfterRestore {
+                refreshAfterRestore = false
+                Task { [weak self] in await self?.refresh() }
+            }
+        }
 
         // ---- 1) Sunucuya sor ------------------------------------------------
         //
-        // YEREL LİSTE YETMİYOR (22 Eki). Sahibin projesi yerelde olmayabilir:
-        // alt koleksiyonu çözülemeyip `failedProjects`e düşmüş, ya da soğuk
-        // açılışta liste henüz boş. Eskiden koruma yalnızca yerel listeye
-        // bakıyordu ve yazma CANLI belgeye tam setData oluyordu: ortaklar
-        // düşüyor, ilerleme yedekteki eski değere dönüyordu.
+        // YEREL LİSTE YETMİYOR. Sahibin projesi yerelde olmayabilir: alt
+        // koleksiyonu çözülemeyip `failedProjects`e düşmüş, ya da soğuk
+        // açılışta liste henüz boş. Asıl sigorta KURALDA (`establishToken`);
+        // bu ön okuma sebebi doğru söylemek, ağ yokken yazmaya hiç
+        // başlamamak ve yarım kalanı canlıdan ayırmak için.
         //
-        // Asıl sigorta KURALDA (`establishToken`): bu ön okuma yalnızca
-        // sebebi doğru söylemek ve ağ yokken yazmaya hiç başlamamak için.
-        // Okunabiliyorsa proje bu kullanıcının; ama elde bu proje için
-        // SAKLANMIŞ bir işaret varsa önceki deneme yarım kalmıştır ve devam
-        // edilir — kural aynı işarete izin veriyor.
-        let saklanan = restoreTokens.token(for: pid)
+        // DEVAM YALNIZCA BOŞ KABUKTA (22 Eki, bağımsız inceleme). İlk sürümde
+        // "okunabilir + saklı işaret" devam için yetiyordu ve aşama 1 TAM
+        // yazmayı yeniden gönderiyordu. Ama aynı işaret belgenin o denemeden
+        // çıktığını kanıtlıyor, BOŞ olduğunu değil: yarım kalan kurulum
+        // kuyruktan gönderilip haftalarca kullanılmış olabilir, merge
+        // düzenlemeleri işareti korur. O durumda aynı dosya canlı projeyi
+        // ezebiliyordu — inceleme emülatörde gösterdi. Şimdi devam yolu aşama
+        // 1'i HİÇ göndermiyor ve yalnızca kayıtsız kabukta açılıyor.
+        var devam = false
         do {
-            if try await repository.probeProject(pid) == .readable, saklanan == nil {
-                return .refused(.existsOnServerOwn)
+            switch try await repository.probeProject(pid) {
+            case .notReadable:
+                break   // yok ya da başkasının — karar kurulum yazmasında kuralda
+            case .readable(let sunucudaki, let kayitVar):
+                guard let saklanan, sunucudaki == saklanan else {
+                    // Bayat işaret bu proje hakkında hiçbir şey söylemiyor.
+                    if saklanan != nil { restoreTokens.clear(pid, uid: user.id) }
+                    return .refused(.existsOnServerOwn)
+                }
+                guard !kayitVar else {
+                    // Kayıt partisi işlenmiş (atomik): geri yükleme bir zaman
+                    // tamamlanmış, sonuç bize ulaşmamış. Üzerine yazılmaz.
+                    restoreTokens.clear(pid, uid: user.id)
+                    refreshAfterRestore = true
+                    return .refused(.alreadyCompleted)
+                }
+                devam = true
             }
         } catch {
             Diag.log("restore", error)
@@ -3072,18 +3137,21 @@ final class ProjectViewModel: ObservableObject {
         // boş bir kabuk kalıyordu ve aynı dosyayla yeniden deneme bir daha
         // tamamlanamıyordu (yeni işaret = kural reddi). Aynı işaret kabuğu
         // tamamlamaya izin veriyor.
-        let isaret = saklanan ?? UUID().uuidString
-        restoreTokens.save(isaret, for: pid)
-        do {
-            try await repository.apply([.createProject(proje, establishToken: isaret)])
-        } catch {
-            Diag.log("restore", error)
-            let red = Self.restoreRefusal(for: error, stage: .establish)
-            // Kural reddi kesin: bu kimlik BAŞKA bir belgeye ait, işaret işe
-            // yaramaz. Diğerlerinde yazma gitmiş OLABİLİR; işaret kalıyor ki
-            // aynı dosyayla devam edilebilsin.
-            if red == .existsOnServerOther { restoreTokens.clear(pid) }
-            return .refused(red)
+        if !devam {
+            let isaret = saklanan ?? UUID().uuidString
+            restoreTokens.save(isaret, for: pid, uid: user.id)
+            do {
+                try await repository.apply([.createProject(proje, establishToken: isaret)])
+            } catch {
+                Diag.log("restore", error)
+                let red = Self.restoreRefusal(for: error, stage: .establish)
+                // Kural reddi: bu kimlikte bir belge var ve bizim değil — işaret
+                // işe yaramaz. Diğerlerinde yazma gitmiş OLABİLİR; işaret
+                // kalıyor ki aynı dosyayla devam edilebilsin. Kalan işaret artık
+                // tehlikeli değil: devam yalnızca kayıtsız kabukta açılıyor.
+                if red == .existsOnServerOther { restoreTokens.clear(pid, uid: user.id) }
+                return .refused(red)
+            }
         }
 
         // ---- 4) Kayıtlar — tek parti ----------------------------------------
@@ -3091,9 +3159,19 @@ final class ProjectViewModel: ObservableObject {
             try await repository.apply(rest)
         } catch {
             Diag.log("restore", error)
-            return .refused(.partial)
+            // TAHMİN ETME, SUNUCUYA SOR. Parti işlenmiş ama onayı kaybolmuş
+            // olabilir; eskiden her hata körlemesine "yarım" sayılıyordu ve
+            // yeniden gönderim (denetim kayıtları yalnızca eklenebilir) sonsuz
+            // bir "tekrar dene" döngüsü kuruyordu.
+            if case .readable(_, true)? = try? await repository.probeProject(pid) {
+                restoreTokens.clear(pid, uid: user.id)
+                refreshAfterRestore = true
+                return .refused(.alreadyCompleted)
+            }
+            let sinif = (error as? RepositoryError) ?? RepositoryError.classify(error)
+            return .refused(sinif == .offline ? .partial : .recordsRejected)
         }
-        restoreTokens.clear(pid)
+        restoreTokens.clear(pid, uid: user.id)
 
         // ---- 5) Ekran — ANCAK sunucu onayından sonra ------------------------
         //
@@ -3156,6 +3234,9 @@ final class ProjectViewModel: ObservableObject {
         // Kurulum yazmasında kural reddi: bu kimlikte bir belge VAR ve bu
         // kullanıcının değil (kendi projesi olsaydı ön okuma görürdü).
         case (.accessDenied?, .establish): return .existsOnServerOther
+        // Ön okumada hiçbir şey yazılmadı; "ulaşıp ulaşmadığı bilinmiyor"
+        // demek yanlış olurdu.
+        case (_, .probe):                  return .probeFailed
         default:                           return .unverified
         }
     }

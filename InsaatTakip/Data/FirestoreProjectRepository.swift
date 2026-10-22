@@ -496,7 +496,18 @@ final class FirestoreProjectRepository: ProjectRepository {
         do {
             let snap = try await db.collection("projects").document(id.uuidString)
                 .getDocument(source: .server)
-            return snap.exists ? .readable : .notReadable
+            guard snap.exists else { return .notReadable }
+            // Kayıt var mı — iki ucuz sorgu. Geri yüklemenin kayıt partisi HER
+            // ZAMAN kendi denetim kaydını taşıyor, yani parti işlendiyse
+            // `auditEntries` boş olamaz; kabuğu elle kullanan biri de çoğunlukla
+            // daire ekliyor. Parti atomik: biri varsa hepsi var.
+            var kayitVar = false
+            for coll in [Coll.auditEntries, Coll.apartments] where !kayitVar {
+                let q = try await collection(coll, id).limit(to: 1).getDocuments(source: .server)
+                kayitVar = !q.isEmpty
+            }
+            return .readable(establishToken: snap.get("establishToken") as? String,
+                             hasRecords: kayitVar)
         } catch {
             switch RepositoryError.classify(error) {
             case .accessDenied?: return .notReadable

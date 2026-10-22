@@ -228,7 +228,13 @@ protocol ProjectRepository {
 /// Sunucudaki proje belgesinin, okuyan kullanıcı açısından durumu.
 enum ProjectProbe: Equatable {
     /// Belge var ve bu kullanıcı onun üyesi.
-    case readable
+    ///
+    /// `establishToken` ve `hasRecords` YARIM KALAN geri yüklemeyi canlı
+    /// projeden ayırmak için. Aynı işaret belgenin o denemeden çıktığını
+    /// kanıtlıyor, hâlâ BOŞ bir kabuk olduğunu DEĞİL: yarım kalan kurulum
+    /// kuyruktan gönderilip haftalarca kullanılmış olabilir ve merge
+    /// düzenlemeleri işareti belgede tutuyor. Devam ancak kabuk boşsa.
+    case readable(establishToken: String?, hasRecords: Bool)
     /// Okunamıyor: ya YOK ya da BAŞKASININ. Kural ikisini ayırt ettirmiyor
     /// (var olmayan belgede `resource` boş, üyelik denetimi reddediyor).
     /// Karar kurulum yazmasında kuraldan geliyor.

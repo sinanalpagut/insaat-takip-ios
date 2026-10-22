@@ -553,7 +553,7 @@ final class BackupRestoreTests: XCTestCase {
         }
         XCTAssertTrue(depo.ic.apartments.contains { $0.projectId == yedek.proje.id },
                       "kayıtlar sunucuya yazılmadı")
-        XCTAssertNil(model.restoreTokens.token(for: yedek.proje.id),
+        XCTAssertNil(model.restoreTokens.token(for: yedek.proje.id, uid: "yeni-uid"),
                      "başarıdan sonra işaret silinmedi")
     }
 
@@ -567,7 +567,7 @@ final class BackupRestoreTests: XCTestCase {
         let sonuc = await model.restore(from: yedek, user: yeniKullanici())
         XCTAssertEqual(sonuc, .refused(.existsOnServerOther))
         XCTAssertFalse(repo.apartments.contains { $0.projectId == yedek.proje.id })
-        XCTAssertNil(model.restoreTokens.token(for: yedek.proje.id),
+        XCTAssertNil(model.restoreTokens.token(for: yedek.proje.id, uid: "yeni-uid"),
                      "kesin retten sonra işaret kaldı")
     }
 
@@ -600,5 +600,100 @@ final class BackupRestoreTests: XCTestCase {
         XCTAssertNil(yuk["establishToken"])
         XCTAssertNil(try Firestore.Encoder().encode(proje)["establishToken"],
                      "işaret Project modeline girmiş")
+    }
+
+    // MARK: - Bağımsız inceleme bulguları (22 Eki 2026)
+
+    /// SAKLI İŞARET CANLI PROJEYİ EZMEMELİ.
+    ///
+    /// İlk düzeltmede devam yolu "okunabilir + saklı işaret var" koşuluyla
+    /// açılıyordu ve aşama 1 TAM yazmayı yeniden gönderiyordu. Ama yarım kalan
+    /// geri yüklemenin işareti diskte kalabiliyor: Firestore kuyruktaki
+    /// yazmayı sonraki açılışta gönderiyor, proje kuruluyor, haftalarca
+    /// kullanılıyor ve merge düzenlemeleri işareti belgede tutuyor. Sonra aynı
+    /// dosya seçilince aynı işaret kuraldan GEÇİYOR ve canlı proje eziliyordu
+    /// — inceleme bunu emülatörde gösterdi. Aynı işaret belgenin bu denemeden
+    /// çıktığını kanıtlıyor, BOŞ bir kabuk olduğunu değil.
+    func testSakliIsaretCanliProjeyiEzmiyor() async throws {
+        let repo = InMemoryProjectRepository()
+        let yedek = try turAt(yedekKur())
+        let pid = yedek.proje.id
+
+        // Proje bir zamanlar bu yedekten kuruldu ve o günden beri kullanılıyor.
+        var canli = yedek.proje
+        canli.ownerUid = "yeni-uid"
+        canli.memberUids = ["yeni-uid", "uid-ortak"]
+        canli.progress = 77
+        try await repo.apply([.createProject(canli, establishToken: "tok-eski")])
+        repo.apartments += yedek.daireler.filter { $0.projectId == pid }
+
+        let model = yalitilmis(ProjectViewModel(repository: repo))
+        model.projects.removeAll { $0.id == pid }              // yüklenemedi
+        model.restoreTokens.save("tok-eski", for: pid, uid: "yeni-uid")          // işaret diskte kalmış
+
+        let sonuc = await model.restore(from: yedek, user: yeniKullanici())
+
+        let sunucu = repo.projects.first { $0.id == pid }
+        XCTAssertEqual(sunucu?.memberUids.contains("uid-ortak"), true,
+                       "saklı işaret canlı projeyi ezdi — ortak düştü")
+        XCTAssertEqual(sunucu?.progress, 77, "canlı ilerleme yedekteki değere döndü")
+        XCTAssertEqual(sonuc, .refused(.alreadyCompleted))
+        XCTAssertNil(model.restoreTokens.token(for: pid, uid: "yeni-uid"),
+                     "bayat işaret silinmedi — bir sonraki denemede yine tehlike")
+    }
+
+    /// Kayıt partisini İŞLEYİP onayı KAYBEDEN sunucu.
+    private final class OnayiKaybedenDepo: ProjectRepository {
+        let ic = InMemoryProjectRepository()
+        var kaybet = true
+        func cachedSnapshot() -> DataSnapshot { ic.cachedSnapshot() }
+        func load() async throws -> DataSnapshot { try await ic.load() }
+        func apply(_ changes: [InsaatTakip.DocumentChange]) async throws {
+            try await ic.apply(changes)
+            let kurulum = changes.contains { if case .createProject = $0 { return true } else { return false } }
+            if !kurulum, kaybet { kaybet = false; throw RepositoryError.accessDenied }
+        }
+        func probeProject(_ id: UUID) async throws -> ProjectProbe { try await ic.probeProject(id) }
+    }
+
+    /// TAHMİN ETME, SUNUCUYA SOR: işlenmiş parti "yarım" sayılmamalı.
+    ///
+    /// Eskiden aşama 2'nin her hatası "yarım · kaldığı yerden tamamlanır"
+    /// diyordu; sunucuda tamamlanmış bir geri yüklemenin yeniden gönderimi
+    /// (denetim kayıtları yalnızca eklenebilir) sonsuz bir döngü kuruyordu.
+    func testIslenmisPartiYarimSayilmiyor() async throws {
+        let depo = OnayiKaybedenDepo()
+        let model = yalitilmis(ProjectViewModel(repository: depo))
+        let yedek = try turAt(yedekKur())
+
+        let sonuc = await model.restore(from: yedek, user: yeniKullanici())
+        XCTAssertEqual(sonuc, .refused(.alreadyCompleted),
+                       "sunucuda tamamlanmış geri yükleme 'yarım' gösterildi")
+        XCTAssertNil(model.restoreTokens.token(for: yedek.proje.id, uid: "yeni-uid"))
+    }
+
+    /// DEVAM, ARAYA BİR YENİLEME GİRİNCE DE ÇALIŞMALI.
+    ///
+    /// Yenileme yarım kalan kabuğu panoya getiriyor. Koruma "zaten duruyor"
+    /// diyordu ve saklı işarete hiç bakılmıyordu: panoda kalıcı, boş bir
+    /// proje kalıyor, aynı dosya bir daha geri yüklenemiyordu — oysa uyarı
+    /// "aynı dosyayla tekrar dene, kaldığı yerden tamamlanır" diyordu.
+    func testDevamYenilemedenSonraDaCalisir() async throws {
+        let depo = KayitlariBirKezDusurenDepo()
+        let model = yalitilmis(ProjectViewModel(repository: depo))
+        let yedek = try turAt(yedekKur())
+
+        let ilk = await model.restore(from: yedek, user: yeniKullanici())
+        XCTAssertEqual(ilk, .refused(.partial))
+
+        await model.refresh()   // kabuk panoya geldi
+        XCTAssertTrue(model.projects.contains { $0.id == yedek.proje.id },
+                      "test kurgusu: yenileme kabuğu getirmeliydi")
+
+        let ikinci = await model.restore(from: yedek, user: yeniKullanici())
+        guard case .restored = ikinci else {
+            return XCTFail("yenilemeden sonra devam edilemedi: \(ikinci)")
+        }
+        XCTAssertTrue(depo.ic.apartments.contains { $0.projectId == yedek.proje.id })
     }
 }
