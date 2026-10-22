@@ -16,6 +16,16 @@ struct JoinWithCodeView: View {
     /// Katılma artık ağ işi (Cloud Function). Bu bayrak olmadan kullanıcı
     /// düğmeye üst üste basar ve aynı kod için birden fazla çağrı gider.
     @State private var isBusy = false
+    /// Kodla ilgili OLMAYAN bir katılma hatası — kalıcı uyarıda gösterilir.
+    ///
+    /// NEDEN UYARI, NOT DEĞİL: bu ekran düz bir `VStack`, kaydırılamıyor ve
+    /// klavye açık açılıyor (`onAppear`). Kutuların altına eklenecek çok
+    /// satırlı bir not "Projeye Katıl" düğmesini klavyenin altına iterdi —
+    /// tam da `.timedOut` metninin basılmasını istediği düğmeyi. Uyarı
+    /// düzene hiç dokunmuyor ve kişi okuyup kapatana kadar kalıyor; 2,6
+    /// saniyelik toast ise "kodu tekrar girme, bağlantını kontrol et,
+    /// düzelmezse çıkış-giriş" sırasını taşıyamıyordu.
+    @State private var failure: InviteError?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -103,6 +113,14 @@ struct JoinWithCodeView: View {
         .padding(.horizontal, 26)
         .background(Palette.ink.ignoresSafeArea())
         .toastOverlay(viewModel.toast)
+        .alert(failure?.errorDescription ?? "",
+               isPresented: Binding(get: { failure != nil },
+                                    set: { if !$0 { failure = nil } }),
+               presenting: failure) { _ in
+            Button("Tamam", role: .cancel) {}
+        } message: { hata in
+            Text(hata.recoverySuggestion ?? "")
+        }
         .onAppear { fieldFocused = true }
     }
 
@@ -186,9 +204,7 @@ struct JoinWithCodeView: View {
                 viewModel.joinedAsPartner = projectTitle
             case .notFound:
                 showInvalid = true
-                // Gerçek neden ağ/bozuk davet olabilir; o durumda ViewModel
-                // kendi toast'ını gösterdi, üzerine yazmıyoruz.
-                if viewModel.toast == nil { viewModel.flash("Böyle bir davet kodu yok") }
+                viewModel.flash("Böyle bir davet kodu yok")
             case .expired:
                 showInvalid = true
                 viewModel.flash("Kodun süresi dolmuş · yöneticiden yeni kod iste")
@@ -198,6 +214,17 @@ struct JoinWithCodeView: View {
             case .alreadyMember:
                 dismiss()
                 viewModel.flash("Bu projenin zaten ortağısın")
+            case .failed(let hata):
+                // Kutular YALNIZCA kodun kendisi hakkında bir hükümde kızarır.
+                // Kod okunmadıysa kızartmak kişiye "yanlış girdin" der ve onu
+                // kodu yeniden yazmaya ya da yöneticiden yeni kod istemeye
+                // iter — ikisi de bu durumda faydasız.
+                if hata.isCodeFault {
+                    showInvalid = true
+                    viewModel.flash(hata.errorDescription ?? "Projeye katılınamadı")
+                } else {
+                    failure = hata
+                }
             }
         }
     }

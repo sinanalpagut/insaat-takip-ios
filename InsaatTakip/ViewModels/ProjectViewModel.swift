@@ -3445,6 +3445,13 @@ final class ProjectViewModel: ObservableObject {
         case expired         // 48 saat dolmuş
         case alreadyUsed     // kod harcanmış
         case alreadyMember   // kullanıcı zaten bu projenin ortağı
+        /// Katılma olmadı ve sebep yukarıdakilerden biri DEĞİL.
+        ///
+        /// Ekran kutuları yalnızca `isCodeFault` ise kızartıyor; diğerlerinde
+        /// kalıcı bir uyarıyla `recoverySuggestion`ı gösteriyor. Eskiden bu
+        /// durum yoktu ve her şey `.notFound`a katlanıyordu — App Check
+        /// arızasında geçerli kod "Böyle bir davet kodu yok" görünüyordu.
+        case failed(InviteError)
     }
 
     /// Davet kodunu kullanır — hangi yoldan gideceğine BURADA karar verilir.
@@ -3468,20 +3475,23 @@ final class ProjectViewModel: ObservableObject {
                 ? .alreadyMember
                 : .success(projectTitle: redemption.projectTitle)
         } catch let error as InviteError {
+            // Yalnızca sunucunun KOD HAKKINDAKİ üç hükmü kendi durumuna
+            // gidiyor. Geri kalan her şey `.failed` — eskiden `.notSignedIn`
+            // sessizce `.notFound`a katlanıyordu ve aynı fonksiyonun diğer
+            // dalları tam bu tehlikeye karşı toast basarken o dal korumasız
+            // kalmıştı. Metni artık ekran seçiyor; burada `flash` yok, iki
+            // katman aynı hatayı iki kez söylemesin.
             switch error {
-            case .notFound, .badFormat, .notSignedIn: return .notFound
-            case .expired:                            return .expired
-            case .alreadyUsed:                        return .alreadyUsed
-            case .inviteBroken, .network, .unknown:
-                // Ayrı bir JoinResult durumu YOK; kullanıcıya gerçek nedeni
-                // toast ile söylüyoruz, aksi halde "böyle bir kod yok" diyerek
-                // yanlış yönlendirmiş olurduk.
-                flash(error.errorDescription ?? "Projeye katılınamadı")
-                return .notFound
+            case .notFound:    return .notFound
+            case .expired:     return .expired
+            case .alreadyUsed: return .alreadyUsed
+            default:           return .failed(error)
             }
         } catch {
-            flash("Projeye katılınamadı")
-            return .notFound
+            // `InviteError` olmayan bir hata — örneğin Auth ID jetonu
+            // yenilenemedi ve hata `from(_:)`e hiç uğramadı. Kod hakkında
+            // bilgi yok; kutular kızarmamalı.
+            return .failed(.unknown)
         }
     }
 

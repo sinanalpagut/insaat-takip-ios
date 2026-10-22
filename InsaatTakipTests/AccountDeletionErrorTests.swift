@@ -49,8 +49,16 @@ final class AccountDeletionErrorTests: XCTestCase {
         XCTAssertEqual(AccountDeletionError.from(functionsError(.notFound)), .notDeployed)
     }
 
+    /// Oturum düştü hükmü işlevin KENDİ anahtarıyla veriliyor.
+    ///
+    /// Bu test eskiden ANAHTARSIZ `.unauthenticated`ı `.signedOut` sayıyordu —
+    /// yani düzeltilen varsayımı sabitliyordu. Anahtarsız 401 çerçevenin
+    /// reddi; gövde hiç çalışmadı ve oturum hakkında bir şey söylemiyor.
+    /// O durum `testCerceveReddiOturumDusmusSayilmiyor` altında.
     func testSignedOutIsNamed() {
-        XCTAssertEqual(AccountDeletionError.from(functionsError(.unauthenticated)), .signedOut)
+        XCTAssertEqual(AccountDeletionError.from(functionsError(.unauthenticated,
+                                                                message: "signed-in-required")),
+                       .signedOut)
         XCTAssertEqual(AccountDeletionError.from(functionsError(.permissionDenied)), .signedOut)
     }
 
@@ -80,5 +88,30 @@ final class AccountDeletionErrorTests: XCTestCase {
         let cumleler = hepsi.compactMap(\.errorDescription)
         XCTAssertEqual(cumleler.count, hepsi.count)
         XCTAssertEqual(Set(cumleler).count, hepsi.count)
+    }
+
+    // MARK: - Aynı 401, iki ekran
+
+    /// Çerçevenin App Check / jeton reddi "oturumun düşmüş" DEĞİL.
+    ///
+    /// `deleteAccount` da `enforceAppCheck: true`. Bu yanıt eskiden
+    /// `.signedOut`a gidiyordu ve silme ekranı kişiyi baştan SMS turuna
+    /// yolluyordu: doğrulama BAŞARILI oluyor (Auth'un App Check ile ilgisi
+    /// yok), silme yine reddediliyor, ekran yine başa atıyor — her tur bir
+    /// SMS. Davet ekranı aynı yanıta artık başka bir teşhis koyduğu için
+    /// ikisinin ayrışması da yanlış olurdu.
+    func testCerceveReddiOturumDusmusSayilmiyor() {
+        let hata = AccountDeletionError.from(functionsError(.unauthenticated,
+                                                            message: "Unauthenticated"))
+        XCTAssertNotEqual(hata, .signedOut,
+                          "çerçeve reddi kullanıcıyı SMS turuna yolluyor")
+        XCTAssertEqual(hata, .requestRejected)
+        XCTAssertTrue(hata.retryable, "yeniden deneme yerine SMS turuna yollanıyor")
+    }
+
+    func testGercekOturumYokAnahtariKorunuyor() {
+        XCTAssertEqual(AccountDeletionError.from(functionsError(.unauthenticated,
+                                                                message: "signed-in-required")),
+                       .signedOut)
     }
 }

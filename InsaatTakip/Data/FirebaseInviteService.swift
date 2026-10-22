@@ -106,12 +106,23 @@ final class FirebaseInviteService: InviteService {
         }
     }
 
+    private static func mapped(_ error: Error) -> InviteError {
+        InviteError.from(error)
+    }
+}
+
+extension InviteError {
     /// Callable hatasını uygulamanın Türkçe hatasına çevirir.
     ///
     /// İşlev, `HttpsError`in mesaj alanında sabit bir anahtar döndürüyor
     /// (`code-used`, `code-expired`…). Firebase bunu `NSLocalizedDescription`
     /// olarak taşıyor.
-    private static func mapped(_ error: Error) -> InviteError {
+    ///
+    /// SINIFIN DIŞINDA olmasının sebebi test: `FirebaseInviteService`
+    /// `@MainActor` ve bu dönüşüm onun içinde `private` kaldıkça birim
+    /// testten çağrılamıyordu. `AccountDeletionError.from(_:)` ile aynı yer,
+    /// aynı sebep.
+    static func from(_ error: Error) -> InviteError {
         let ns = error as NSError
         #if DEBUG
         print("[invite] \(ns.domain) code=\(ns.code) · \(ns.localizedDescription)")
@@ -123,15 +134,23 @@ final class FirebaseInviteService: InviteService {
             let mappedByMessage = InviteError.fromFunctionCode(ns.localizedDescription)
             if mappedByMessage != .unknown { return mappedByMessage }
 
+            // YEDEK DAL KOD HAKKINDA HÜKÜM VERMEZ.
+            //
+            // Buraya yalnızca anahtar taşımayan hatalar düşüyor ve anahtarı
+            // üreten tek yer işlev GÖVDESİ. Çerçeve oturum ve App Check
+            // kapılarını gövdeden ÖNCE denetliyor; SDK zaman aşımını ve 404'ü
+            // kendi metniyle üretiyor. Yani bu dala gelen her çağrıda sunucu
+            // kodu OKUMADI. Eskiden üç dal okumuş gibi cevap veriyordu:
+            // `.unauthenticated → .notSignedIn` (ekranda "kod yok"),
+            // `.deadlineExceeded → .expired` ("süresi doldu"), ve `.notFound`
+            // — ki 404 burada "işlev yok / bölge yanlış" demek, bu dosyanın
+            // başındaki yorum tam bu tuzağı yazıyor.
             switch code {
-            case .unauthenticated:    return .notSignedIn
-            case .invalidArgument:    return .badFormat
-            case .notFound:           return .notFound
-            case .deadlineExceeded:   return .expired
-            case .alreadyExists:      return .alreadyUsed
-            case .failedPrecondition: return .inviteBroken
-            case .unavailable:        return .network
-            default:                  return .unknown
+            case .unauthenticated:   return .requestRejected
+            case .deadlineExceeded:  return .timedOut
+            case .resourceExhausted: return .tooManyAttempts
+            case .unavailable:       return .network
+            default:                 return .unknown
             }
         }
         if ns.domain == NSURLErrorDomain { return .network }

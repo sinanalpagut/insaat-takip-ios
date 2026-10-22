@@ -35,8 +35,18 @@ struct AccountDeletionSummary {
 enum AccountDeletionError: LocalizedError, Equatable {
     /// Ağ yok ya da sunucuya ulaşılamadı — VERİ HENÜZ SİLİNMEMİŞ olabilir.
     case unreachable
-    /// Oturum düşmüş; jeton sunucuda geçerli değil.
+    /// Oturum düşmüş — işlevin KENDİ `signed-in-required` anahtarı.
     case signedOut
+    /// İstek, işlev gövdesine girmeden reddedildi (çerçevenin App Check /
+    /// jeton kapısı). Davet ekranındaki `InviteError.requestRejected` ile
+    /// AYNI sunucu yanıtı.
+    ///
+    /// Eskiden `.signedOut`a gidiyordu ve bu bir SMS döngüsüydü: ekran kişiyi
+    /// baştan telefon doğrulamasına yolluyor, doğrulama BAŞARILI oluyor
+    /// (Auth'un App Check ile ilgisi yok), silme yine reddediliyor, ekran yine
+    /// başa atıyor. Her tur bir SMS — bu dosyanın başındaki yorumun "kotaya
+    /// çarpar" dediği döngünün ta kendisi.
+    case requestRejected
     /// Sunucu yakın zamanlı doğrulama istiyor (`reauth-required`).
     case reauthRequired
     /// İşlev dağıtılmamış ya da bölge yanlış — kurulum hatası.
@@ -48,6 +58,7 @@ enum AccountDeletionError: LocalizedError, Equatable {
         switch self {
         case .unreachable:    return "Bağlantı yok · silme tamamlanmadı"
         case .signedOut:      return "Oturumun düşmüş · çıkıp tekrar gir"
+        case .requestRejected: return "İstek doğrulanamadı · bağlantını kontrol edip tekrar dene"
         case .reauthRequired: return "Doğrulamanın süresi doldu · baştan başla"
         case .notDeployed:    return "Silme servisi bu projede kurulu değil"
         case .serverFailed:   return "Sunucu silmeyi tamamlayamadı · tekrar dene"
@@ -59,7 +70,10 @@ enum AccountDeletionError: LocalizedError, Equatable {
     /// `reauthRequired` ve `signedOut` için YOK: ekranın kod adımına dönüp
     /// tekrar "sil" demek aynı hatayı üretir. Diğerleri geçici.
     var retryable: Bool {
-        self == .unreachable || self == .serverFailed
+        // `requestRejected` YENİDEN DENENEBİLİR: sebep çoğunlukla jetonun
+        // alınamadığı kötü bağlantı ve aynı oturumla düzelebiliyor. Kişiyi
+        // SMS turuna geri yollamak düzeltmiyor, yalnızca SMS yakıyor.
+        self == .unreachable || self == .serverFailed || self == .requestRejected
     }
 
     /// `FunctionsErrorDomain` NSError'ından çeviri.
@@ -77,7 +91,11 @@ enum AccountDeletionError: LocalizedError, Equatable {
         switch code {
         case .unavailable, .deadlineExceeded, .aborted, .cancelled:
             return .unreachable
-        case .unauthenticated, .permissionDenied:
+        case .unauthenticated:
+            // Anahtar yalnızca işlev GÖVDESİNDEN gelir. Anahtarsız 401 =
+            // çerçeve reddetti, gövde hiç çalışmadı.
+            return ns.localizedDescription == "signed-in-required" ? .signedOut : .requestRejected
+        case .permissionDenied:
             return .signedOut
         case .failedPrecondition:
             // Sunucu `reauth-required` diyorsa doğrulama eskimiş demektir.
