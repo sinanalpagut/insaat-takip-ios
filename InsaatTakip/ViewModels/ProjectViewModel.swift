@@ -42,6 +42,13 @@ final class ProjectViewModel: ObservableObject {
 
     /// Ekran altında beliren onay bildirimi.
     @Published var toast: String?
+    /// Davet kodu üretimi süren projeler (madde 5).
+    ///
+    /// Kod ekranda ANCAK sunucu onayıyla görünüyor; o ana kadar bu küme
+    /// "hazırlanıyor" durumunu taşıyor. Ayrı bir küme olmasının sebebi
+    /// `project.invite`e yer tutucu yazmamak: eskiden yazılan yerel kod hiçbir
+    /// yere kaydedilmiyordu ama kopyalanıp paylaşılabiliyordu.
+    @Published private(set) var invitePending: Set<UUID> = []
 
     /// Bildirim zilindeki okunmamış işareti.
     @Published var hasUnreadActivity = true
@@ -3390,47 +3397,60 @@ final class ProjectViewModel: ObservableObject {
             return
         }
 
-        var code = InviteCode.generate()
-        let activeCodes = Set(projects.compactMap { $0.invite?.isUsable == true ? $0.invite?.code : nil })
-        var attempts = 0
-        while activeCodes.contains(code), attempts < 20 {
-            code = InviteCode.generate()
-            attempts += 1
-        }
-        projects[index].invite = Invite(code: code, createdAt: Date())
-
         guard let invites else {
-            // Demo verisi: kod yalnızca projenin içinde yaşar.
+            // Demo verisi: kod yalnızca projenin içinde yaşar; üretildiği an
+            // "kaydedilmiş" sayılır, gösterilmesinde sakınca yok.
+            var code = InviteCode.generate()
+            let activeCodes = Set(projects.compactMap { $0.invite?.isUsable == true ? $0.invite?.code : nil })
+            var attempts = 0
+            while activeCodes.contains(code), attempts < 20 {
+                code = InviteCode.generate()
+                attempts += 1
+            }
+            projects[index].invite = Invite(code: code, createdAt: Date())
             persist([.projectInvite(projectId: projects[index].id,
                                     invite: projects[index].invite)],
                     failureNote: "Davet kodu")
             return
         }
 
-        // Firestore: `invites/{KOD}` otorite kaydı ile proje aynası TEK PARTİDE
-        // yazılır. `persist` KULLANILMIYOR çünkü `invites` koleksiyonu
-        // `DocumentChange`'in bilmediği bir yol — repository yalnızca proje
-        // ağacını tanıyor ve davet o ağacın dışında (bilerek: kod okuma herkese
-        // kapalı olmalı, proje belgesinin içinde olsa üyeler de görürdü).
-        let projectId = projects[index].id
+        // Aynı proje için ikinci dokunuş yok sayılır: iki parti kuyruğa girer,
+        // iki kod da geçerli olur ve ekranda hangisinin kalacağı yarışa kalırdı.
+        guard !invitePending.contains(projectId) else { return }
+
+        // EKRANA YER TUTUCU KOD YAZILMIYOR (madde 5). Eskiden burada yerel bir
+        // kod A üretilip hemen `invite`e konuyordu; ama `createInvite` kendi
+        // içinde AYRI bir kod B üretip onu yazıyor — A HİÇBİR YERE
+        // kaydedilmiyordu. Çevrimiçiyken A birkaç yüz milisaniye görünüp B
+        // ile değişiyordu. ÇEVRİMDIŞI DAHA KÖTÜ: `createInvite` bir Firestore
+        // partisi ve `await batch.commit()` ağ yokken hata fırlatmıyor, sunucu
+        // onayına kadar ASKIDA kalıyor. `catch` hiç çalışmıyor, A süresiz
+        // ekranda kalıyor ve paylaşılabiliyordu — asla geçerli olmayacak bir
+        // kod. Paylaşmak ancak sunucu kodu gördükten sonra güvenli: ortağın
+        // `redeemInvite` çağrısı sunucuya gidiyor, yerel önbelleğe değil.
+        //
+        // NOT — DAVET AYNASI ÜYELERE AÇIK: `invites/{KOD}` proje ağacının
+        // dışında ve orada kod okuma herkese kapalı. Ama yöneticinin ekranı
+        // için `createInvite` proje belgesine bir ayna da yazıyor ve proje
+        // belgesi TÜM üyelere açık, yani ayna ortakların cihazına da iniyor.
+        // Buradaki eski yorum bunun tersini söylüyordu; açık bir madde.
         let ownerUid = projects[index].ownerUid
+        invitePending.insert(projectId)
         Task { [weak self] in
             guard let self else { return }
+            defer { self.invitePending.remove(projectId) }
             do {
-                // Sunucunun ürettiği kod kazanır: çakışma olursa servis yeniden
-                // dener ve elimizdeki yerel kod geçersiz kalırdı.
-                let serverCode = try await invites.createInvite(projectId: projectId,
-                                                               ownerUid: ownerUid)
+                let code = try await invites.createInvite(projectId: projectId,
+                                                         ownerUid: ownerUid)
                 if let i = self.projects.firstIndex(where: { $0.id == projectId }) {
-                    self.projects[i].invite = Invite(code: serverCode, createdAt: Date())
+                    self.projects[i].invite = Invite(code: code, createdAt: Date())
                 }
             } catch {
                 Diag.log("invite", error)
-                // Yerel kodu geri al: ekranda kullanılamayacak bir kod
-                // göstermek, kod göstermemekten kötü.
-                if let i = self.projects.firstIndex(where: { $0.id == projectId }) {
-                    self.projects[i].invite = nil
-                }
+                // ÖNCEKİ KOD YERİNDE KALIYOR. Eskiden `invite = nil` yapılıyordu:
+                // yeni kod üretmeyi deneyip başaramayan sahip, sunucuda HÂLÂ
+                // GEÇERLİ olan kodunu da ekrandan kaybediyordu. `invite`e
+                // üretim boyunca hiç dokunulmadığı için geri alınacak bir şey yok.
                 self.flash("Davet kodu üretilemedi")
             }
         }
@@ -3488,9 +3508,10 @@ final class ProjectViewModel: ObservableObject {
             default:           return .failed(error)
             }
         } catch {
-            // `InviteError` olmayan bir hata — örneğin Auth ID jetonu
-            // yenilenemedi ve hata `from(_:)`e hiç uğramadı. Kod hakkında
-            // bilgi yok; kutular kızarmamalı.
+            // ÜRETİMDE ERİŞİLMİYOR: `FirebaseInviteService.redeem` her hatayı
+            // `InviteError.from(_:)`den geçiriyor. Bu dal yalnızca hatayı
+            // çevirmeyen başka bir `InviteService` uygulamasında (test sahtesi)
+            // çalışır. Kod hakkında bilgi yok; kutular kızarmamalı.
             return .failed(.unknown)
         }
     }

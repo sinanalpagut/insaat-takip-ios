@@ -12,8 +12,17 @@ struct InviteSheet: View {
 
     let projectId: UUID
 
+    /// Üretim birkaç saniyeyi geçti mi — geçtiyse bağlantı açıklaması çıkar.
+    /// Çevrimiçi durumda kod yüz milisaniyeler içinde geliyor; açıklamayı hemen
+    /// göstermek her seferinde bir an yanıp sönen gürültü olurdu.
+    @State private var slowGeneration = false
+
     private var project: Project? {
         viewModel.projects.first { $0.id == projectId }
+    }
+
+    private var isGenerating: Bool {
+        viewModel.invitePending.contains(projectId)
     }
 
     var body: some View {
@@ -22,7 +31,13 @@ struct InviteSheet: View {
                         subtitle: "Davet edilen kişi \(project?.title ?? "") projesini yalnızca görüntüleyebilir.",
                         subtitleAccent: project?.title) { dismiss() }
 
-            if let invite = project?.invite {
+            // ÖNCE "hazırlanıyor": üretim sürerken ne önceki kod ne de bir yer
+            // tutucu gösteriliyor. Önceki kodu göstermek "Yeni Kod"a basan
+            // kişiye eski kodu paylaştırırdı; yer tutucu ise sunucuda hiç
+            // olmayan bir kodu paylaştırıyordu (madde 5).
+            if isGenerating {
+                generatingState
+            } else if let invite = project?.invite {
                 codeBlock(invite)
                 linkRow(invite.code)
                 whatsappButton(invite.code)
@@ -49,9 +64,43 @@ struct InviteSheet: View {
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
         .toastOverlay(viewModel.toast)
+        .task(id: isGenerating) {
+            slowGeneration = false
+            guard isGenerating else { return }
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if !Task.isCancelled { slowGeneration = true }
+        }
     }
 
     // MARK: Durumlar
+
+    /// Kod sunucuya yazılıyor. Paylaşma düğmeleri bilerek yok.
+    ///
+    /// Çevrimdışıyken bu durum ağ gelene kadar sürer: yazma kuyrukta bekliyor
+    /// ve iptal edilmiyor, bağlantı gelince kod kendiliğinden burada belirir.
+    /// Ekran kapatılsa da üretim devam ediyor.
+    private var generatingState: some View {
+        VStack(spacing: 10) {
+            ProgressView()
+                .tint(Palette.textTertiary)
+            Text("Kod hazırlanıyor…")
+                .font(.manrope(12, .semiBold))
+                .foregroundColor(Palette.textSecondary)
+            if slowGeneration {
+                Text("Bağlantı bekleniyor. Kod sunucuya ulaşınca burada görünecek; paylaşmak o zaman güvenli.")
+                    .font(.manrope(11, .medium))
+                    .foregroundColor(Palette.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 18)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 132)
+        .background(Palette.fillSubtle)
+        .cornerRadius(16)
+        .padding(.top, 18)
+    }
 
     /// Henüz kod üretilmemiş hali.
     private var emptyState: some View {
