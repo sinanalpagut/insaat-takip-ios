@@ -32,7 +32,7 @@ struct AccountDeletionSummary {
 // okuyan kişi akışı baştan başlatıyor, her denemede yeni bir SMS yakıyor ve
 // sonunda Firebase kotasına çarpıyor — yani mesajın belirsizliği kullanıcıyı
 // çalışmayan bir döngüye sokuyor.
-enum AccountDeletionError: LocalizedError, Equatable {
+enum AccountDeletionError: LocalizedError, Equatable, CaseIterable {
     /// Ağ yok ya da sunucuya ulaşılamadı — VERİ HENÜZ SİLİNMEMİŞ olabilir.
     case unreachable
     /// Oturum düşmüş — işlevin KENDİ `signed-in-required` anahtarı.
@@ -58,7 +58,9 @@ enum AccountDeletionError: LocalizedError, Equatable {
         switch self {
         case .unreachable:    return "Bağlantı yok · silme tamamlanmadı"
         case .signedOut:      return "Oturumun düşmüş · çıkıp tekrar gir"
-        case .requestRejected: return "İstek doğrulanamadı · bağlantını kontrol edip tekrar dene"
+        // Bu metin SMS kodu alanının hemen altında görünüyor; "doğrulanamadı"
+        // kelimesi "SMS kodun doğrulanamadı" diye okunuyordu.
+        case .requestRejected: return "Sunucu isteği reddetti · SMS kodun geçerli, bağlantını kontrol edip tekrar dene"
         case .reauthRequired: return "Doğrulamanın süresi doldu · baştan başla"
         case .notDeployed:    return "Silme servisi bu projede kurulu değil"
         case .serverFailed:   return "Sunucu silmeyi tamamlayamadı · tekrar dene"
@@ -96,7 +98,11 @@ enum AccountDeletionError: LocalizedError, Equatable {
             // çerçeve reddetti, gövde hiç çalışmadı.
             return ns.localizedDescription == "signed-in-required" ? .signedOut : .requestRejected
         case .permissionDenied:
-            return .signedOut
+            // 403'ü işlev gövdesi HİÇ fırlatmıyor ve projede `authPolicy`
+            // yok; yani yalnızca altyapıdan geliyor (Cloud Run çağırma izni,
+            // kuruluş politikası). Oturumla ilgisi yok — `.signedOut` kişiyi
+            // SMS turuna yollar ve 401 için kapatılan döngü burada açık kalırdı.
+            return .requestRejected
         case .failedPrecondition:
             // Sunucu `reauth-required` diyorsa doğrulama eskimiş demektir.
             return ns.localizedDescription.contains("reauth") ? .reauthRequired : .serverFailed

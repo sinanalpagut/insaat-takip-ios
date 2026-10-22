@@ -40,9 +40,11 @@ enum InviteError: LocalizedError, Equatable, CaseIterable {
     /// Çerçeve (`firebase-functions` `wrapOnCallHandler`) oturum ve App Check
     /// kapılarını gövdeden önce denetliyor ve reddettiğinde kendi metnini
     /// ("Unauthenticated") yazıyor. En sık sebep kötü bağlantı: App Check
-    /// jetonu alınamazsa iOS SDK'sı hatayı yutup isteği başlıksız gönderiyor.
-    /// Aynı yanıt geçersiz oturum jetonunda da geliyor ve istemci ikisini
-    /// AYIRT EDEMİYOR — metin bu yüzden tek bir neden iddia etmiyor.
+    /// jetonu alınamazsa iOS SDK'sı hatayı yutup başlığa bir YER TUTUCU jeton
+    /// koyuyor, çerçeve onu geçersiz (INVALID — "missing" değil; sunucu
+    /// günlüğünde bu kelimeyle aranmalı) sayıp reddediyor. Aynı yanıt geçersiz
+    /// oturum jetonunda da geliyor ve istemci ikisini AYIRT EDEMİYOR — metin bu
+    /// yüzden tek bir neden iddia etmiyor.
     ///
     /// Eskiden `.notSignedIn`e, oradan SESSİZCE `.notFound`a gidiyordu:
     /// arızada GEÇERLİ HER KOD "Böyle bir davet kodu yok" gösteriliyordu.
@@ -73,7 +75,10 @@ enum InviteError: LocalizedError, Equatable, CaseIterable {
     var errorDescription: String? {
         switch self {
         case .notSignedIn:     return "Oturumun düşmüş · çıkıp tekrar gir"
-        case .badFormat:       return "Kod 6 haneli olmalı"
+        // Sunucunun `code-format`ı neredeyse yalnızca istemcinin kabul edip
+        // sunucunun sildiği harflerden (Türkçe karakterler) doğuyor; ekranda
+        // altı dolu kutu varken "6 haneli olmalı" kişiye bir şey söylemiyordu.
+        case .badFormat:       return "Kodda geçersiz karakter var"
         case .notFound:        return "Böyle bir davet kodu yok"
         case .expired:         return "Kodun süresi doldu · yöneticiden yeni kod iste"
         case .alreadyUsed:     return "Bu kod daha önce kullanılmış"
@@ -81,7 +86,9 @@ enum InviteError: LocalizedError, Equatable, CaseIterable {
         case .network:         return "Bağlantı yok"
         case .requestRejected: return "İstek doğrulanamadı · kod denenmedi"
         case .timedOut:        return "Yanıt gelmedi · aynı kodu bir kez daha dene"
-        case .tooManyAttempts: return "Çok fazla hatalı deneme · biraz bekle"
+        // "Başarısız", "hatalı" değil: sunucu sayacı kodla ilgisi olmayan
+        // başarısızlıkları da sayıyor.
+        case .tooManyAttempts: return "Çok fazla başarısız deneme · biraz bekle"
         case .unknown:         return "Projeye katılınamadı"
         }
     }
@@ -99,9 +106,12 @@ enum InviteError: LocalizedError, Equatable, CaseIterable {
     var recoverySuggestion: String? {
         switch self {
         case .requestRejected:
-            return "Kodda bir sorun yok; sunucu isteği okumadan reddetti ve kod harcanmadı. "
+            // Kod hakkında OLUMLU hüküm de yok: "kodda sorun yok" demek, kod
+            // okunmadığı hâlde hüküm vermek olurdu ve bağlantı düzelince aynı
+            // kod "kod yok" alırsa iki mesaj birbirini yalanlardı.
+            return "Sunucu isteği kodu okumadan reddetti; kod denenmedi ve harcanmadı. "
                  + "Bağlantını kontrol et, uygulamayı kapatıp aç ve aynı kodu tekrar dene. "
-                 + "Düzelmezse çıkış yapıp telefon numaranla yeniden gir."
+                 + "Bağlantın iyiyken de sürerse Hesap > Oturumu Kapat ile çıkıp telefon numaranla yeniden gir."
         case .timedOut:
             // DURMA KURALI var: "bir kez daha", sonra yer değiştir. Sınırsız
             // tekrar, sunucuya ulaşıp patlayan her denemeyi oran sınırına
@@ -111,19 +121,42 @@ enum InviteError: LocalizedError, Equatable, CaseIterable {
                  + "Yine yanıt gelmezse bağlantının daha iyi olduğu bir yerde dene."
         case .tooManyAttempts:
             return "Güvenlik için denemeler kısa süreliğine durduruldu; en geç 15 dakika içinde yeniden açılır. "
-                 + "Kodu yöneticinden doğru aldığından emin ol."
+                 + "Daha önce \"kod yok\" gördüysen kodu yöneticinden doğru aldığından emin ol."
         case .notSignedIn:
-            return "Sunucu oturumunu kabul etmedi. Çıkış yapıp telefon numaranla yeniden gir, "
-                 + "sonra aynı kodu dene."
+            return "Sunucu oturumunu kabul etmedi. Hesap > Oturumu Kapat ile çıkıp "
+                 + "telefon numaranla yeniden gir, sonra aynı kodu dene."
         case .network:
-            return "Kod denenmedi. İnternete bağlanınca aynı kodu tekrar dene."
+            // Kesin konuşmuyor: istek gönderildikten sonra kopan bağlantıda
+            // sunucu katılımı tamamlamış olabilir.
+            return "Bağlantı koptu; katılım tamamlanmış olabilir. İnternete bağlanınca aynı kodu "
+                 + "tekrar dene — zaten ortak olduysan uygulama bunu söyleyecek."
         case .inviteBroken:
             return "Bu davetin bağlı olduğu proje bulunamadı. Yöneticinden yeni bir kod iste."
         case .unknown:
-            return "Bunun kodla ilgili olduğu kesin değil. Biraz sonra aynı kodu tekrar dene; "
-                 + "sürerse yöneticine bildir."
+            // "Yöneticine bildir" DEĞİL: bu daldaki hataların hiçbirini proje
+            // yöneticisi düzeltemez.
+            return "Sorunun kodla ilgisi olup olmadığı belli değil. Biraz sonra aynı kodu tekrar dene; "
+                 + "sürerse Hesap > Geri bildirim gönder'den bildir."
         case .badFormat, .notFound, .expired, .alreadyUsed:
             return nil
+        }
+    }
+
+    /// Kalıcı uyarının başlığı — yalnızca DURUM.
+    ///
+    /// `errorDescription` toast için "durum · eylem" kalıbında; uyarıda eylemi
+    /// açıklama satırı taşıdığı için başlıkta tekrarı gereksiz gürültüydü.
+    var alertTitle: String {
+        switch self {
+        case .requestRejected: return "İstek reddedildi"
+        case .timedOut:        return "Yanıt gelmedi"
+        case .tooManyAttempts: return "Denemeler durduruldu"
+        case .notSignedIn:     return "Oturum geçersiz"
+        case .network:         return "Bağlantı koptu"
+        case .inviteBroken:    return "Davet geçersiz"
+        case .unknown:         return "Projeye katılınamadı"
+        case .badFormat, .notFound, .expired, .alreadyUsed:
+            return errorDescription ?? "Projeye katılınamadı"
         }
     }
 

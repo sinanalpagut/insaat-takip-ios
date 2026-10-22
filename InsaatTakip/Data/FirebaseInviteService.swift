@@ -145,15 +145,24 @@ extension InviteError {
             // `.deadlineExceeded → .expired` ("süresi doldu"), ve `.notFound`
             // — ki 404 burada "işlev yok / bölge yanlış" demek, bu dosyanın
             // başındaki yorum tam bu tuzağı yazıyor.
+            //
+            // `.resourceExhausted` BURADA YOK ve bilerek: sunucunun gerçek
+            // oran sınırı HER ZAMAN `too-many-attempts` anahtarıyla geliyor ve
+            // yukarıda yakalanıyor. Anahtarsız 429 ise Cloud Run'ın örnek
+            // sınırından (`maxInstances`) geliyor; onu "çok fazla deneme"
+            // saymak hiç denemeyen kişiyi suçlamak olurdu.
             switch code {
-            case .unauthenticated:   return .requestRejected
-            case .deadlineExceeded:  return .timedOut
-            case .resourceExhausted: return .tooManyAttempts
-            case .unavailable:       return .network
-            default:                 return .unknown
+            case .unauthenticated:  return .requestRejected
+            case .deadlineExceeded: return .timedOut
+            case .unavailable:      return .network
+            default:                return .unknown
             }
         }
         if ns.domain == NSURLErrorDomain { return .network }
+        // SDK çağrıdan ÖNCE Auth ID jetonunu tazeliyor; önbellekteki jeton
+        // eskimişken ağ yoksa hata Auth alanından geliyor (17020 =
+        // `networkError`). Bağlantı sorunu, "katılınamadı" değil.
+        if ns.domain == "FIRAuthErrorDomain", ns.code == 17020 { return .network }
         return .unknown
     }
 }

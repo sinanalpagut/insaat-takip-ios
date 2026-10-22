@@ -90,6 +90,35 @@ final class InviteErrorMappingTests: XCTestCase {
                        .network)
     }
 
+    /// Anahtarsız 429 sunucunun oran sınırı DEĞİL — Cloud Run'ın örnek
+    /// sınırı. Kişi hiç deneme yapmamış olabilir; "çok fazla deneme" demek onu
+    /// haksız yere suçlar.
+    func testAltyapi429OranSiniriSayilmiyor() {
+        XCTAssertNotEqual(InviteError.from(callable(.resourceExhausted, "RESOURCE EXHAUSTED")),
+                          .tooManyAttempts)
+    }
+
+    /// Auth ID jetonu tazelenirken ağ yoksa hata Auth alanından geliyor; bu
+    /// bir bağlantı sorunu.
+    func testAuthAgHatasiBaglantiSayiliyor() {
+        XCTAssertEqual(InviteError.from(NSError(domain: "FIRAuthErrorDomain", code: 17020)),
+                       .network)
+    }
+
+    /// Uyarı başlıkları da birbirinden ayrı ve eylemi tekrar etmiyor.
+    func testUyariBasliklariAyriVeKisa() {
+        let kodDisi = InviteError.allCases.filter { !$0.isCodeFault }
+        let basliklar = kodDisi.map(\.alertTitle)
+        XCTAssertEqual(Set(basliklar).count, basliklar.count, "iki uyarı aynı başlığı taşıyor")
+        for b in basliklar { XCTAssertFalse(b.contains("·"), "'\(b)' başlıkta eylem tekrar ediyor") }
+    }
+
+    /// Kod okunmadığı yolda kod hakkında OLUMLU hüküm de verilmemeli.
+    func testKodOkunmadanKodHakkindaHukumYok() {
+        let metin = InviteError.requestRejected.recoverySuggestion ?? ""
+        XCTAssertFalse(metin.localizedCaseInsensitiveContains("sorun yok"))
+    }
+
     // MARK: - Yeni durumların kendisi
 
     func testYeniDurumlarDogruYereGidiyor() {

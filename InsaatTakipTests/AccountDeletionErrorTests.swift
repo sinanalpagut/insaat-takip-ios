@@ -59,7 +59,17 @@ final class AccountDeletionErrorTests: XCTestCase {
         XCTAssertEqual(AccountDeletionError.from(functionsError(.unauthenticated,
                                                                 message: "signed-in-required")),
                        .signedOut)
-        XCTAssertEqual(AccountDeletionError.from(functionsError(.permissionDenied)), .signedOut)
+    }
+
+    /// Anahtarsız 403 de oturum hakkında hüküm değil: işlev gövdesi 403
+    /// fırlatmıyor, yalnızca altyapı (çağırma izni) fırlatıyor. Eskiden bu
+    /// test 403'ü `.signedOut`a sabitliyordu — 401 için kapatılan SMS
+    /// döngüsünü 403 üzerinden açık tutan varsayım.
+    func testAltyapi403OturumDusmusSayilmiyor() {
+        let hata = AccountDeletionError.from(functionsError(.permissionDenied,
+                                                            message: "PERMISSION DENIED"))
+        XCTAssertNotEqual(hata, .signedOut)
+        XCTAssertTrue(hata.retryable, "403 kişiyi SMS turuna yolluyor")
     }
 
     /// Functions dışından gelen bir hata (ağ katmanı) da anlamlı bir sınıfa
@@ -83,8 +93,9 @@ final class AccountDeletionErrorTests: XCTestCase {
     /// Her sınıfın kullanıcıya söyleyecek AYRI bir cümlesi olmalı; ikisi aynı
     /// olsaydı ayırmanın bir faydası kalmazdı.
     func testEveryCaseHasItsOwnSentence() {
-        let hepsi: [AccountDeletionError] =
-            [.unreachable, .signedOut, .reauthRequired, .notDeployed, .serverFailed]
+        // `allCases`, elle liste DEĞİL: elle tutulan liste `.requestRejected`
+        // eklendiğinde güncellenmemişti ve yeni cümle hiç denetlenmiyordu.
+        let hepsi = AccountDeletionError.allCases
         let cumleler = hepsi.compactMap(\.errorDescription)
         XCTAssertEqual(cumleler.count, hepsi.count)
         XCTAssertEqual(Set(cumleler).count, hepsi.count)

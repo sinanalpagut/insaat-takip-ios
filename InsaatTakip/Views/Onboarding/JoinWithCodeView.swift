@@ -113,7 +113,7 @@ struct JoinWithCodeView: View {
         .padding(.horizontal, 26)
         .background(Palette.ink.ignoresSafeArea())
         .toastOverlay(viewModel.toast)
-        .alert(failure?.errorDescription ?? "",
+        .alert(failure?.alertTitle ?? "",
                isPresented: Binding(get: { failure != nil },
                                     set: { if !$0 { failure = nil } }),
                presenting: failure) { _ in
@@ -173,6 +173,11 @@ struct JoinWithCodeView: View {
     // MARK: Aksiyonlar
 
     private func submit() {
+        // Önceki denemenin kızarttığı kutular yeni denemede SIFIRLANIR. Yoksa
+        // ilk denemedeki "kod yok"tan kalan kırmızı, sonraki bir "istek
+        // reddedildi" uyarısında da durur ve "kutular yalnızca kod hükmünde
+        // kızarır" sözü pratikte tutmaz.
+        showInvalid = false
         guard InviteCode.sanitize(code).count == 6 else {
             showInvalid = true
             viewModel.flash("Kod 6 haneli olmalı")
