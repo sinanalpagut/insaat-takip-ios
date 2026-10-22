@@ -18,8 +18,8 @@ import {
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, query,
-  serverTimestamp, setDoc, updateDoc, where, writeBatch,
+  arrayRemove, arrayUnion, collection, deleteDoc, deleteField, doc, getDoc,
+  getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
 /// Uygulamanın HER yazmaya eklediği sunucu damgası (madde 77).
@@ -247,6 +247,133 @@ describe('projects/{pid}', () => {
 });
 
 // ═══════════════════════════ Alt koleksiyonlar ═══════════════════════════
+
+describe('proje belgesi yazması üyeliği ve daveti EZMİYOR', () => {
+
+  // ───────────────────────────────────────────────────────────────────────
+  // NEDEN BU TESTLER EMÜLATÖRDE: Swift tarafındaki davranış testleri
+  // `InMemoryProjectRepository` üzerinde koşuyor ve ÜRETİM yazma yolunu hiç
+  // çalıştırmıyor. Kırmızı probla ölçüldü: `serverOwnedProjectFields` boşa
+  // çekilince (yani düzeltmenin çekirdeği devre dışı) o testlerin ÜÇÜ DE
+  // YEŞİL KALDI — ölçtükleri şey bellek içi deponun daraltması. Üretim
+  // yükünün gerçek Firestore semantiğiyle doğrulanacağı tek yer burası.
+  //
+  // Kusur: proje belgesi her yazışta TAM gönderiliyordu ve yük sahibin
+  // CİHAZINDAKİ kopyadan kuruluyordu. Sunucudaki `redeemInvite` ortağı
+  // `arrayUnion` ile ekledikten sonra sahibin herhangi bir düzenlemesi
+  // listeyi eski hâliyle eziyor, ortak projeyi okuyamaz hâle geliyordu.
+  // ───────────────────────────────────────────────────────────────────────
+
+  const NEWCOMER = 'uid-newcomer';
+
+  /// `FirestoreProjectRepository.projectFields` ile AYNI biçim: iş alanları +
+  /// silme sentinel'leri, üyelik yalnızca kendini onaran `arrayUnion`, davet
+  /// aynası YOK.
+  const duzenlemeYuku = (uid, isAlanlari) => stamped(uid, {
+    ...isAlanlari,
+    memberUids: arrayUnion(uid),
+  });
+
+  before(async () => {
+    // `seed()` ÖNCE: dosyanın kalıbı bu ve zemini önceki bloğun artığından
+    // bağımsız kılıyor. Atlandığında test, ölçmek istediği şeyi değil
+    // çalıştırma sırasını ölçüyor.
+    await seed();
+    // Sunucu olayı: yeni ortak davetle katıldı (`redeemInvite` arrayUnion) ve
+    // sahip bir davet kodu üretti (`createInvite` aynayı yazdı).
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'projects', P1), {
+        memberUids: [OWNER, MEMBER, NEWCOMER],
+        invite: { code: 'ABC123', createdAt: new Date() },
+      });
+    });
+  });
+
+  it('sahibin alan yazması sunucudaki ortağı DÜŞÜRMÜYOR', async () => {
+    const db = testEnv.authenticatedContext(OWNER).firestore();
+
+    await assertSucceeds(setDoc(
+      doc(db, 'projects', P1),
+      duzenlemeYuku(OWNER, { progress: 42, phase: 'Kaba inşaat' }),
+      { merge: true },
+    ));
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const snap = await getDoc(doc(ctx.firestore(), 'projects', P1));
+      const uids = snap.data().memberUids;
+      if (!uids.includes(NEWCOMER)) {
+        throw new Error(`alan yazması üyeliği ezdi: ${JSON.stringify(uids)}`);
+      }
+      if (!uids.includes(MEMBER)) throw new Error('eski üye de düştü');
+      if (snap.data().progress !== 42) throw new Error('iş alanı yazılmadı');
+      if (snap.data().invite?.code !== 'ABC123') {
+        throw new Error('davet aynası silindi');
+      }
+    });
+  });
+
+  it('ESKİ BİÇİM kusuru üretiyordu — tam liste yazması ortağı düşürür', async () => {
+    // Bu test düzeltmeyi değil, DÜZELTİLEN ŞEYİ belgeliyor: aynı kural aynı
+    // yazmayı kabul ediyor, yani kusur kuralda değil İSTEMCİNİN GÖNDERDİĞİ
+    // VERİDE'ydi. Kuralın bunu reddetmesini beklemek yanlış yere bakmak olur.
+    const db = testEnv.authenticatedContext(OWNER).firestore();
+    await assertSucceeds(setDoc(
+      doc(db, 'projects', P1),
+      stamped(OWNER, { memberUids: [OWNER], progress: 7 }),
+      { merge: true },
+    ));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const uids = (await getDoc(doc(ctx.firestore(), 'projects', P1))).data().memberUids;
+      if (uids.includes(NEWCOMER)) throw new Error('beklenen kusur üremedi');
+      // Zemini bir sonraki test için geri al.
+      await updateDoc(doc(ctx.firestore(), 'projects', P1), {
+        memberUids: arrayUnion(MEMBER, NEWCOMER),
+      });
+    });
+  });
+
+  it('üyelik kapısı arrayRemove ile kapanıyor (ortak çıkarma)', async () => {
+    const db = testEnv.authenticatedContext(OWNER).firestore();
+    await assertSucceeds(updateDoc(
+      doc(db, 'projects', P1),
+      stamped(OWNER, { memberUids: arrayRemove(NEWCOMER) }),
+    ));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const uids = (await getDoc(doc(ctx.firestore(), 'projects', P1))).data().memberUids;
+      if (uids.includes(NEWCOMER)) throw new Error('üyelik kapısı kapanmadı');
+      if (!uids.includes(OWNER)) throw new Error('sahip de düştü');
+    });
+  });
+
+  it('silme sentinel’i merge yazmada kuraldan geçiyor', async () => {
+    // `merge: true` yükte OLMAYAN alanı sunucuda bırakıyor; kullanıcının
+    // temizlediği opsiyonel için açık `deleteField()` gerekiyor.
+    const db = testEnv.authenticatedContext(OWNER).firestore();
+    await assertSucceeds(setDoc(
+      doc(db, 'projects', P1),
+      duzenlemeYuku(OWNER, { archivedAt: deleteField() }),
+      { merge: true },
+    ));
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const d = (await getDoc(doc(ctx.firestore(), 'projects', P1))).data();
+      if ('archivedAt' in d) throw new Error('silme sentinel’i işlemedi');
+    });
+  });
+
+  it('ortak bu yoldan da yazamıyor', async () => {
+    const db = testEnv.authenticatedContext(MEMBER).firestore();
+    await assertFails(setDoc(
+      doc(db, 'projects', P1),
+      duzenlemeYuku(MEMBER, { progress: 99 }),
+      { merge: true },
+    ));
+    // Kendini üyeliğe ekleme denemesi de reddedilmeli.
+    await assertFails(updateDoc(
+      doc(db, 'projects', P2),
+      stamped(MEMBER, { memberUids: arrayUnion(MEMBER) }),
+    ));
+  });
+});
 
 describe('projects/{pid}/apartments — yönetici yazar, ortak okur', () => {
   before(seed);

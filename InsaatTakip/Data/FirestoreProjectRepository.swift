@@ -263,18 +263,25 @@ final class FirestoreProjectRepository: ProjectRepository {
     /// yazılmış iptal" durumu hâlâ imkânsız. Proje belgesi içeren tek çok-yazmalı
     /// eylem proje KURULUMU; orada yarı başarı "proje kuruldu, daireler gelmedi"
     /// demek: görünür ve yeniden denenebilir.
+    /// 1. AŞAMADA ARTIK YALNIZCA `.createProject` VAR (19 Eki düzeltmesi).
+    /// İki aşamanın gerekçesi — alt koleksiyon kuralının parti içindeki proje
+    /// OLUŞTURMASINI görmemesi — yalnızca kurulumda geçerli. Var olan bir
+    /// projeye yazan `.project`, `.projectMembership` ve `.projectInvite`
+    /// artık partiye giriyor; bu, `removePartner`ın kendi yorumunun istediği
+    /// "üyelik kapısı + ortak kaydı TEK partide" sözünü ilk kez gerçekten
+    /// tutuyor ve `addApartment`ın daire sayacı ↔ daire ayrışmasını kapatıyor.
     func apply(_ changes: [DocumentChange]) async throws {
         guard !changes.isEmpty else { return }
 
-        // 1. aşama — proje belgeleri.
+        // 1. aşama — proje KURULUMU.
         for change in changes {
-            guard case .project(let project) = change else { continue }
+            guard case .createProject(let project) = change else { continue }
             try await db.collection("projects").document(project.id.uuidString)
                 .setData(try encode(project))
         }
 
         // 2. aşama — geri kalan her şey tek parti.
-        let rest = changes.filter { if case .project = $0 { return false } else { return true } }
+        let rest = changes.filter { if case .createProject = $0 { return false } else { return true } }
         if !rest.isEmpty {
             let batch = db.batch()
             for change in rest { try stage(change, in: batch) }
@@ -295,7 +302,36 @@ final class FirestoreProjectRepository: ProjectRepository {
     private func mirror(_ changes: [DocumentChange]) {
         for change in changes {
             switch change {
-            case .project(let p):        upsert(p, into: &latest.projects)
+            // AYNA DA YAZMA YOLUNU TAKLİT ETMEK ZORUNDA: `.project` sunucuda
+            // üyeliğe ve davete dokunmadığı için iç kopyada da dokunmamalı.
+            // Tam nesneyi basmak, sunucuda korunan ortağı yerel kopyadan
+            // düşürür ve `verifySeam` bunu GÖREMEZ (yalnızca kayıt SAYISI
+            // karşılaştırıyor, alan değil).
+            case .project(let p):
+                if let i = latest.projects.firstIndex(where: { $0.id == p.id }) {
+                    var birlesik = p
+                    birlesik.memberUids = latest.projects[i].memberUids
+                    birlesik.invite = latest.projects[i].invite
+                    latest.projects[i] = birlesik
+                } else {
+                    upsert(p, into: &latest.projects)
+                }
+            case .createProject(let p):  upsert(p, into: &latest.projects)
+            case .projectMembership(let pid, let uid, let op):
+                if let i = latest.projects.firstIndex(where: { $0.id == pid }) {
+                    switch op {
+                    case .add:
+                        if !latest.projects[i].memberUids.contains(uid) {
+                            latest.projects[i].memberUids.append(uid)
+                        }
+                    case .remove:
+                        latest.projects[i].memberUids.removeAll { $0 == uid }
+                    }
+                }
+            case .projectInvite(let pid, let invite):
+                if let i = latest.projects.firstIndex(where: { $0.id == pid }) {
+                    latest.projects[i].invite = invite
+                }
             case .material(let m):       upsert(m, into: &latest.materials)
             case .materialLog(let l):    upsert(l, into: &latest.materialLogs)
             case .apartment(let a):      upsert(a, into: &latest.apartments)
@@ -358,9 +394,27 @@ final class FirestoreProjectRepository: ProjectRepository {
 
     private func stage(_ change: DocumentChange, in batch: WriteBatch) throws {
         switch change {
-        case .project:
+        case .createProject:
             // 1. aşamada işlendi; buraya düşmemesi gerekiyor.
             return
+
+        case .project(let p):
+            // merge: true ZORUNLU — `projectFields` içinde `FieldValue.delete()`
+            // sentinel'leri var ve onlar merge OLMAYAN bir `setData` içinde
+            // ObjC istisnası atıyor. Swift'te `try`/`catch` ile YAKALANMAZ:
+            // uygulama çöker. Bu yükü başka bir yazmaya taşıma.
+            batch.setData(stamped(try Self.projectFields(p, writerUid: writerUid)),
+                          forDocument: projectRef(p.id), merge: true)
+
+        case .projectMembership(let pid, let uid, let op):
+            let islem = op == .add ? FieldValue.arrayUnion([uid])
+                                   : FieldValue.arrayRemove([uid])
+            batch.updateData(stamped(["memberUids": islem]), forDocument: projectRef(pid))
+
+        case .projectInvite(let pid, let invite):
+            let deger: Any = try invite.map { try Firestore.Encoder().encode($0) as Any }
+                             ?? FieldValue.delete()
+            batch.updateData(stamped(["invite": deger]), forDocument: projectRef(pid))
 
         case .material(let m):
             batch.setData(try encode(m), forDocument: ref(.materials, m.projectId, m.id))
@@ -429,6 +483,59 @@ final class FirestoreProjectRepository: ProjectRepository {
     }
 
     // MARK: - Yollar
+
+    private func projectRef(_ pid: UUID) -> DocumentReference {
+        db.collection("projects").document(pid.uuidString)
+    }
+
+    private var writerUid: String { Auth.auth().currentUser?.uid ?? "" }
+
+    // MARK: - Proje belgesinin yazma yükü
+
+    /// Sunucunun sahibi olduğu, istemcinin kendi kopyasından YAZMAYACAĞI alanlar.
+    static let serverOwnedProjectFields = ["memberUids", "invite"]
+
+    /// Sıradan düzenlemede kullanıcının TEMİZLEYEBİLDİĞİ opsiyonel alanlar.
+    ///
+    /// `merge: true` yalnızca YÜKTE OLAN alanları yazıyor; yükte olmayan alan
+    /// sunucuda ESKİ DEĞERİYLE KALIYOR. Yani "kullanıcı kalan maliyet
+    /// tahminini sildi" niyeti, alanı yükten çıkarmakla anlatılamaz — açık
+    /// `FieldValue.delete()` gerekiyor. Yoksa silinen değer bir sonraki
+    /// `refresh()`te geri gelir ve bu ekranda anında görünmez.
+    ///
+    /// ⚠️ BU LİSTEYE `memberUids` YA DA `invite` EKLENMEMELİ. O iki alan
+    /// yükten zaten çıkarıldığı için `fields[key] == nil` koşulu ikisi için
+    /// DAİMA doğru olur ve her düzenleme üyeliği SİLER — bugünkü sessiz
+    /// düşmeden kat kat beter, çünkü sahip de kendi projesini okuyamaz hâle
+    /// gelir (kural `uid() in request.resource.data.memberUids` istiyor).
+    /// `ProjectMembershipWriteTests` listeyi pinliyor.
+    static let erasableProjectFields = ["archivedAt", "remainingCostEstimate",
+                                        "expenseTaxBasis", "salesTaxBasis"]
+
+    /// Sıradan proje düzenlemesinin yükü.
+    ///
+    /// STATİK ve SAF olmasının sebebi test: depo ÖRNEĞİ kurmak Firestore
+    /// istemcisini ayağa kaldırmak demek, birim testi üretim veritabanına
+    /// bağlamak istemiyoruz. Sözlük buradan doğrudan ölçülebiliyor.
+    ///
+    /// `writerUid` boş değilse yüke `memberUids: arrayUnion([writerUid])`
+    /// ekleniyor — KENDİNİ ONARMA. `memberUids` yükten çıkınca kuralın
+    /// `uid() in request.resource.data.memberUids` şartı SUNUCUDAKİ listeye
+    /// bakmaya başlıyor; o liste bir sebeple sahibin uid'ini kaybederse
+    /// (hatalı bir işlev yazması, elle konsol düzenlemesi) sahibin HER
+    /// yazması kalıcı `permission-denied` olurdu. `arrayUnion` yalnızca
+    /// EKLİYOR, hiçbir koşulda kimseyi düşürmüyor, ve idempotent.
+    static func projectFields(_ project: Project, writerUid: String) throws -> [String: Any] {
+        var fields = try Firestore.Encoder().encode(project)
+        for key in serverOwnedProjectFields { fields.removeValue(forKey: key) }
+        for key in erasableProjectFields where fields[key] == nil {
+            fields[key] = FieldValue.delete()
+        }
+        if !writerUid.isEmpty {
+            fields["memberUids"] = FieldValue.arrayUnion([writerUid])
+        }
+        return fields
+    }
 
     private func ref(_ coll: Coll, _ pid: UUID, _ id: UUID) -> DocumentReference {
         db.collection("projects").document(pid.uuidString)

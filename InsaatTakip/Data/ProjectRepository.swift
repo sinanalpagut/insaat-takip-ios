@@ -80,8 +80,53 @@ extension DataSnapshot {
 ///
 /// Model taşıyan case'ler UPSERT'tir: kimlik modelin `id`'sidir, bu yüzden "ekle"
 /// ile "güncelle" ayrı case olmak zorunda değil — Firestore'da da değil.
+/// Üyelik kapısına yapılacak işlem — tam liste ASLA gönderilmiyor.
+enum MembershipOp {
+    case add
+    case remove
+}
+
 enum DocumentChange {
+    /// Proje belgesinin **İŞ ALANLARI** — ilerleme, aşama, KDV tabanı, daire
+    /// sayacı, arşiv damgası...
+    ///
+    /// `memberUids` ve `invite` BU YÜKE DAHİL DEĞİL. Sebebi bir veri kaybıydı:
+    /// proje belgesi her yazışta TAM gönderiliyordu ve yük sahibin
+    /// CİHAZINDAKİ kopyadan kuruluyordu. Sunucudaki `redeemInvite` ortağı
+    /// `arrayUnion` ile ekledikten sonra sahibin herhangi bir düzenlemesi
+    /// listeyi eski hâliyle eziyor, ortak projeyi okuyamaz hâle geliyordu —
+    /// iki tarafa da hiçbir hata gösterilmeden. Canlı snapshot dinleyici
+    /// BİLEREK olmadığı için (bkz. `RootView`) sahibin kopyası ancak `load()`
+    /// ile tazeleniyor, yani pencere dar değil: davet ekranını açık tutan
+    /// sahip için varsayılan akışın kendisi.
+    ///
+    /// Aynı kusur `deleteAccount`ın `arrayRemove` ile çıkardığı SİLİNMİŞ
+    /// hesabı da listeye geri koyuyordu ve o hayalet üyelik arayüzden
+    /// temizlenemiyordu: `removePartner` `partners` kaydı üzerinden çalışıyor,
+    /// o kayıt ise sunucuda silinmiş oluyor.
+    ///
+    /// Bu iki alan artık yalnızca `.projectMembership` ve `.projectInvite`
+    /// ile, niyet beyan ederek yazılıyor.
     case project(Project)
+    /// Proje KURULUMU — belgenin tamamı, merge YOK.
+    ///
+    /// Ayrı durum olmasının sebebi kural: `allow create` hem `ownerUid` hem
+    /// `memberUids` istiyor (sahiplik ve ilk üyelik aynı yazmada, açıkça).
+    /// Birleştirilecek bir sunucu durumu da yok.
+    case createProject(Project)
+    /// Üyelik kapısı — TEK öğe, hep dizi işlemi.
+    ///
+    /// Tam liste göndermek istemciyi sunucunun bilgisine hakem yapar; bu
+    /// maddenin kusuru tam olarak oydu. `arrayUnion`/`arrayRemove` öğe bazlı
+    /// olduğu için çevrimdışı kuyrukta beklerken araya giren bir katılım da
+    /// korunuyor: dönüşüm sunucudaki GERÇEK değere göre yeniden hesaplanıyor.
+    case projectMembership(projectId: UUID, uid: String, op: MembershipOp)
+    /// Proje belgesindeki davet aynası (`nil` → alanı sil).
+    ///
+    /// `updateData` iç içe map'i TÜMÜYLE değiştiriyor; `merge: true` burada
+    /// derin birleştirip eski `usedAt`/`usedByName` alanlarını hayalet
+    /// bırakırdı.
+    case projectInvite(projectId: UUID, invite: Invite?)
     case material(Material)
     case materialLog(MaterialLog)
     case apartment(Apartment)

@@ -2927,7 +2927,7 @@ final class ProjectViewModel: ObservableObject {
         auditEntries.append(contentsOf: denetim)
 
         // ---- Yazmalar ------------------------------------------------------
-        var writes: [DocumentChange] = [.project(proje)]
+        var writes: [DocumentChange] = [.createProject(proje)]
         writes += malzemeler.map { .material($0) }
         writes += daireler.map { .apartment($0) }
         writes += hareketler.map { .materialLog($0) }
@@ -3015,7 +3015,7 @@ final class ProjectViewModel: ObservableObject {
                               createdAt: Date(),
                               invite: nil, photoCount: 0)
         projects.append(project)
-        var writes: [DocumentChange] = [.project(project)]
+        var writes: [DocumentChange] = [.createProject(project)]
 
         // Daireler boş (satılmamış) olarak oluşturulur; kat = 4 daire varsayımıyla.
         // Tip ve alan UYDURULMAZ: önceden sabit bir listeden ("2+1 / 95 m²")
@@ -3293,7 +3293,8 @@ final class ProjectViewModel: ObservableObject {
         // yalnızca kayıt siliniyor — silecek bir erişim de yok.
         if let uid = partner.userUid, !uid.isEmpty {
             projects[projectIndex].memberUids.removeAll { $0 == uid }
-            writes.append(.project(projects[projectIndex]))
+            writes.append(.projectMembership(projectId: partner.projectId,
+                                             uid: uid, op: .remove))
         }
         partners.remove(at: index)
         writes.append(.deletePartner(id: partnerId, projectId: partner.projectId))
@@ -3400,7 +3401,9 @@ final class ProjectViewModel: ObservableObject {
 
         guard let invites else {
             // Demo verisi: kod yalnızca projenin içinde yaşar.
-            persist([.project(projects[index])], failureNote: "Davet kodu")
+            persist([.projectInvite(projectId: projects[index].id,
+                                    invite: projects[index].invite)],
+                    failureNote: "Davet kodu")
             return
         }
 
@@ -3517,7 +3520,11 @@ final class ProjectViewModel: ObservableObject {
                          title: "\(user.name) projeye katıldı",
                          meta: "\(project.title) · davet kodu ile · salt okunur",
                          timestamp: Date()))
-        persist([.project(projects[index]), .partner(partner), activity],
+        persist([.projectInvite(projectId: projects[index].id,
+                                invite: projects[index].invite),
+                 .projectMembership(projectId: projects[index].id,
+                                    uid: user.id, op: .add),
+                 .partner(partner), activity],
                 failureNote: "Projeye katılma")
         return .success(projectTitle: project.title)
     }

@@ -55,7 +55,33 @@ final class InMemoryProjectRepository: ProjectRepository {
 
     private func apply(_ change: DocumentChange) {
         switch change {
-        case .project(let value):        upsert(value, into: &projects)
+        // ÜRETİM DEPOSUYLA AYNI DARALTMA. Buraya uygulanmazsa demo ile üretim
+        // sessizce ayrışır ve bunu hiçbir şey haber vermez: birim testlerin
+        // tamamı bu depo üzerinde koşuyor, DEBUG'daki `verifySeam` ise yalnızca
+        // kayıt SAYISI karşılaştırıyor — eksik ya da ezilmiş bir ALAN sayıyı
+        // değiştirmediği için görünmez. O hâlde testler düzeltmeyi değil,
+        // hangi depoya bakıldığını ölçerdi.
+        case .project(let value):
+            if let i = projects.firstIndex(where: { $0.id == value.id }) {
+                var birlesik = value
+                birlesik.memberUids = projects[i].memberUids
+                birlesik.invite = projects[i].invite
+                projects[i] = birlesik
+            } else {
+                upsert(value, into: &projects)
+            }
+        case .createProject(let value):  upsert(value, into: &projects)
+        case .projectMembership(let pid, let uid, let op):
+            if let i = projects.firstIndex(where: { $0.id == pid }) {
+                switch op {
+                case .add:
+                    if !projects[i].memberUids.contains(uid) { projects[i].memberUids.append(uid) }
+                case .remove:
+                    projects[i].memberUids.removeAll { $0 == uid }
+                }
+            }
+        case .projectInvite(let pid, let invite):
+            if let i = projects.firstIndex(where: { $0.id == pid }) { projects[i].invite = invite }
         case .material(let value):       upsert(value, into: &materials)
         case .apartment(let value):      upsert(value, into: &apartments)
         case .partner(let value):        upsert(value, into: &partners)
