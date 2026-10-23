@@ -199,7 +199,19 @@ service cloud.firestore {
     // hesabı (48 saat sonrası). İkisi arasındaki ağ gecikmesi ve saat sapması
     // yüzünden tam eşitlik istenemez.
     match /invites/{code} {
-      allow read: if false;
+      // SAHİP KENDİ PROJESİNİN DAVETİNİ OKUR (23 Eki). Eskiden okuma herkese
+      // kapalıydı ve sahip kodu proje belgesindeki AYNADAN görüyordu; ama
+      // proje belgesi tüm üyelere açık olduğu için ham kod ortakların
+      // cihazına iniyor ve Yedek.json'a sızıyordu. Artık ayna kalkıyor,
+      // sahip otoriteyi okuyor.
+      //
+      // NUMARALAMA KÂHİNİ AÇILMIYOR: `resource != null` kısa devresi, var
+      // olmayan kod ile başkasının kodunu AYNI rete düşürüyor (kısa devre
+      // olmadan emülatör mesajları "Null value error" / "false" diye
+      // ayrışıyordu). `list` kararı verilerden değil sorgu kısıtından
+      // veriliyor: `projectId == X` ancak X arayanın projesiyse geçer.
+      allow get: if signedIn() && resource != null && isOwner(resource.data.projectId);
+      allow list: if signedIn() && isOwner(resource.data.projectId);
       allow create: if signedIn()
                     && request.resource.data.projectId is string
                     && isOwner(request.resource.data.projectId)
@@ -223,7 +235,8 @@ service cloud.firestore {
       allow create: if signedIn()
                     && request.resource.data.ownerUid == uid()
                     && uid() in request.resource.data.memberUids
-                    && establishTokenShape();
+                    && establishTokenShape()
+                    && inviteMirrorShape();
 
       // Sahiplik DEVREDİLEMEZ ve kimse kendini sahip yapamaz.
       //
@@ -236,7 +249,8 @@ service cloud.firestore {
       allow update: if isOwner(pid)
                     && request.resource.data.ownerUid == resource.data.ownerUid
                     && uid() in request.resource.data.memberUids
-                    && establishTokenUnchanged();
+                    && establishTokenUnchanged()
+                    && (inviteMirrorShape() || inviteMirrorUnchanged());
 
       // ── KURULUM YALNIZCA BELGE YOKSA ───────────────────────────────────
       //
@@ -257,6 +271,26 @@ service cloud.firestore {
       //
       // BİLİNEN SINIR: 169'un kendi geri yüklemesi işaret taşımadığı için
       // sıradan bir düzenlemeden ayırt edilemiyor (testte belgelendi).
+      // ── DAVET AYNASI YA TAM YA HİÇ (23 Eki) ───────────────────────────
+      //
+      // Derleme 169 ve Android aynayı ZORUNLU `code` + `createdAt` ile çözüyor
+      // ve proje çözümü yalıtılmış değil: `code`'suz bir `invite` haritası o
+      // projenin TÜM ÜYELERİNDE panoyu boşaltır. Ayna kaldırılırken hiçbir
+      // yazma yolu yarım harita bırakamamalı. Tam ayna 169'un davet partisi
+      // için hâlâ geçerli; güncel istemci aynayı yalnızca SİLİYOR.
+      function inviteMirrorShape() {
+        return !('invite' in request.resource.data)
+            || (request.resource.data.invite is map
+                && request.resource.data.invite.code is string
+                && request.resource.data.invite.createdAt is timestamp);
+      }
+      // Güncellemede ayna DEĞİŞMİYORSA bekçi devreye girmez: üretimde eski
+      // bir yarım ayna kalmışsa sahibin her düzenlemesi (ilerleme, arşiv)
+      // reddedilip proje kilitlenirdi. Bekçinin işi yeni yarım harita
+      // yazılmasını engellemek, eski veriye takılmak değil.
+      function inviteMirrorUnchanged() {
+        return request.resource.data.get('invite', null) == resource.data.get('invite', null);
+      }
       function establishTokenShape() {
         return !('establishToken' in request.resource.data)
             || (request.resource.data.establishToken is string

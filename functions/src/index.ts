@@ -541,7 +541,6 @@ export const deleteAccount = onCall<unknown, Promise<DeleteResult>>(
       for (const alt of await project.ref.listCollections()) {
         await db.recursiveDelete(alt);
       }
-      await project.ref.delete();
 
       // DAVET BELGELERİ ÜST DÜZEYDE ve proje ağacının DIŞINDA duruyor
       // (`invites/{KOD}`), yani `recursiveDelete` onlara hiç uğramıyor.
@@ -549,9 +548,21 @@ export const deleteAccount = onCall<unknown, Promise<DeleteResult>>(
       // İSTEMCİ HİÇBİR ZAMAN silemez, sahibi bile. Buradan silinmezlerse
       // sonsuza dek kalırlar ve içlerinde `usedByName` alanı, yani daveti
       // kullanan kişinin GERÇEK ADI vardır (KVKK).
+      //
+      // PROJE BELGESİNDEN ÖNCE (23 Eki). Eskiden sonra siliniyordu: proje
+      // belgesi gidip davet silmesi kesilirse yetim davetler kalıyordu ve
+      // `owned` sorgusu projeyi bir daha bulamadığı için kimse onları
+      // temizlemiyordu. Sahip artık KENDİ projesinin davetlerini okuyabiliyor
+      // (`isOwner(resource.data.projectId)`); proje kimliğini bilen biri
+      // (ör. eski bir ortak) aynı kimlikle proje kurup sahip olursa yetim
+      // davetlerdeki `usedByName`i okuyabilirdi. "Üst belge en son" ilkesi
+      // davetleri de kapsıyor: kesinti olursa proje hâlâ bulunabilir durumda
+      // ve yeniden deneme temizliği tamamlar.
       const invites = await db.collection("invites")
         .where("projectId", "==", project.id).get();
       await Promise.all(invites.docs.map((doc) => doc.ref.delete()));
+
+      await project.ref.delete();
     }
 
     // ---- 2) ORTAK OLDUĞU PROJELER: yalnızca kendini çıkar ----------------

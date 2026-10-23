@@ -522,6 +522,64 @@ describe('derleme 169 ile uyum — istemci yazma biçimleri', () => {
   });
 });
 
+describe('davet aynası ya TAM ya HİÇ — 169 panosu boşalmasın', () => {
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Derleme 169 ve Android aynayı ZORUNLU `code` + `createdAt` ile çözüyor ve
+  // proje çözümü yalıtılmış değil: `code`'suz bir `invite` haritası o projenin
+  // TÜM ÜYELERİNDE panoyu boşaltır (169 modeliyle derlenen prototipte ölçüldü).
+  // Ayna kaldırılırken hiçbir yazma yolu yarım harita bırakamamalı.
+  // ───────────────────────────────────────────────────────────────────────
+
+  before(seed);
+
+  it('yarım ayna (kodsuz) REDDEDİLİR', async () => {
+    await assertFails(updateDoc(doc(ownerDb, 'projects', P1),
+      stamped(OWNER, { invite: { createdAt: new Date() } })));
+  });
+
+  it('boş ayna haritası REDDEDİLİR', async () => {
+    await assertFails(updateDoc(doc(ownerDb, 'projects', P1), stamped(OWNER, { invite: {} })));
+  });
+
+  it('yarım aynayla kurulum REDDEDİLİR', async () => {
+    await assertFails(setDoc(doc(ownerDb, 'projects', 'ayna-yarim'), stamped(OWNER, {
+      id: 'ayna-yarim', ownerUid: OWNER, memberUids: [OWNER],
+      blockNumber: '5', parcelNumber: '5', createdAt: new Date(),
+      invite: { code: 'ABC234' },
+    })));
+  });
+
+  it('ESKİ yarım ayna projeyi KİLİTLEMEZ — ayna değişmeyen düzenleme geçer', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'projects', 'ayna-eski'), {
+        id: 'ayna-eski', ownerUid: OWNER, memberUids: [OWNER],
+        blockNumber: '6', parcelNumber: '6', createdAt: new Date(),
+        invite: { createdAt: new Date() },   // bir şekilde kalmış yarım ayna
+      });
+    });
+    await assertSucceeds(setDoc(doc(ownerDb, 'projects', 'ayna-eski'),
+      stamped(OWNER, { progress: 30, memberUids: arrayUnion(OWNER) }), { merge: true }));
+    // Ama yarım aynayı DEĞİŞTİREREK yeniden yazmak yine reddedilir.
+    await assertFails(updateDoc(doc(ownerDb, 'projects', 'ayna-eski'),
+      stamped(OWNER, { invite: { createdAt: new Date(Date.now() + 1000) } })));
+  });
+
+  it('aynayı SİLMEK geçer — güncel istemcinin davet partisi bunu yapıyor', async () => {
+    await assertSucceeds(updateDoc(doc(ownerDb, 'projects', P1), { invite: deleteField() }));
+  });
+
+  it('güncel istemcinin davet partisi geçer — davet belgesi + ayna SİLME', async () => {
+    const batch = writeBatch(ownerDb);
+    batch.set(doc(ownerDb, 'invites', 'NEW234'), {
+      projectId: P1, createdAt: serverTimestamp(),
+      expiresAt: new Date(Date.now() + 48 * 3600 * 1000), usedAt: null,
+    });
+    batch.update(doc(ownerDb, 'projects', P1), { invite: deleteField() });
+    await assertSucceeds(batch.commit());
+  });
+});
+
 describe('proje kurulumu YALNIZCA belge yoksa — establishToken', () => {
 
   // ───────────────────────────────────────────────────────────────────────
@@ -670,8 +728,40 @@ describe('invites/{KOD}', () => {
     }));
   });
 
-  it('kodu SAHİBİ DAHİ okuyamaz — 6 hane kaba kuvvetle denenebilirdi', async () => {
-    await assertFails(getDoc(doc(ownerDb, 'invites', 'X7B9Q2')));
+  // ── SAHİP KENDİ DAVETİNİ OKUR (23 Eki) ──────────────────────────────
+  //
+  // Eskiden okuma HERKESE kapalıydı ve sahip kodu proje belgesindeki AYNADAN
+  // görüyordu. Ama proje belgesi TÜM ÜYELERE açık: ham kod salt okur
+  // ortakların cihazına iniyor, Yedek.json ile dosyalara sızıyordu. Ortak
+  // kodu başkasına verirse o kişi katılabiliyordu — salt okur ortak fiilen
+  // davet yetkisi kazanıyordu. Artık sahip OTORİTEYİ okuyor, ayna kalkıyor.
+  //
+  // NUMARALAMA KÂHİNİ AÇILMIYOR: sahip olmayan için karar kodun var olup
+  // olmamasından bağımsız. Kod YOKSA `resource != null` düşer, BAŞKASININ
+  // ise `isOwner` düşer — ikisi de aynı ret. (Eski gerekçe "6 hane kaba
+  // kuvvetle denenebilirdi" bu biçimde geçerli değil; yazma yolundaki kâhin
+  // ayrı bir madde.)
+  it('sahip KENDİ projesinin davetini okur', async () => {
+    await assertSucceeds(getDoc(doc(ownerDb, 'invites', 'X7B9Q2')));
+  });
+
+  it('başkasının kodu ile var olmayan kod AYNI yanıtı verir — numaralama kâhini yok', async () => {
+    await assertFails(getDoc(doc(strangerDb, 'invites', 'X7B9Q2')));   // var, başkasının
+    await assertFails(getDoc(doc(strangerDb, 'invites', 'ZZ9ZZ9')));   // yok
+    await assertFails(getDoc(doc(ownerDb, 'invites', 'ZZ9ZZ9')));      // yok, sahip için de
+  });
+
+  it('ORTAK davet kodunu okuyamaz — davet yönetici yetkisi', async () => {
+    await assertFails(getDoc(doc(memberDb, 'invites', 'X7B9Q2')));
+  });
+
+  it('sahip kendi projesinin davetlerini projectId ile listeler', async () => {
+    await assertSucceeds(getDocs(query(collection(ownerDb, 'invites'), where('projectId', '==', P1))));
+  });
+
+  it('başkasının projesinin davetleri listelenemez', async () => {
+    await assertFails(getDocs(query(collection(strangerDb, 'invites'), where('projectId', '==', P1))));
+    await assertFails(getDocs(query(collection(memberDb, 'invites'), where('projectId', '==', P1))));
   });
 
   it('davet edilen kişi kodu okuyup projeyi bulamaz (callable şart)', async () => {
