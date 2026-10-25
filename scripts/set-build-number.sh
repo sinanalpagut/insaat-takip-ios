@@ -15,9 +15,17 @@
 # ve elle takip gerektirmiyor. App Store aynı build numarasını iki kez kabul
 # etmiyor; unutulan bir artırım gönderim gününde fark ediliyor.
 #
-# ARTIK ELLE ÇAĞRILMASI GEREKMİYOR (madde 74): şemanın Archive ön-eylemi
-# bu betiği kendisi çalıştırıyor. Ön-eylem kum havuzunun DIŞINDA koşuyor,
-# dolayısıyla `.git`i okuyabiliyor — derleme fazının okuyamadığı şeyi.
+# ŞEMANIN ARCHIVE ÖN-EYLEMİ BU BETİĞİ ÇALIŞTIRIYOR (madde 74) AMA AYNI
+# ARŞİVE YETİŞMİYOR. Ön-eylem kum havuzunun dışında koşup `.git`i
+# okuyabiliyor; ancak Xcode derleme ayarlarını ön-eylemden ÖNCE okuyor.
+# 25 Eki 2026'da ölçüldü: ön-eylem proje dosyasına "233 → 250" yazdı, arşivin
+# Info.plist'i 233 çıktı. Yani yeni commit'lerden sonraki İLK arşiv bayat
+# numarayı taşıyor, numara ancak bir sonraki arşive geçiyor.
+#
+# DOĞRU SIRA: arşivden ÖNCE `npm run build:number` (ya da bu betik), sonra
+# Archive. Ön-eylem yerinde kalıyor çünkü zararsız ve unutulan bir çalıştırmayı
+# en azından bir sonraki arşivde düzeltiyor. Yüklemeden önce Organizer'daki
+# numarayı `git rev-list --count HEAD` ile karşılaştır.
 #
 # DERLEME FAZI DENENDİ VE OLMADI; iki engel de ölçülerek görüldü:
 #   1. `git -C "$SRCROOT" rev-list --count HEAD` kum havuzunda
