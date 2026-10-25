@@ -74,10 +74,23 @@ struct ProjectDetailView: View {
         viewModel.projects.first { $0.id == projectId }
     }
 
+    /// Kilit sebebi (arşiv, paket sınırı) — yalnızca SAHİBE: ortak zaten salt
+    /// okur ve "paketin yetmiyor" ona söylenecek bir cümle değil.
+    private var engel: ProjectViewModel.WriteBlock? {
+        isAdmin ? viewModel.writeBlock(for: projectId) : nil
+    }
+
+    /// Düzenleme düğmeleri. Görünürlük `isAdmin`de kalıyor: kilitli projede
+    /// sahip her şeyi görmeye devam ediyor.
+    private var canEdit: Bool { isAdmin && engel == nil }
+
+    @State private var showPlans = false
+
     var body: some View {
         VStack(spacing: 0) {
             if let project {
                 header(project)
+                if let engel { kilitSeridi(engel) }
                 tabBar
 
                 // Sekme içerikleri — mantık ViewModel'de, görünümler "dumb".
@@ -88,7 +101,8 @@ struct ProjectDetailView: View {
                     }
                 case .daireler:
                     ApartmentsTabView(projectId: projectId) { apartment in
-                        guard isAdmin else {
+                        guard canEdit else {
+                            // Kilitli projede sahip de bu yoldan gider.
                             // Ortak salt okunur ama artık HER dairenin detayını
                             // görebilir: arsa sahibinin dairesini gizlemek
                             // şeffaflık iddiasıyla çelişirdi.
@@ -120,7 +134,7 @@ struct ProjectDetailView: View {
         // sekmede veri sessizce eskir.
         .refreshable { await viewModel.refresh() }
         .navigationBarHidden(true)
-        .floatingActionButton(fabTitle ?? "", visible: isAdmin && fabTitle != nil) {
+        .floatingActionButton(fabTitle ?? "", visible: canEdit && fabTitle != nil) {
             switch tab {
             case .malzemeler: activeSheet = .receipt
             case .giderler:   activeSheet = .expense
@@ -238,6 +252,41 @@ struct ProjectDetailView: View {
 
     // MARK: Koyu başlık
 
+    /// KİLİT ŞERİDİ. Düzenleme düğmeleri sessizce kaybolsaydı kişi
+    /// uygulamanın bozulduğunu sanırdı; şerit nedenini ve TEK dokunuşla
+    /// çıkışını söylüyor. Arşivdeyse çıkış arşivden çıkarmak (o da kotaya
+    /// tabi), sınırdaysa paketler.
+    private func kilitSeridi(_ engel: ProjectViewModel.WriteBlock) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: engel == .archived ? "archivebox" : "lock")
+                .iconFont(13, weight: .semibold)
+                .foregroundColor(Palette.accent)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 7) {
+                Text(engel.message)
+                    .font(.manrope(12, .medium))
+                    .foregroundColor(Palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(engel == .archived ? "Arşivden çıkar" : "Paketlere bak") {
+                    if engel == .archived {
+                        viewModel.setArchived(false, role: .admin, projectId: projectId)
+                    } else {
+                        showPlans = true
+                    }
+                }
+                .font(.manrope(12, .bold))
+                .foregroundColor(Palette.accent)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(Palette.accentTint)
+        .cornerRadius(13)
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .sheet(isPresented: $showPlans) { PlansSheet() }
+    }
+
     private func header(_ project: Project) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 10) {
@@ -272,7 +321,7 @@ struct ProjectDetailView: View {
                     NavigationLink(value: Route.auditTrail(projectId)) {
                         Label("Kayıt İzi", systemImage: "clock.arrow.circlepath")
                     }
-                    if isAdmin {
+                    if canEdit {
                         Button {
                             activeSheet = .progress
                         } label: {
@@ -297,6 +346,10 @@ struct ProjectDetailView: View {
                         } label: {
                             Label("Daire Ekle", systemImage: "plus.rectangle.on.rectangle")
                         }
+                    }
+                    // ARŞİV DÜĞMESİ KİLİTTEN BAĞIMSIZ: kilitli projeyi
+                    // arşivlemek, hangi projede çalışılacağını seçmenin yolu.
+                    if isAdmin {
 
                         // ARŞİVLEME (madde 60). Onay diyaloğu YOK, bilerek:
                         // işlem yıkıcı değil ve aynı menüden geri alınıyor.

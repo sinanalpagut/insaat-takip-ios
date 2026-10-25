@@ -43,6 +43,10 @@ struct ExpensesTabView: View {
         }
     }
     /// Proje bazlı rol (bkz. Project.role(for:)).
+    /// Kilitli projede (arşiv, paket sınırı) düzenleme düğmeleri yok;
+    /// görünürlük `isAdmin`de kalıyor (`ProjectViewModel.canEdit`).
+    private var canEdit: Bool { viewModel.canEdit(projectId, for: appState.currentUser) }
+
     private var isAdmin: Bool {
         viewModel.projects.first { $0.id == projectId }?
             .role(for: appState.currentUser) == .admin
@@ -96,7 +100,7 @@ struct ExpensesTabView: View {
                             },
                             onReceiptTap: { previewedReceipt = SharePayloadImage(image: $0) })
                             .contextMenu {
-                                if isAdmin {
+                                if canEdit {
                                     Button {
                                         editingExpense = expense
                                     } label: {
@@ -221,8 +225,9 @@ struct ExpensesTabView: View {
             Text("Henüz gider kaydı yok")
                 .font(.manrope(13.5, .bold))
                 .foregroundColor(Palette.ink)
-            Text(isAdmin
+            Text(canEdit
                  ? "İşçilik, taşeron, arsa ve harç giderlerini buraya girersen \"Net\" rakamı gerçeği yansıtır"
+                 : isAdmin ? "Proje salt okunur; yeni gider girilemiyor."
                  : "Yönetici gider girdikçe burada görünecek")
                 .font(.manrope(11.5, .medium))
                 .foregroundColor(Palette.textSecondary)

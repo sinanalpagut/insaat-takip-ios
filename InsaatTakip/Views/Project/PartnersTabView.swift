@@ -30,6 +30,12 @@ struct PartnersTabView: View {
     /// oturuma `.admin` veriyor (rol artık projede yaşıyor, kullanıcıda değil —
     /// madde 16j); global bakılınca davetle katılan ORTAK burada yönetici
     /// muamelesi görür.
+    /// Kilitli projede (arşiv, paket sınırı) düzenleme düğmeleri yok;
+    /// görünürlük `isAdmin`de kalıyor (`ProjectViewModel.canEdit`).
+    /// ORTAĞI ÇIKARMAK BUNA BAĞLI DEĞİL: erişimi kesmek kilitli projede de
+    /// açık (`removePartner` kapıdan geçmiyor).
+    private var canEdit: Bool { viewModel.canEdit(projectId, for: appState.currentUser) }
+
     private var isAdmin: Bool {
         viewModel.role(inProject: projectId, for: appState.currentUser) == .admin
     }
@@ -69,7 +75,7 @@ struct PartnersTabView: View {
                             // Hisse düzenleme YALNIZCA yöneticide. Bu yol açılana
                             // kadar sharePercent hiç girilemiyordu: kurucu sabit
                             // %100, davetle katılan %0.
-                            if isAdmin { editingPartner = partner }
+                            if canEdit { editingPartner = partner }
                         }
                         .contextMenu {
                             // KURUCU listelenmiyor: kendini çıkarırsa projeyi
@@ -175,7 +181,7 @@ struct PartnersTabView: View {
                 Text("Ortak Cari Hesabı")
                     .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
                 Spacer()
-                if isAdmin {
+                if canEdit {
                     Button {
                         ledgerFor = LedgerTarget(partnerId: nil)
                     } label: {
@@ -274,7 +280,7 @@ struct PartnersTabView: View {
         .padding(.vertical, 10)
         .contentShape(Rectangle())
         .contextMenu {
-            if isAdmin {
+            if canEdit {
                 Button(role: .destructive) {
                     pendingLedgerDelete = entry
                 } label: {

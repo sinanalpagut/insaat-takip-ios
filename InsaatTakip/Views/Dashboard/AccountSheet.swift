@@ -172,7 +172,7 @@ struct AccountSheet: View {
     /// kişiye tekrar satmaya çalışmak olurdu.
     private var paketBasligi: String {
         switch viewModel.entitlement {
-        case .preLaunchUnlimited: return "Paketler"
+        case .resolving: return "Paketler"
         case .plan(.ucretsiz):    return "Ücretsiz katman · yükselt"
         case .plan(let plan):     return "\(plan.displayName) paketi"
         }

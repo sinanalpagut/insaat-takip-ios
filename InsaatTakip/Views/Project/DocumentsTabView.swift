@@ -23,6 +23,8 @@ struct DocumentsTabView: View {
     private var isAdmin: Bool {
         viewModel.role(inProject: projectId, for: appState.currentUser) == .admin
     }
+    /// Kilitli projede "＋ Dosya Ekle" yok; boş durum metni onu göstermemeli.
+    private var canEdit: Bool { viewModel.canEdit(projectId, for: appState.currentUser) }
     /// Filtre çipleri bu görünümün içinde; koyu başlık sekmeye göre yükseklik değiştirmesin diye.
     @Binding var filter: Filter
 
@@ -89,8 +91,9 @@ struct DocumentsTabView: View {
                         Text(filter == .tumu ? "Henüz dosya yok" : "Bu kategoride dosya yok")
                             .font(.manrope(13.5, .bold))
                             .foregroundColor(Palette.ink)
-                        Text(isAdmin
+                        Text(canEdit
                              ? "Plan, ruhsat ve sözleşmeleri \"＋ Dosya Ekle\" ile yükleyebilirsin"
+                             : isAdmin ? "Proje salt okunur; yeni dosya yüklenemiyor."
                              : "Yönetici dosya yükledikçe burada görünecek")
                             .font(.manrope(11.5, .medium))
                             .foregroundColor(Palette.textSecondary)

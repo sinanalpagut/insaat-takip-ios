@@ -52,6 +52,13 @@ struct ApartmentDetailSheet: View {
     /// ekranda duran ama hiçbir yere gitmeyen bir fotoğraf ve "sonra yeniden
     /// denenecek" diyen, asla tutulamayacak bir söz. Aynı soru
     /// `SitePhotosView`de baştan doğru soruluyordu.
+    /// Kilitli projede (arşiv, paket sınırı) düzenleme düğmeleri yok;
+    /// görünürlük `isAdmin`de kalıyor (`ProjectViewModel.canEdit`).
+    private var canEdit: Bool {
+        viewModel.canEdit(viewModel.apartments.first { $0.id == apartmentId }?.projectId,
+                          for: appState.currentUser)
+    }
+
     private var isAdmin: Bool {
         viewModel.role(forApartment: apartmentId, user: appState.currentUser) == .admin
     }
@@ -111,7 +118,7 @@ struct ApartmentDetailSheet: View {
                         }
                         detailRow("Teslim durumu", apartment.deliveryNote)
 
-                        if isAdmin {
+                        if canEdit {
                             adminActions(apartment)
                         }
 
@@ -320,7 +327,7 @@ struct ApartmentDetailSheet: View {
                     photoTile(photo)
                 }
 
-                if isAdmin {
+                if canEdit {
                     // Galeriden seç
                     PhotosPicker(selection: $pickedItems, maxSelectionCount: 6, matching: .images) {
                         addTile(icon: "photo.on.rectangle", title: "Galeriden")
@@ -364,7 +371,7 @@ struct ApartmentDetailSheet: View {
             }
         }
         .contextMenu {
-            if isAdmin {
+            if canEdit {
                 Button(role: .destructive) {
                     viewModel.removeApartmentPhoto(role: isAdmin ? .admin : .partner,
                                                    photoId: photo.id)
@@ -622,7 +629,7 @@ struct ApartmentDetailSheet: View {
                 }
             }
 
-            if isAdmin {
+            if canEdit {
                 Button {
                     showPayment = true
                 } label: {
@@ -682,7 +689,7 @@ struct ApartmentDetailSheet: View {
         }
         .padding(.vertical, 11)
         .contextMenu {
-            if isAdmin {
+            if canEdit {
                 Button {
                     editingPayment = payment
                 } label: {

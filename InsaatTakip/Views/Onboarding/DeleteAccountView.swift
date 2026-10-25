@@ -20,6 +20,7 @@ struct DeleteAccountView: View {
 
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ProjectViewModel
+    @EnvironmentObject private var subscriptions: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
     // `done` adımı YOKTU ve olamazdı: `deleteAccount` `currentUser`ı nil'liyor,
@@ -94,6 +95,9 @@ struct DeleteAccountView: View {
         .sheet(item: $exportPayload) { payload in
             ShareSheet(items: payload.urls)
         }
+        // Abonelik durumu bu ekranda TAZELENİYOR: silme uyarısı yenileme
+        // durumuna bakıyor ve paket ekranı oturumda hiç açılmamış olabilir.
+        .task { await subscriptions.refresh() }
     }
 
     private var header: some View {
@@ -138,6 +142,8 @@ struct DeleteAccountView: View {
                 .font(.manrope(13.5, .bold))
                 .foregroundColor(Palette.accentLight)
                 .padding(.top, 14)
+
+            aboneligiUyar
 
             if let errorText {
                 Text(errorText)
@@ -205,6 +211,63 @@ struct DeleteAccountView: View {
                 .foregroundColor(.white.opacity(0.62))
                 .padding(.top, 12)
         }
+    }
+
+    /// ABONELİK HESAP SİLMEYLE BİTMİYOR — ödeme Apple'da.
+    ///
+    /// Apple'ın hesap silme rehberi: aboneliği olan kişiye faturalamanın Apple
+    /// üzerinden süreceği söylenmeli ve devam etmeden önce iptal etmesi
+    /// istenmeli. Söylenmeseydi kişi hesabını silip ödemeye devam ederdi —
+    /// üstelik silinmiş bir hesap için.
+    ///
+    /// İPTAL EDİLMİŞSE BAŞKA CÜMLE: yenilenmeyecek bir aboneliği "iptal et"
+    /// demek, kişiyi zaten yaptığı şeyi aramaya gönderirdi.
+    ///
+    /// KARAR `billingNotice`TA: hak açık olmasa da (ödeme yeniden deneniyor)
+    /// yenileme sürüyorsa uyarı çıkıyor. Durum bu ekran açılınca tazeleniyor
+    /// (`.task` aşağıda) — paket ekranı hiç açılmamış olabilir.
+    @ViewBuilder
+    private var aboneligiUyar: some View {
+        switch subscriptions.billingNotice {
+        case .none:
+            EmptyView()
+        case .continues(let plan):
+            abonelikKutusu(plan, iptalEdilmis: false)
+        case .cancelled(let plan):
+            abonelikKutusu(plan, iptalEdilmis: true)
+        }
+    }
+
+    private func abonelikKutusu(_ plan: Plan, iptalEdilmis: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(iptalEdilmis
+                 ? "\(plan.displayName) aboneliğin iptal edilmiş; dönem sonunda biter ve yeniden ücret alınmaz."
+                 : "\(plan.displayName) aboneliğin hesabı silince iptal olmaz: ödeme Apple üzerinden sürer. "
+                   + "Devam etmeden önce aboneliğini iptal et.")
+                .font(.manrope(13, .semiBold))
+                .foregroundColor(.white)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+            if !iptalEdilmis {
+                Button {
+                    Task { await subscriptions.showManageSubscriptions() }
+                } label: {
+                    Text("Aboneliği yönet")
+                        .font(.manrope(13, .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 38)
+                        .background(Color.white.opacity(0.16))
+                        .cornerRadius(11)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.08))
+        .cornerRadius(14)
+        .padding(.top, 18)
     }
 
     /// Ne kaybedileceği — sayılarla. Ortağı olmayan tek projeli bir kullanıcı

@@ -1,0 +1,151 @@
+{
+  "identifier": "5E1C2A7B",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {},
+  "subscriptionGroups": [
+    {
+      "id": "21480001",
+      "localizations": [
+        {
+          "description": "",
+          "displayName": "İnşaat Takip Paketleri",
+          "locale": "tr"
+        }
+      ],
+      "name": "Paketler",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "749.00",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "6480000001",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "3 aktif proje, sınırsız ortak daveti",
+              "displayName": "Şantiye · Aylık",
+              "locale": "tr"
+            }
+          ],
+          "productID": "com.sinanalpagut.insaattakip.santiye.aylik",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Şantiye Aylık",
+          "subscriptionGroupID": "21480001",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "7490.00",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "6480000002",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "3 aktif proje, sınırsız ortak daveti",
+              "displayName": "Şantiye · Yıllık",
+              "locale": "tr"
+            }
+          ],
+          "productID": "com.sinanalpagut.insaattakip.santiye.yillik",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Şantiye Yıllık",
+          "subscriptionGroupID": "21480001",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "1499.00",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "6480000003",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "10 aktif proje, sınırsız ortak daveti",
+              "displayName": "Müteahhit · Aylık",
+              "locale": "tr"
+            }
+          ],
+          "productID": "com.sinanalpagut.insaattakip.muteahhit.aylik",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Müteahhit Aylık",
+          "subscriptionGroupID": "21480001",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "14990.00",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "6480000004",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "10 aktif proje, sınırsız ortak daveti",
+              "displayName": "Müteahhit · Yıllık",
+              "locale": "tr"
+            }
+          ],
+          "productID": "com.sinanalpagut.insaattakip.muteahhit.yillik",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Müteahhit Yıllık",
+          "subscriptionGroupID": "21480001",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "4999.00",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6480000005",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Sınırsız aktif proje ve ortak daveti",
+              "displayName": "Kurumsal · Aylık",
+              "locale": "tr"
+            }
+          ],
+          "productID": "com.sinanalpagut.insaattakip.kurumsal.aylik",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Kurumsal Aylık",
+          "subscriptionGroupID": "21480001",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "49990.00",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6480000006",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Sınırsız aktif proje ve ortak daveti",
+              "displayName": "Kurumsal · Yıllık",
+              "locale": "tr"
+            }
+          ],
+          "productID": "com.sinanalpagut.insaattakip.kurumsal.yillik",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Kurumsal Yıllık",
+          "subscriptionGroupID": "21480001",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

@@ -30,6 +30,10 @@ struct MaterialLogSheet: View {
     /// basınca istemci kapısını geçiyor, yazma sunucuda reddediliyor ama fiş
     /// ekrandan düşmüş oluyordu. Fiş görseli buluta bağlandıktan sonra aynı yol
     /// Storage silmesine de uzanırdı.
+    /// Kilitli projede (arşiv, paket sınırı) düzenleme düğmeleri yok;
+    /// görünürlük `isAdmin`de kalıyor (`ProjectViewModel.canEdit`).
+    private var canEdit: Bool { viewModel.canEdit(material?.projectId, for: appState.currentUser) }
+
     private var isAdmin: Bool {
         guard let material else { return false }
         return viewModel.role(inProject: material.projectId,
@@ -84,7 +88,7 @@ struct MaterialLogSheet: View {
                 // `recalculate` toplamları `devir + fişler` diye kuruyor.
                 // Kayıtlı devir varsa düğme onu YAZIYOR — kullanıcı, gördüğü
                 // stoğun ne kadarının fişlerden geldiğini bilmeli.
-                if isAdmin {
+                if canEdit {
                     Button {
                         showOpening = true
                     } label: {
@@ -115,7 +119,7 @@ struct MaterialLogSheet: View {
                     Text("Son Hareketler")
                         .smallCapsLabel(size: 10.5, color: Palette.textFaded, tracking: 1.2)
                     Spacer()
-                    if isAdmin {
+                    if canEdit {
                         Text("Düzeltmek için basılı tut")
                             .font(.manrope(10.5, .medium))
                             .foregroundColor(Palette.textTertiary)
@@ -426,7 +430,7 @@ struct MaterialLogSheet: View {
         // Boş alan da dokunulabilir olsun (aksi halde yalnızca metne basmak gerekir).
         .contentShape(Rectangle())
         .contextMenu {
-            if isAdmin {
+            if canEdit {
                 Button {
                     editingLog = log
                 } label: {

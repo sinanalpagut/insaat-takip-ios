@@ -65,7 +65,7 @@ enum LaunchConfig {
     ///
     /// NEDEN GEREKLİ: paket satırı ve paket ekranı DÖRT duruma göre farklı
     /// görünüyor — yayın öncesi, ücretsiz, ücretsiz+sınırda, ücretli. Yayın
-    /// öncesi varsayılan `preLaunchUnlimited` olduğu için diğer üçü elle HİÇ
+    /// öncesi varsayılan sınırsızlık olduğu için diğer üçü elle HİÇ
     /// açılamıyordu: ekranın çoğu durumu, kod yazıldıktan sonra bile
     /// görülmeden kalıyordu. Sınır ENJEKTE EDİLEREK test edilir ilkesinin
     /// (QuotaTests) ekran tarafındaki karşılığı.
@@ -83,6 +83,19 @@ enum LaunchConfig {
         }
         #else
         return nil
+        #endif
+    }
+
+    /// "-store fake" → StoreKit yerine sahte mağaza (`DemoSubscriptionStore`).
+    ///
+    /// `simctl` ile kurulan uygulama Xcode şemasındaki StoreKit yapılandırmasını
+    /// görmüyor; paket ekranının fiyatlı hâli ve satın alma akışı bunsuz
+    /// simülatörde hiç açılamıyordu. YALNIZCA DEBUG.
+    static var usesDemoStore: Bool {
+        #if DEBUG
+        return value(for: "store") == "fake"
+        #else
+        return false
         #endif
     }
 

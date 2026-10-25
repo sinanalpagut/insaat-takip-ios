@@ -18,6 +18,10 @@ struct ApartmentsTabView: View {
     var onEditInfo: (Apartment) -> Void
 
     /// Proje bazlı rol (bkz. Project.role(for:)).
+    /// Kilitli projede (arşiv, paket sınırı) düzenleme düğmeleri yok;
+    /// görünürlük `isAdmin`de kalıyor (`ProjectViewModel.canEdit`).
+    private var canEdit: Bool { viewModel.canEdit(projectId, for: appState.currentUser) }
+
     private var isAdmin: Bool {
         viewModel.projects.first { $0.id == projectId }?
             .role(for: appState.currentUser) == .admin
@@ -105,7 +109,7 @@ struct ApartmentsTabView: View {
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
-                    if isAdmin {
+                    if canEdit {
                         Button {
                             onEditInfo(apartment)
                         } label: {
@@ -137,7 +141,7 @@ struct ApartmentsTabView: View {
                 summaryCard
                     .padding(.top, 16)
 
-                if isAdmin {
+                if canEdit {
                     HStack {
                         Spacer()
                         Text("Tip, m² ve durum için karta basılı tut")

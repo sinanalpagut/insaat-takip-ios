@@ -871,6 +871,7 @@ final class ProjectViewModel: ObservableObject {
                      expense: TaxBasis?, sales: TaxBasis?) {
         guard role == .admin,
               let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
+        guard yazmaAcik(projectId) else { return }
         let before = projects[index]
         guard before.expenseTaxBasis != expense || before.salesTaxBasis != sales else { return }
 
@@ -897,6 +898,20 @@ final class ProjectViewModel: ObservableObject {
     func setArchived(_ archived: Bool, role: UserRole, projectId: UUID) {
         guard role == .admin,
               let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
+        // ARŞİVDEN ÇIKARMAK KOTAYA TABİ. Bakmasaydı "arşivle → yenisini aç →
+        // eskisini geri çıkar" döngüsü ücretsiz katmanda sınırsız aktif proje
+        // demekti. ARŞİVLEMEK ise her zaman serbest: kilitli projeyi
+        // arşivlemek, kişinin hangi projede çalışacağını seçme yolu.
+        if !archived, projects[index].isArchived,
+           actingUser == nil || actingUser?.id == projects[index].ownerUid {
+            let sahip = projects[index].ownerUid
+            let aktif = projects.filter { $0.ownerUid == sahip && !$0.isArchived }.count
+            if case .wouldExceedProjects(let limit) = Quota.canCreateProject(QuotaSnapshot(activeProjects: aktif),
+                                                                            entitlement: entitlement) {
+                flash(Quota.unarchiveLimitMessage(limit: limit))
+                return
+            }
+        }
         projects[index].archivedAt = archived ? Date() : nil
         var writes: [DocumentChange] = [.project(projects[index])]
         writes += recordAudit(recordId: projectId, projectId: projectId,
@@ -1482,6 +1497,7 @@ final class ProjectViewModel: ObservableObject {
             flash("Malzeme seçilmedi")
             return false
         }
+        guard yazmaAcik(materials[index].projectId) else { return false }
 
         let amount = Self.parseQuantity(amountText)
         guard amount > 0 else {
@@ -1554,6 +1570,7 @@ final class ProjectViewModel: ObservableObject {
         guard let logIndex = materialLogs.firstIndex(where: { $0.id == logId }),
               let material = materials.first(where: { $0.id == materialLogs[logIndex].materialId })
         else { return false }
+        guard yazmaAcik(material.projectId) else { return false }
 
         let amount = Self.parseQuantity(amountText)
         guard amount > 0 else {
@@ -1650,6 +1667,7 @@ final class ProjectViewModel: ObservableObject {
         guard let logIndex = materialLogs.firstIndex(where: { $0.id == logId }),
               let material = materials.first(where: { $0.id == materialLogs[logIndex].materialId })
         else { return false }
+        guard yazmaAcik(material.projectId) else { return false }
 
         let removed = materialLogs.remove(at: logIndex)
         recalculateMaterial(material.id)
@@ -1778,6 +1796,7 @@ final class ProjectViewModel: ObservableObject {
                         remainingCostText: String? = nil) {
         guard role == .admin,
               let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
+        guard yazmaAcik(projectId) else { return }
         projects[index].progress = min(100, max(0, progress))
         projects[index].phase = phase
 
@@ -1805,6 +1824,7 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }),
               apartments[index].isCommitted else { return false }
+        guard yazmaAcik(apartments[index].projectId) else { return false }
 
         var apartment = apartments[index]
         let hadBuyer = apartment.buyerName != nil
@@ -1892,6 +1912,7 @@ final class ProjectViewModel: ObservableObject {
                          buyerName: String = "", blockLabel: String = "") -> Bool {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return false }
+        guard yazmaAcik(apartments[index].projectId) else { return false }
 
         let before = apartments[index]
         // Satış kaydı olan daire bu formdan boşaltılamaz: tahsilatı hiçbir
@@ -2033,6 +2054,7 @@ final class ProjectViewModel: ObservableObject {
                     receiptImage: UIImage? = nil) -> Bool {
         guard role == .admin else { return false }
         guard let apartment = apartments.first(where: { $0.id == apartmentId }) else { return false }
+        guard yazmaAcik(apartment.projectId) else { return false }
 
         let amount = Self.parseMoney(amountText)
         guard amount > .zero else {
@@ -2097,6 +2119,7 @@ final class ProjectViewModel: ObservableObject {
               let index = payments.firstIndex(where: { $0.id == paymentId }),
               let apartment = apartments.first(where: { $0.id == payments[index].apartmentId })
         else { return false }
+        guard yazmaAcik(apartment.projectId) else { return false }
 
         let amount = Self.parseMoney(amountText)
         guard amount > .zero else {
@@ -2150,6 +2173,7 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin,
               let payment = payments.first(where: { $0.id == id }),
               let apartment = apartments.first(where: { $0.id == payment.apartmentId }) else { return }
+        guard yazmaAcik(apartment.projectId) else { return }
         payments.removeAll { $0.id == id }
         discardReceipt(bucket: .paymentReceipts, projectId: payment.projectId,
                        id: id, path: payment.receiptPath)
@@ -2206,6 +2230,7 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin,
               let source = apartments.first(where: { $0.id == apartmentId })
         else { return 0 }
+        guard yazmaAcik(source.projectId) else { return 0 }
 
         let hedefler = apartments.indices.filter { i in
             let a = apartments[i]
@@ -2257,6 +2282,7 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin,
               let projectIndex = projects.firstIndex(where: { $0.id == projectId })
         else { return false }
+        guard yazmaAcik(projectId) else { return false }
 
         let roster = apartments(for: projectId)
         let nextNumber = (roster.map(\.apartmentNumber).max() ?? 0) + 1
@@ -2298,6 +2324,7 @@ final class ProjectViewModel: ObservableObject {
               let index = apartments.firstIndex(where: { $0.id == apartmentId }),
               let projectIndex = projects.firstIndex(where: { $0.id == apartments[index].projectId })
         else { return false }
+        guard yazmaAcik(apartments[index].projectId) else { return false }
 
         let apartment = apartments[index]
         guard !apartment.isCommitted else {
@@ -2357,6 +2384,7 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin,
               let index = materials.firstIndex(where: { $0.id == materialId })
         else { return false }
+        guard yazmaAcik(materials[index].projectId) else { return false }
 
         let girenDevir = Self.parseQuantity(inText)
         let cikanDevir = Self.parseQuantity(outText)
@@ -2414,6 +2442,7 @@ final class ProjectViewModel: ObservableObject {
                     amountText: String, payee: String, note: String,
                     date: Date, receiptImage: UIImage? = nil) -> Bool {
         guard role == .admin else { return false }
+        guard yazmaAcik(projectId) else { return false }
 
         let amount = Self.parseMoney(amountText)
         guard amount > .zero else {
@@ -2453,6 +2482,7 @@ final class ProjectViewModel: ObservableObject {
         guard role == .admin,
               let index = expenses.firstIndex(where: { $0.id == expenseId })
         else { return false }
+        guard yazmaAcik(expenses[index].projectId) else { return false }
 
         let amount = Self.parseMoney(amountText)
         guard amount > .zero else {
@@ -2507,6 +2537,7 @@ final class ProjectViewModel: ObservableObject {
 
     func deleteExpense(role: UserRole, id: UUID) {
         guard role == .admin, let expense = expenses.first(where: { $0.id == id }) else { return }
+        guard yazmaAcik(expense.projectId) else { return }
         expenses.removeAll { $0.id == id }
         discardReceipt(bucket: .receipts, projectId: expense.projectId,
                        id: id, path: expense.receiptPath)
@@ -2525,6 +2556,7 @@ final class ProjectViewModel: ObservableObject {
     func addMaterial(role: UserRole, projectId: UUID, name: String, subtitle: String,
                      unit: String, unitPriceText: String) -> Material? {
         guard role == .admin else { return nil }
+        guard yazmaAcik(projectId) else { return nil }
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedUnit = unit.trimmingCharacters(in: .whitespaces)
         guard !trimmedName.isEmpty else {
@@ -2571,6 +2603,7 @@ final class ProjectViewModel: ObservableObject {
                   installmentCount: Int = 0, firstDueDate: Date? = nil) -> Bool {
         guard role == .admin else { return false }
         guard let index = apartments.firstIndex(where: { $0.id == apartmentId }) else { return false }
+        guard yazmaAcik(apartments[index].projectId) else { return false }
 
         // Kat karşılığı daire arsa sahibinindir; satış formunda seçilebilir
         // olmaması yetmez, model düzeyinde de reddedilmeli.
@@ -2816,6 +2849,8 @@ final class ProjectViewModel: ObservableObject {
         case recordsRejected
         /// Başka bir geri yükleme sürüyor.
         case busy
+        /// Geri yüklenen proje aktif döner ve paketin aktif proje sınırı dolu.
+        case overQuota(limit: Int)
 
         var title: String {
             switch self {
@@ -2832,6 +2867,7 @@ final class ProjectViewModel: ObservableObject {
             case .probeFailed:         return "Sunucuya sorulamadı"
             case .alreadyCompleted:    return "Bu yedek zaten geri yüklenmiş"
             case .recordsRejected:     return "Kayıtlar yazılamadı"
+            case .overQuota:           return "Aktif proje sınırındasın"
             }
         }
 
@@ -2874,6 +2910,10 @@ final class ProjectViewModel: ObservableObject {
                 return "Proje kuruldu ama sunucu kayıtları kabul etmedi; aynı dosyayla tekrar "
                      + "denemek büyük olasılıkla aynı sonucu verir. Hesap > Geri bildirim "
                      + "gönder'den bildir."
+            case .overQuota(let limit):
+                return "Hiçbir şey yazılmadı. Geri yüklenen proje aktif olarak döner ve "
+                     + (limit == 1 ? "ücretsiz katmandaki 1 aktif proje" : "paketindeki \(limit) aktif proje")
+                     + " dolu. Biten bir projeyi arşivleyip tekrar dene ya da paketlere bak."
             }
         }
     }
@@ -2993,6 +3033,16 @@ final class ProjectViewModel: ObservableObject {
         // kilitliyordu (panoda boş bir proje kalıyordu). Karar sunucuda.
         guard saklanan != nil || !projects.contains(where: { $0.id == pid }) else {
             return .refused(.alreadyLoaded)
+        }
+        // KOTA: geri yüklenen proje AKTİF dönüyor (`archivedAt = nil`, aşağıda),
+        // yani yeni proje açmakla aynı kontenjanı kullanıyor. Yarım kalanın
+        // kabuğu panodaysa kendisi sayılmıyor — devam, yeni proje değil.
+        var sayim = quotaSnapshot(for: user)
+        if projects.contains(where: { $0.id == pid && $0.ownerUid == user.id && !$0.isArchived }) {
+            sayim.activeProjects -= 1
+        }
+        if case .wouldExceedProjects(let limit) = Quota.canCreateProject(sayim, entitlement: entitlement) {
+            return .refused(.overQuota(limit: limit))
         }
         // İkinci dokunuş yok sayılır: iki geri yükleme aynı kimliğe yarışırdı.
         guard !restorePending else { return .refused(.busy) }
@@ -3262,11 +3312,10 @@ final class ProjectViewModel: ObservableObject {
             return nil
         }
 
-        // KOTA BOĞAZI (madde 87). Bugün `preLaunchUnlimited` olduğu için
-        // hiçbir şeyi durdurmuyor; yayında `entitlement` değiştiği an sınır
-        // TEK yerden yürürlüğe giriyor. Çağrının bugün burada olmasının
-        // sebebi, yarın eklenecek bir koşulun proje açan başka bir yolu
-        // atlaması ihtimalini bugün kapatmak.
+        // KOTA BOĞAZI (madde 87). Sınır `entitlement`ten (StoreKit) geliyor
+        // ve TEK yerden uygulanıyor; proje açan her yol buradan geçmeli.
+        // Arşivden çıkarma ve geri yükleme aynı kontenjanı kendi yerlerinde
+        // denetliyor (`setArchived`, `restore`).
         if case .wouldExceedProjects(let limit) = Quota.canCreateProject(quotaSnapshot(for: user),
                                                                         entitlement: entitlement) {
             flash(Quota.limitMessage(limit: limit))
@@ -3436,6 +3485,7 @@ final class ProjectViewModel: ObservableObject {
                         kind: PartnerLedgerEntry.Kind, amountText: String,
                         date: Date, note: String) -> Bool {
         guard role == .admin else { return false }
+        guard yazmaAcik(projectId) else { return false }
         // ORTAK KAYDI BU PROJEDE OLMALI: başka projenin ortağına hareket
         // yazmak, iki projenin cari hesabını sessizce birbirine karıştırırdı.
         guard partners(for: projectId).contains(where: { $0.id == partnerId }) else {
@@ -3476,6 +3526,7 @@ final class ProjectViewModel: ObservableObject {
     func deleteLedgerEntry(role: UserRole, entryId: UUID) -> Bool {
         guard role == .admin else { return false }
         guard let index = partnerLedger.firstIndex(where: { $0.id == entryId }) else { return false }
+        guard yazmaAcik(partnerLedger[index].projectId) else { return false }
         let entry = partnerLedger.remove(at: index)
 
         let ortakAdi = partners(for: entry.projectId).first { $0.id == entry.partnerId }?.name ?? "Ortak"
@@ -3492,17 +3543,20 @@ final class ProjectViewModel: ObservableObject {
 
     // MARK: - Kota (madde 87)
 
-    /// Kullanıcının hakkı.
+    /// Kullanıcının hakkı — kaynağı `SubscriptionManager` (StoreKit),
+    /// bağlantı `InsaatTakipApp`te.
     ///
-    /// YAYINDAN ÖNCE DEĞİŞECEK TEK SATIR BU. Bugün sınırsız, çünkü ödeme
-    /// alacak bir yol yok ve olmayan bir aboneliğin yokluğunu cezalandırmak
-    /// kullanıcıyı ürünü hiç kullanamayacağı bir kapıya çarptırmak olurdu.
-    /// Değişken (`var`) olmasının tek sebebi test: sınırın gerçekten
-    /// uygulandığı, sınır açılmadan da kanıtlanabilsin.
-    /// Varsayılan yayın öncesi sınırsızlık; `-plan` argümanı verildiğinde
-    /// (yalnızca DEBUG) onun söylediği paket. Testlerde argüman olmadığı için
-    /// varsayılan değişmiyor.
-    var entitlement: Entitlement = LaunchConfig.entitlement ?? .preLaunchUnlimited
+    /// Varsayılan `.resolving` (sınır yok): StoreKit cevap verene kadarki ilk
+    /// an ve testler. `-plan` argümanı (yalnızca DEBUG) hakkı sabitliyor.
+    /// Değişken olmasının sebebi hem bu bağlantı hem testlerin sınırı
+    /// enjekte edebilmesi.
+    ///
+    /// YAYIMLANIYOR (`@Published`, 25 Eki bağımsız inceleme): değilken hak
+    /// değişikliği yalnızca başka bir şey ekranı tazelerse görünüyordu.
+    /// "Satın Almak İçin Sor" onayı, iade ya da başka cihazdan yükseltme
+    /// `Transaction.updates` ile sessizce gelince kilit şeridi ve gizli
+    /// düğmeler eski hakta kalıyordu.
+    @Published var entitlement: Entitlement = LaunchConfig.entitlement ?? .resolving
 
     /// Kotanın ölçtüğü sayılar — YALNIZCA kullanıcının SAHİBİ olduğu
     /// projelerden.
@@ -3522,6 +3576,91 @@ final class ProjectViewModel: ObservableObject {
         snapshot.photos = sitePhotos.filter { ids.contains($0.projectId) }.count
             + apartmentPhotos.filter { ids.contains($0.projectId) }.count
         return snapshot
+    }
+
+    // MARK: Yazma kilidi (abonelik · 25 Eki 2026)
+
+    /// Projeye kayıt girilmesini durduran sebep.
+    enum WriteBlock: Equatable {
+        /// Arşivdeki proje salt okunur.
+        case archived
+        /// Paketin aktif proje sınırının dışında kalan proje salt okunur.
+        case overLimit(limit: Int)
+
+        var message: String {
+            switch self {
+            case .archived:
+                return "Proje arşivde ve salt okunur. Kayıt girmek için arşivden çıkar."
+            case .overLimit(let limit):
+                return (limit == 1
+                        ? "Ücretsiz katmanda 1 aktif projeye kayıt girilebilir."
+                        : "Paketinde \(limit) aktif projeye kayıt girilebilir.")
+                    + " Bu proje salt okunur: biten bir projeyi arşivle ya da paketini yükselt."
+            }
+        }
+    }
+
+    /// Düzenleme düğmeleri gösterilsin mi: bu projede yönetici VE proje
+    /// kilitli değil.
+    ///
+    /// GÖRÜNÜRLÜKTEN AYRI SORU. Ekranlar `isAdmin`i iki iş için kullanıyordu:
+    /// neyi GÖREBİLECEĞİ (alıcı adı, gizli belgeler) ve neyi DÜZENLEYEBİLECEĞİ.
+    /// Kilitli projede sahip hâlâ her şeyi görmeli (okuma kapanmıyor) ama
+    /// düzenleme düğmeleri kalkmalı; ikisini tek bayrağa bağlamak ya veriyi
+    /// gizler ya da basınca reddedilen düğmeler bırakırdı.
+    func canEdit(_ projectId: UUID?, for user: User?) -> Bool {
+        guard let projectId else { return false }
+        return role(inProject: projectId, for: user) == .admin && writeBlock(for: projectId) == nil
+    }
+
+    /// Projeye kayıt girilebilir mi? `nil` = girilebilir.
+    ///
+    /// ARŞİV SALT OKUNUR, KOTADAN BAĞIMSIZ. Arşiv "biten proje" demek ve
+    /// aktif proje sayısına girmiyor; yazılabilir kalsaydı kişi her şeyi
+    /// arşivde tutup orada çalışır, aktif proje sınırı süs olurdu.
+    ///
+    /// SINIRIN ÜSTÜNDE EN ESKİLER YAZILABİLİR (kullanıcı kararı, 25 Eki).
+    /// Abonelik bittiğinde yalnızca YENİ projeyi durdurmak yetmiyordu: bir ay
+    /// paket alıp on proje açan kişi iptalden sonra on projede çalışmaya devam
+    /// ederdi. Hepsini kilitlemek ise ödemesi aksayan müteahhidi bütün
+    /// şantiyelerinden birden koparırdı. Sıra açılış tarihine göre, çünkü
+    /// tek kararlı ölçüt o; kişi hangisinde çalışacağını diğerlerini
+    /// arşivleyerek kendisi seçiyor.
+    ///
+    /// OKUMA HİÇBİR ZAMAN KAPANMIYOR. Bu kapı yalnızca yazma yollarında
+    /// soruluyor; ekranlar, rapor ve dışa aktarma kilitten etkilenmiyor
+    /// (`Quota.swift` karar notu: abonelik yazmayı kilitler, okumayı asla).
+    func writeBlock(for projectId: UUID) -> WriteBlock? {
+        guard let project = projects.first(where: { $0.id == projectId }) else { return nil }
+        if project.isArchived { return .archived }
+        // Sınır yalnızca KENDİ projelerine: hak bu kişinin. Başkasının
+        // projesinde ortak zaten yazamıyor; "paketin yetmiyor" demek yanlış
+        // kişiyi suçlardı.
+        if let uid = actingUser?.id, uid != project.ownerUid { return nil }
+        guard let limit = entitlement.activeProjectLimit else { return nil }
+        let sirali = projects
+            .filter { $0.ownerUid == project.ownerUid && !$0.isArchived }
+            .sorted { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) }
+        guard let sira = sirali.firstIndex(where: { $0.id == projectId }) else { return nil }
+        return sira < limit ? nil : .overLimit(limit: limit)
+    }
+
+    /// YAZMA KAPISI: her yazma yolunda rol kontrolünden sonra, HİÇBİR
+    /// DEĞİŞİKLİKTEN ÖNCE. Yerel durumu değiştirip yazmayı göndermemek ekranda
+    /// sunucuda olmayan bir kayıt bırakırdı.
+    ///
+    /// NEDEN HER FONKSİYONDA AYRI SATIR, `persist`te DEĞİL: `persist`e
+    /// gelindiğinde yerel dizi çoktan değişmiş oluyor. Kapsamı
+    /// `ProjectWriteLockTests` bütün yazma yollarını tek tek deneyerek
+    /// koruyor; yeni bir yazma yolu o listeye de eklenmeli.
+    ///
+    /// YARIM KALAN YÜKLEMELER KİLİTLENMİYOR (`hydrateDocuments`,
+    /// `uploadImage`): kayıt kilitten ÖNCE girilmişti, yükleme onun
+    /// tamamlanması. Kesmek ekranda dosyası hiç gelmeyen bir belge bırakırdı.
+    private func yazmaAcik(_ projectId: UUID) -> Bool {
+        guard let engel = writeBlock(for: projectId) else { return true }
+        flash(engel.message)
+        return false
     }
 
     /// Oturumu açan kişinin BU PROJEDEKİ ortak kaydı. Bağ `userUid` üzerinden:
@@ -3600,6 +3739,7 @@ final class ProjectViewModel: ObservableObject {
     func updatePartnerShare(role: UserRole, partnerId: UUID, percent: Int) -> Bool {
         guard role == .admin else { return false }
         guard let index = partners.firstIndex(where: { $0.id == partnerId }) else { return false }
+        guard yazmaAcik(partners[index].projectId) else { return false }
         let partner = partners[index]
         let clamped = max(0, min(100, percent))
         guard clamped != partner.sharePercent else { return true }
@@ -3649,14 +3789,19 @@ final class ProjectViewModel: ObservableObject {
     func generateInviteCode(role: UserRole, projectId: UUID) {
         guard role == .admin,
               let index = projects.firstIndex(where: { $0.id == projectId }) else { return }
+        guard yazmaAcik(projectId) else { return }
 
-        // ORTAK KOTASI (madde 87). Bugün `preLaunchUnlimited` olduğu için
-        // hiçbir şeyi durdurmuyor; ücretsiz katman açıldığında sınır TEK
-        // yerden yürürlüğe giriyor.
+        // ORTAK KOTASI (madde 87): ücretsiz katmanda 2 davetli ortak.
         //
         // KURUCU SAYILMIYOR: proje kurucusunun da bir `Partner` kaydı var ve
         // onu saymak, ilan edilen "2 ortak"ı sessizce 1'e indirirdi.
-        let davetliSayisi = partners(for: projectId).filter { !$0.isFounder }.count
+        //
+        // ERİŞİMİ OLMAYAN KAYIT SAYILMIYOR (25 Eki bağımsız inceleme): geri
+        // yükleme ortak kayıtlarını `userUid`siz getiriyor ve özet "yeniden
+        // davet etmen gerekiyor" diyor. Onları saymak, ücretsiz katmanda o
+        // daveti imkânsız kılıyordu; sınırın ölçtüğü şey projeye ERİŞEN kişi.
+        let davetliSayisi = partners(for: projectId)
+            .filter { !$0.isFounder && !($0.userUid ?? "").isEmpty }.count
         if case .wouldExceedPartners(let limit) = Quota.canInvitePartner(invitedCount: davetliSayisi,
                                                                         entitlement: entitlement) {
             flash(Quota.partnerLimitMessage(limit: limit))
@@ -3864,6 +4009,7 @@ final class ProjectViewModel: ObservableObject {
                      sourceURL: URL, versionNote: String,
                      partnerVisible: Bool) -> Bool {
         guard role == .admin else { return false }
+        guard yazmaAcik(projectId) else { return false }
 
         let fileName = sourceURL.lastPathComponent
         let ext = (fileName as NSString).pathExtension.lowercased()
@@ -3992,6 +4138,7 @@ final class ProjectViewModel: ObservableObject {
     func addApartmentPhotos(role: UserRole, apartmentId: UUID, images: [UIImage]) {
         guard role == .admin, !images.isEmpty else { return }
         guard let apartment = apartments.first(where: { $0.id == apartmentId }) else { return }
+        guard yazmaAcik(apartment.projectId) else { return }
         let existing = photos(forApartment: apartmentId).count
         var writes: [DocumentChange] = []
         for (offset, image) in images.enumerated() {
@@ -4013,6 +4160,7 @@ final class ProjectViewModel: ObservableObject {
     func removeApartmentPhoto(role: UserRole, photoId: UUID) {
         guard role == .admin,
               let photo = apartmentPhotos.first(where: { $0.id == photoId }) else { return }
+        guard yazmaAcik(photo.projectId) else { return }
         apartmentPhotos.removeAll { $0.id == photoId }
         persist([.deleteApartmentPhoto(id: photoId, projectId: photo.projectId)],
                 failureNote: "Görsel silme")
@@ -4029,6 +4177,7 @@ final class ProjectViewModel: ObservableObject {
     /// Küçültme çağıran tarafta, arka planda yapılır — burada yalnızca hazır görseller beklenir.
     func addSitePhotos(role: UserRole, projectId: UUID, images: [UIImage]) {
         guard role == .admin, !images.isEmpty else { return }
+        guard yazmaAcik(projectId) else { return }
         var writes: [DocumentChange] = []
         for image in images {
             let photo = SitePhoto(id: UUID(), projectId: projectId, date: Date(), image: image)

@@ -2304,6 +2304,8 @@ verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam
       ücretsiz" gibi bilinçli bir karar da kayıtlı değil.
       → **YAPILDI (31 Ağu 2026) — (a) karar yazıldı, (b) kotanın duracağı yer
       açıldı. (c) StoreKit AYRI ve sonraya.**
+      → **(c) YAPILDI (25 Eki 2026) — 1.0 reddi üzerine StoreKit 2 bağlandı;
+      ayrıntı aşağıda "(c) STOREKIT".**
 
       ### GELİR MODELİ KARARI
 
@@ -2467,6 +2469,98 @@ verilmesi gerekiyor — yapılacaksa madde, yapılmayacaksa yazılı bir "kapsam
       ödeme bağlantısı kuralı bölgeye göre değişiyor ve son yıllarda değişti.
       (c) parçasının tetiği: ilk ücretli yayından önce ya da Firebase
       harcaması yazılı bir eşiği geçtiğinde.
+
+      ### (c) STOREKIT (25 Eki 2026)
+
+      **TETİK: RET.** 1.0 (169) Guideline 2.1(b) ile reddedildi: paket ekranı
+      fiyat gösteriyordu, App Store Connect'te tek bir satın alma ürünü
+      yoktu. (c)'nin yazılı tetiği "ilk ücretli yayından önce"ydi; ret, ilk
+      yayının fiyatlı olacağını kesinleştirdi. İki yol sunuldu: (A) fiyatı
+      gizleyip ücretsiz yayın, (B) aboneliği 1.0'a bağlamak. Kullanıcı B'yi
+      seçti: yayında kullanıcı yok, yani A'nın tek gerçek bedeli —
+      sınırsızlığı sonradan geri almak — hiç doğmadan sınır ilk günden
+      konabiliyor.
+
+      **DOĞRULAMA CİHAZDA, SUNUCU YOK.** (b)'nin korkuluğu zaten kotayı
+      istemciye koymuştu; App Check zorlamada olduğu için değiştirilmiş
+      uygulama Firestore'a yazamıyor ve StoreKit 2 her işlemi Apple
+      imzasıyla cihazda doğruluyor. Sunucu ancak Android/web iOS'taki
+      aboneliği tanımak zorunda kalınca gerekiyor; `appAccountToken` (uid'den
+      türetilmiş UUID) o köprünün ilk taşı. Satın alma verisi bize gelmediği
+      için App Privacy beyanı DEĞİŞMEDİ.
+
+      **HAK APPLE KİMLİĞİNE BAĞLI, HESABA DEĞİL.** Uid'e bağlamak, hesabını
+      silip aynı numarayla açan ve App Store'da ödemeye devam eden kişiyi
+      haksız bırakırdı; Apple da Restore'un çalışmasını istiyor. Bedeli (aynı
+      Apple Kimliğini paylaşan iki hesap aynı paketi görür) ödeyenin aleyhine
+      değil.
+
+      **ÖDEME EK SÜRESİ.** `Transaction.currentEntitlements` "subscribed" ve
+      "inGracePeriod" abonelikleri veriyor (Apple belgesi okundu), ek
+      süredekinin bitiş tarihi geçmişte olabilir. Hak kararı bu yüzden
+      tarihe BAKMIYOR; baksaydı kartı yenilenmeyi bekleyen ödeyen kişi tam
+      Apple'ın ona süre tanıdığı anda kilitlenirdi.
+
+      **YAZMA KİLİDİ — İKİ BOŞLUK, İKİ KARAR.** Kota yürürlüğe girdiği an
+      iki yol aktif proje sınırını süse çeviriyordu: arşivden çıkarma kotaya
+      bakmıyordu (arşivle → yenisini aç → geri çıkar = sınırsız) ve
+      arşivdeki projeye yazılabiliyordu. Üçüncüsü abonelik bitince yalnızca
+      yeni projenin durmasıydı: bir ay paket alıp on proje açan kişi on
+      projede çalışmaya devam ederdi. Kullanıcı kararları (25 Eki):
+      **arşiv salt okunur**; **sınırın üstünde en eski N proje yazılabilir,
+      fazlası salt okunur** — kişi hangisinde çalışacağını arşivleyerek
+      seçer. (b)'nin "yazma kilitlenir, okuma asla" korkuluğu aynen
+      uygulandı: okuma ve dışa aktarma hiçbir durumda kapanmıyor; arşivleme
+      ve ortak çıkarma her zaman açık; geri yükleme kotaya tabi.
+      Kapı `writeBlock(for:)` + her yazma yolunda `yazmaAcik` (27 yol);
+      `persist`e konmadı çünkü oraya gelindiğinde yerel dizi değişmiş
+      oluyor. `ProjectWriteLockTests` 26 yolu tek tek deniyor ve kırmızı
+      adımda HEPSİ arşivdeki projeye yazıyordu.
+
+      **EKRAN.** Fiyatlar Apple'ın `displayPrice`ı (katalogdaki rakam artık
+      ASC'ye girilecek HEDEF); mağaza cevap vermezse fiyat yazılmıyor. Yıllık
+      tasarruf mağaza fiyatlarından hesaplanıyor ("iki ay bedava" katalog
+      rakamına bağlıydı, Apple basamaklarında yanlış olabilirdi). 3.1.2:
+      tahsil edilen tutar en belirgin, otomatik yenileme cümlesi, koşullar +
+      gizlilik, Restore. Hesap silmede abonelik uyarısı + "Aboneliği yönet"
+      (Apple hesap silme rehberi). Kilitli projede düzenleme düğmeleri
+      yok, şerit nedenini ve çıkışını söylüyor, panodaki kart "salt okunur".
+
+      **TEST.** 291 Swift testi: 290 geçti, 1 atlandı. Gerçek StoreKit
+      testleri `xcodebuild` ortamında kurulamıyor (bilinen Xcode sorunu —
+      yapılandırma simülatöre aktarılmıyor), o yüzden ortam yoksa gerekçesiyle
+      ATLANIYOR, yanlış yeşil vermiyor; Xcode içinden ⌘U ile tam koşuyor.
+      Satın alma penceresi gerçek StoreKit'te elle denendi ("You're all
+      set"). Konsol adımları `ASC_ABONELIK.md`.
+
+      **BAĞIMSIZ İNCELEME (25 Eki).** 28 yazma yolunun hiçbirinin kilitli
+      projeye yazamadığını doğruladı; beş gerçek kusur buldu, beşi düzeltildi
+      ve her biri önce kırmızıya düşen bir testle kilitlendi (291 test):
+      1. *Hak ön plana dönüşte okunmuyordu.* Süresi dolan abonelik yeni işlem
+         üretmiyor, `Transaction.updates` tetiklenmiyor; uygulama arka planda
+         kaldıkça iptal edilmiş paket ücretli sınırlarla sürüyordu. Artık
+         sahne `.active` olunca yeniden okunuyor.
+      2. *`entitlement` yayımlanmıyordu.* "Satın Almak İçin Sor" onayı ya da
+         iade sessizce gelince kilit şeridi eski hakta kalıyordu; satın alma
+         yolu yalnızca tesadüfen (`flash`) tazeleniyordu.
+      3. *Erişimi olmayan ortak kaydı davet sınırını yiyordu.* Geri yükleme
+         ortakları `userUid`siz getiriyor ve "yeniden davet et" diyor;
+         ücretsiz katmanda bu imkânsızdı. Artık erişen kişi sayılıyor.
+      4. *Hesap silme uyarısı haktan okunuyordu.* Ödeme yeniden denenirken
+         (ek süre dışında) hak "ücretsiz" görünüyor ama yenileme açık — Apple
+         kart güncellenince silinmiş hesap için ücret alırdı. Uyarı artık
+         yenileme durumundan; durum bilinmiyorsa tedbirli cümle.
+      5. *Kilitli projede boş durum metinleri gizli düğmeyi gösteriyordu*
+         ("＋ Fotoğraf Ekle"). Şantiye fotoğrafları ekranında şerit de
+         olmadığı için neden yazılmıyordu.
+
+      **AÇIK, AYRI MADDE OLARAK:** (a) kilitli projede önceden üretilmiş
+      davet kodu 48 saat geçerli kalıyor ve iptal edilemiyor — iptalin tek
+      yolu yeni kod üretmek ve o artık kilitli. Sahip sonradan katılanı
+      çıkarabiliyor; kalıcı çözüm sunucuda (`redeemInvite` arşiv durumuna
+      bakmalı) ve dağıtım ister. (b) `redeemInvite` geri yüklenmiş ortağı
+      yeniden davet edince YENİ ortak belgesi kuruyor, eski hisse kaydıyla
+      eşleştirmiyor — çift ortak. İkisi de bu sürümün kapsamı dışında.
 
       ### (d) PAKETLER GÖRÜNÜR OLDU (15 Eki 2026)
 

@@ -556,19 +556,35 @@ struct DashboardView: View {
 
     private var planRowTitle: String {
         switch viewModel.entitlement {
-        case .preLaunchUnlimited: return "Paketler"
+        case .resolving: return "Paketler"
         case .plan(.ucretsiz):    return planAtLimit ? "Aktif proje sınırındasın" : "Ücretsiz katman"
         case .plan(let plan):     return "\(plan.displayName) paketi"
         }
     }
 
+    /// Paket sınırının dışında kalıp salt okunur olan proje sayısı.
+    private var kilitliProjeSayisi: Int {
+        viewModel.activeProjects(for: appState.currentUser).filter {
+            if case .overLimit = viewModel.writeBlock(for: $0.id) { return true }
+            return false
+        }.count
+    }
+
     /// SINIRDAYKEN İKİ ÇIKIŞ DA YAZILI: arşivlemek ücretsiz, paket ücretli.
     /// Yalnızca paketi göstermek, kullanıcının zaten hakkı olan ücretsiz
     /// çözümü saklamak olurdu.
+    ///
+    /// SALT OKUNUR PROJE VARSA ÖNCE O SÖYLENİYOR (25 Eki 2026): satır sınır
+    /// rengindeyken "paketini gör" demek, kişiye neden uyarıldığını
+    /// söylememek olurdu.
     private var planRowDetail: String {
+        let kilitli = kilitliProjeSayisi
+        if kilitli > 0 {
+            return "\(kilitli) proje salt okunur · biten projeyi arşivle ya da paketini yükselt"
+        }
         switch viewModel.entitlement {
-        case .preLaunchUnlimited:
-            return "Yayın öncesi · tüm özellikler açık"
+        case .resolving:
+            return "Paketin kontrol ediliyor"
         case .plan(.ucretsiz):
             return planAtLimit
                 ? "Biten projeyi arşivle ya da paketlere bak"
@@ -856,6 +872,16 @@ struct ProjectCardView: View {
                     Text(project.meta)
                         .font(.manrope(12.5, .medium))
                         .foregroundColor(Palette.textSecondary)
+                    // PAKET SINIRININ DIŞINDA KALAN PROJE KARTTA DA SÖYLENİYOR:
+                    // kişi hangi projede kayıt girebileceğini proje proje açıp
+                    // denemeden görmeli. Arşivdekiler ayrı bölümde durduğu için
+                    // orada ayrıca işaret gerekmiyor.
+                    if case .overLimit = viewModel.writeBlock(for: project.id) {
+                        Label("Salt okunur · paket sınırı", systemImage: "lock")
+                            .font(.manrope(11, .semiBold))
+                            .foregroundColor(Palette.accent)
+                            .padding(.top, 3)
+                    }
                 }
                 Spacer()
                 StatusChip(text: project.phase.rawValue,

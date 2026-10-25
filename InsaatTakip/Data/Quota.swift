@@ -2,30 +2,31 @@ import Foundation
 
 // MARK: - Kota ve hak (madde 87)
 //
-// BU DOSYA ÖDEME ALMIYOR. StoreKit yok ve bilerek yok (madde 87 · parça c).
-// Burada olan şey daha küçük ve daha aceleci: SINIRIN DURACAĞI YERİ açmak.
+// ÖDEME BURADA DEĞİL: satın alma `Subscriptions.swift` + `SubscriptionManager`
+// (StoreKit 2, 25 Eki 2026). Bu dosya yalnızca SINIRIN kararını veriyor:
+// sayaçlar, sınır sabitleri ve TEK boğaz noktası. Açılıp kapanan tek şey
+// `Entitlement`.
 //
-// Gerekçe geri dönülemezlikte: StoreKit'i sonra yazabilirsin, ilk yayının
-// SINIRSIZLIĞINI geri alamazsın. 12 proje açmış bir kullanıcıyı sonradan
+// Tarihçe: sayaçlar ve boğaz StoreKit'ten ÖNCE kuruldu, çünkü ilk yayının
+// sınırsızlığı geri alınamazdı — 12 proje açmış bir kullanıcıyı sonradan
 // 3 proje sınırına sokmak ya sonsuza kadar muafiyet ya da güven kaybı demek.
-// Bu yüzden sayaçlar, sınır sabitleri ve TEK boğaz noktası bugün var; açılıp
-// kapanan tek şey `Entitlement`.
 
-/// Kullanıcının hakkı — bugün tek bir yerden geliyor, yarın StoreKit'ten.
-/// Kullanıcının hakkı — bugün tek bir yerden geliyor, yarın StoreKit'ten.
+/// Kullanıcının hakkı — kaynağı StoreKit (`EntitlementResolver`).
 enum Entitlement: Equatable {
     /// Satın alınmış (ya da ücretsiz) paket. Sınırlar `Plan`dan okunuyor:
     /// fiyat ve sınır ayrı dursaydı birini değiştirip diğerini unutmak
     /// serbest olurdu.
     case plan(Plan)
 
-    /// Yayın öncesi: sınır YOK.
+    /// Hak HENÜZ BİLİNMİYOR: StoreKit açılışta cevap vermedi. Sınır YOK.
     ///
-    /// Bugün herkes bu haktadır çünkü ödeme alacak bir yol yok ve olmayan bir
-    /// aboneliğin yokluğunu cezalandırmak, kullanıcıyı ürünü hiç
-    /// kullanamayacağı bir kapıya çarptırmak olurdu. YAYINDAN ÖNCE bu değer
-    /// `.free`e çevrilecek; değişecek tek satır `ProjectViewModel.entitlement`.
-    case preLaunchUnlimited
+    /// NEDEN SINIRSIZ, NEDEN ÜCRETSİZ DEĞİL: `Transaction.currentEntitlements`
+    /// cihazdaki imzalı kayıtları okuyor ve ağ istemiyor, yani bu durum
+    /// açılışın ilk anından ibaret. O anı `.free` saymak, ücretli kullanıcının
+    /// projelerini bir an "salt okunur" gösterir ve tam o an dokunduğu yazmayı
+    /// reddederdi — ödeyen kişiyi cezalandıran bir yarış. Bu anda yapılabilecek
+    /// en kötü şey, birkaç yüz milisaniyelik sınırsızlıktan daha pahalı.
+    case resolving
 
     /// Kalıcı ücretsiz katman: 1 AKTİF proje, 2 davetli ortak.
     ///
@@ -38,7 +39,7 @@ enum Entitlement: Equatable {
     var invitedPartnerLimit: Int? {
         switch self {
         case .plan(let plan):     return plan.invitedPartnerLimit
-        case .preLaunchUnlimited: return nil
+        case .resolving: return nil
         }
     }
 
@@ -51,7 +52,7 @@ enum Entitlement: Equatable {
     var activeProjectLimit: Int? {
         switch self {
         case .plan(let plan):     return plan.activeProjectLimit
-        case .preLaunchUnlimited: return nil
+        case .resolving: return nil
         }
     }
 }
@@ -112,6 +113,18 @@ enum Quota {
         "Ücretsiz katmanda \(limit) ortak davet edilebilir. Daha fazlası için paketi yükselt."
     }
 
+    /// Arşivden çıkarma sınıra çarptığında söylenen cümle.
+    ///
+    /// Arşivden çıkarmak da bir projeyi aktif yapıyor; kotaya bakmasaydı
+    /// "arşivle → yenisini aç → eskisini geri çıkar" döngüsü ücretsiz
+    /// katmanda sınırsız aktif proje demekti.
+    static func unarchiveLimitMessage(limit: Int) -> String {
+        (limit == 1
+            ? "Ücretsiz katmanda aynı anda 1 aktif proje tutulabilir."
+            : "Paketinde aynı anda \(limit) aktif proje var.")
+            + " Arşivden çıkarmak için önce başka bir projeyi arşivle; daha fazlası için paketlere bakabilirsin."
+    }
+
     /// Sınır dolduğunda kullanıcıya söylenen cümle.
     ///
     /// NE YAPACAĞINI SÖYLÜYOR: "sınıra ulaştın" tek başına kişiyi çıkışsız
@@ -143,6 +156,11 @@ enum Quota {
 // ikisini aynı yere koymak, ticari bir hatanın veri kaybı gibi görünmesine
 // yol açar.
 //
-// DOĞRULANACAK TEK DIŞ BİLİNMEYEN (bundan önce StoreKit'e tek satır kod
-// yazılmamalı): Apple'ın uygulama içi satın alma zorunluluğu ve dış ödeme
-// bağlantısı kuralı bölgeye göre değişiyor ve son yıllarda değişti.
+// YAZMA KİLİDİ (25 Eki 2026, kullanıcı kararı): arşivdeki proje salt okunur;
+// sınırın üstünde kalan aktif projelerin en eskileri yazılabilir, fazlası salt
+// okunur. Kapı `ProjectViewModel.writeBlock(for:)`. Okuma ve dışa aktarma
+// hiçbir durumda kapanmıyor — yukarıdaki ilkenin uygulaması.
+//
+// DIŞ BİLİNMEYEN KAPANDI: dijital abonelik Türkiye mağazasında uygulama içi
+// satın alma (IAP) ile satılıyor; dış ödeme bağlantısı kullanılmıyor, yani
+// bölgeye göre değişen bağlantı kuralları bu ürüne uygulanmıyor.

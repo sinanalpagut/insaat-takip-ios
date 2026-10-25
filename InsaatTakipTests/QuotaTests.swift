@@ -3,7 +3,10 @@ import XCTest
 
 /// Kota ve hak — madde 87.
 ///
-/// NEDEN BU TESTLER VAR: sınır bugün AÇIK DEĞİL (`preLaunchUnlimited`) ve
+/// NEDEN BU TESTLER VAR: sınır `Entitlement` üzerinden enjekte ediliyor;
+/// gerçek hak `SubscriptionManager`dan geliyor. Testler sınırı doğrudan
+/// kurarak kotanın kendi kararını denetliyor. Eski giriş cümlesi: sınır o
+/// gün AÇIK DEĞİLDİ (`resolving`) ve
 /// açık olmayan bir mekanizmanın çalıştığı iddia edilemez. Testler sınırı
 /// enjekte ederek yayın gününü BUGÜN provası yapıyor: kapatılan tek şey bir
 /// sabit olduğunda, kapatınca ne olacağı önceden biliniyor.
@@ -16,11 +19,12 @@ final class QuotaTests: XCTestCase {
         return vm
     }
 
-    /// BUGÜN SINIR YOK — ve bu bilinçli.
-    func testPreLaunchIsUnlimited() {
-        XCTAssertNil(Entitlement.preLaunchUnlimited.activeProjectLimit)
+    /// HAK BİLİNMİYORKEN SINIR YOK — açılışın ilk anı (gerekçe
+    /// `Entitlement.resolving`ta).
+    func testResolvingIsUnlimited() {
+        XCTAssertNil(Entitlement.resolving.activeProjectLimit)
         let snapshot = QuotaSnapshot(activeProjects: 99)
-        XCTAssertEqual(Quota.canCreateProject(snapshot, entitlement: .preLaunchUnlimited), .allowed)
+        XCTAssertEqual(Quota.canCreateProject(snapshot, entitlement: .resolving), .allowed)
     }
 
     /// Ücretsiz katman: 1 aktif proje.
@@ -156,23 +160,22 @@ final class QuotaTests: XCTestCase {
 
     // MARK: - Sınır ile ödeme yolu birbirine bağlı
 
-    /// SINIR YÜRÜRLÜĞE GİRDİĞİ GÜN SATIN ALMA DA AÇIK OLMALI.
+    /// SINIRA ÇARPAN KİŞİNİN ÖDEYEREK ÇIKABİLECEĞİ BİR ÜRÜN OLMALI.
     ///
-    /// Yayın günü yapılacak değişiklik TEK SATIR: `entitlement` varsayılanı
-    /// `.preLaunchUnlimited`ten `.free`e dönecek. O satır tek başına
-    /// değiştirilirse kullanıcı ikinci projesini açamaz VE ödeyerek açmanın
-    /// bir yolu da olmaz — yani ürünün yapabileceği en kötü şey, çıkışı
-    /// olmayan bir duvar.
-    ///
-    /// İki değişikliği bir araya bağlayan tek şey bu test. Bugün sessizce
-    /// geçiyor (koşul sağlanmıyor); yayın günü kotayı açan kişi, satın almayı
-    /// açmadan testi yeşil göremez.
-    func testLimitsNeedAPaymentPath() {
-        let vm = ProjectViewModel(repository: InMemoryProjectRepository())
-        guard vm.entitlement != .preLaunchUnlimited else { return }
-        XCTAssertTrue(Plan.purchasesAvailable,
-                      "Kota yürürlükte ama satın alma kapalı — "
-                      + "kullanıcı sınıra çarpar ve ödeyerek çıkamaz")
+    /// Eskiden `Plan.purchasesAvailable` bayrağını denetliyordu: kota açılıp
+    /// satın alma kapalı kalırsa kullanıcı çıkışı olmayan bir duvara çarpardı.
+    /// Bayrak StoreKit gelince (25 Eki 2026) kalktı; aynı söz artık şöyle
+    /// tutuluyor: sınırı olan her katmanın ÜSTÜNDE, mağazada satılan ve o
+    /// sınırı genişleten bir paket var.
+    func testEveryLimitHasAPaidWayOut() {
+        for plan in Plan.allCases {
+            guard let sinir = plan.activeProjectLimit else { continue }
+            let cikis = Plan.purchasable.first { ust in
+                ust.rank > plan.rank && (ust.activeProjectLimit ?? .max) > sinir
+                    && ust.monthlyProductId != nil && ust.yearlyProductId != nil
+            }
+            XCTAssertNotNil(cikis, "\(plan.rawValue) sınırının üstünde satın alınabilir paket yok")
+        }
     }
 
     /// Sınır cümlesi NE YAPACAĞINI söylüyor — burada çıkış arşivlemek değil.

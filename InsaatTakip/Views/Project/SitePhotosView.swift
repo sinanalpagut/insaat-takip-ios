@@ -21,6 +21,9 @@ struct SitePhotosView: View {
 
     /// Proje bazlı rol (bkz. Project.role(for:)).
     private var isAdmin: Bool { project?.role(for: appState.currentUser) == .admin }
+    /// Kilitli projede (arşiv, paket sınırı) düzenleme düğmeleri yok;
+    /// görünürlük `isAdmin`de kalıyor (`ProjectViewModel.canEdit`).
+    private var canEdit: Bool { viewModel.canEdit(projectId, for: appState.currentUser) }
 
     private let columns = [
         GridItem(.flexible(), spacing: 7),
@@ -72,7 +75,7 @@ struct SitePhotosView: View {
         }
         .background(Palette.page.ignoresSafeArea())
         .navigationBarHidden(true)
-        .floatingActionButton("Fotoğraf Ekle", visible: isAdmin) {
+        .floatingActionButton("Fotoğraf Ekle", visible: canEdit) {
             showPicker = true
         }
         .photosPicker(isPresented: $showPicker, selection: $pickedItems,
@@ -114,8 +117,11 @@ struct SitePhotosView: View {
             Text("Henüz şantiye fotoğrafı yok")
                 .font(.manrope(13.5, .bold))
                 .foregroundColor(Palette.ink)
-            Text(isAdmin ? "Haftalık ilerlemeyi \"＋ Fotoğraf Ekle\" ile kaydetmeye başla"
-                         : "Yönetici fotoğraf ekledikçe burada görünecek")
+            // KİLİTLİ PROJEDE "＋ Fotoğraf Ekle" YOK; metin onu göstermemeli.
+            // Bu ekranda proje şeridi olmadığı için nedeni burada söyleniyor.
+            Text(canEdit ? "Haftalık ilerlemeyi \"＋ Fotoğraf Ekle\" ile kaydetmeye başla"
+                 : isAdmin ? (viewModel.writeBlock(for: projectId)?.message ?? "")
+                 : "Yönetici fotoğraf ekledikçe burada görünecek")
                 .font(.manrope(11.5, .medium))
                 .foregroundColor(Palette.textSecondary)
                 .multilineTextAlignment(.center)

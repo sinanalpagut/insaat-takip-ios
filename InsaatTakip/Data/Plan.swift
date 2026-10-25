@@ -71,6 +71,14 @@ enum Plan: String, Codable, CaseIterable, Identifiable {
     }
 
     /// Aylık ücret. `nil` = ücretsiz paket.
+    ///
+    /// BU RAKAM App Store Connect'e GİRİLECEK HEDEF, ekrandaki fiyat DEĞİL
+    /// (25 Eki 2026). Ekran ve tahsilat Apple'ın `displayPrice`ını kullanıyor
+    /// (`StoreOffer`): kişinin mağaza bölgesi başka bir ülkeyse fiyat o ülkenin
+    /// parasıyla geliyor ve Apple vergi değişikliğinde fiyatı kendisi
+    /// ayarlayabiliyor. Katalog ile konsol ayrışırsa kullanıcı yine doğru
+    /// rakamı görür; ayrışmayı yakalamak `Config/InsaatTakip.storekit`
+    /// karşılaştırmasının işi (`SubscriptionTests`).
     var monthlyPrice: Kurus? {
         switch self {
         case .ucretsiz:  return nil
@@ -149,17 +157,4 @@ enum Plan: String, Codable, CaseIterable, Identifiable {
         "Dönem raporu, PDF ve Excel çıktısı",
         "Reklam yok, veri izleme yok",
     ]
-
-    /// SATIN ALMA HENÜZ AÇIK DEĞİL — StoreKit bağlanmadı (madde 87/c).
-    ///
-    /// Paket ekranı bugün BİLGİ ekranı olarak çalışıyor: fiyatlar görünüyor,
-    /// "Satın Al" düğmesi görünmüyor. Çalışmayan bir düğme, bastıran
-    /// kullanıcıya uygulamanın bakımsız olduğunu söyler; hiç olmaması ise
-    /// yalnızca "henüz satışta değil" der.
-    ///
-    /// BU BAYRAK KOTAYLA BİRLİKTE AÇILMALI. Sınır yürürlüğe girip satın alma
-    /// kapalı kalırsa kullanıcı çıkışı olmayan bir duvara çarpar — ürünün
-    /// yapabileceği en kötü şey. `QuotaTests.testLimitsNeedAPaymentPath`
-    /// tam bu ikiliyi denetliyor.
-    static let purchasesAvailable = false
 }

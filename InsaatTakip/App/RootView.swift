@@ -19,6 +19,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var viewModel: ProjectViewModel
     @EnvironmentObject private var appLock: AppLock
+    @EnvironmentObject private var subscriptions: SubscriptionManager
 
     @State private var path = NavigationPath()
 
@@ -38,6 +39,14 @@ struct RootView: View {
             // kullanılan eylemde her seferinde yüz taraması istemek olurdu).
             // Gerekçenin tamamı `AppLock` içinde.
             .onChange(of: scenePhase) { yeni in
+                // HAK ÖN PLANA DÖNÜŞTE YENİDEN OKUNUYOR (25 Eki bağımsız
+                // inceleme). Süresi dolan abonelik YENİ İŞLEM üretmiyor, yani
+                // `Transaction.updates` hiç tetiklenmiyor: iptal edilip dönemi
+                // biten, ek süresi tükenen kişi uygulama arka planda kaldıkça
+                // (iOS'ta günlerce) ücretli sınırlarla devam ediyordu. Ters
+                // yönde de geçerli: açılışta henüz eşitlenmemiş ödeyen kişi
+                // yeniden başlatana kadar kilitli kalıyordu.
+                if yeni == .active { Task { await subscriptions.refresh() } }
                 guard appState.currentUser != nil else { return }
                 switch yeni {
                 case .inactive:   appLock.applicationWillResignActive()
