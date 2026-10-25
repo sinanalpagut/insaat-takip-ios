@@ -80,6 +80,13 @@ struct PlansSheet: View {
         .sheetHeight(0.92)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius24()
+        // MESAJ BU EKRANIN ÜSTÜNDE. Kökteki toast bu sheet'in ve onu açan
+        // Hesap sheet'inin ARKASINDA çiziliyor; 25 Eki'de TestFlight'ta
+        // görüldü: geri yükleme başarılıydı, ekran kapandı, "Paketin geri
+        // yüklendi" mesajı Hesap ekranının arkasında kaldı ve kişi hiçbir
+        // şey olmadığını sandı. Diğer sheet'ler aynı sebeple kendi
+        // katmanlarını taşıyor.
+        .toastOverlay(viewModel.toast)
         .task {
             if let durum = subscriptions.status { donem = durum.period }
             if subscriptions.offersState != .loaded { await subscriptions.loadOffers() }
@@ -356,8 +363,10 @@ struct PlansSheet: View {
     private func satinAl(_ teklif: StoreOffer) async {
         switch await subscriptions.purchase(teklif, uid: appState.currentUser?.id) {
         case .purchased(let plan):
+            // EKRAN AÇIK KALIYOR: üstteki durum kartı yeni paketi ve
+            // yenilenme tarihini hemen gösteriyor — sonucun kendisi bu.
+            // Kapatmak, kişiyi sonucu göremediği bir ekrana bırakıyordu.
             viewModel.flash("Paketin: \(plan.displayName)")
-            dismiss()
         case .pending:
             uyari = Uyari(baslik: "Onay bekleniyor",
                           mesaj: "Satın alma onay bekliyor (ör. Aile Paylaşımı'nda \"Satın Almak İçin Sor\"). "
@@ -455,7 +464,6 @@ struct PlansSheet: View {
         switch await subscriptions.restore() {
         case .restored(let plan):
             viewModel.flash("Paketin geri yüklendi: \(plan.displayName)")
-            dismiss()
         case .nothingFound:
             uyari = Uyari(baslik: "Abonelik bulunamadı",
                           mesaj: "Bu Apple Kimliğinde etkin bir İnşaat Takip aboneliği yok. Aboneliği "
