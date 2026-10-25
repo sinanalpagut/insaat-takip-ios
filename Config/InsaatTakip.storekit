@@ -5,7 +5,7 @@
   "settings": {},
   "subscriptionGroups": [
     {
-      "id": "21480001",
+      "id": "22512945",
       "localizations": [
         {
           "description": "",
@@ -18,7 +18,7 @@
         {
           "adHocOffers": [],
           "codeOffers": [],
-          "displayPrice": "749.00",
+          "displayPrice": "749.99",
           "familyShareable": false,
           "groupNumber": 3,
           "internalID": "6480000001",
@@ -33,13 +33,13 @@
           "productID": "com.sinanalpagut.insaattakip.santiye.aylik",
           "recurringSubscriptionPeriod": "P1M",
           "referenceName": "Şantiye Aylık",
-          "subscriptionGroupID": "21480001",
+          "subscriptionGroupID": "22512945",
           "type": "RecurringSubscription"
         },
         {
           "adHocOffers": [],
           "codeOffers": [],
-          "displayPrice": "7490.00",
+          "displayPrice": "7499.99",
           "familyShareable": false,
           "groupNumber": 3,
           "internalID": "6480000002",
@@ -54,13 +54,13 @@
           "productID": "com.sinanalpagut.insaattakip.santiye.yillik",
           "recurringSubscriptionPeriod": "P1Y",
           "referenceName": "Şantiye Yıllık",
-          "subscriptionGroupID": "21480001",
+          "subscriptionGroupID": "22512945",
           "type": "RecurringSubscription"
         },
         {
           "adHocOffers": [],
           "codeOffers": [],
-          "displayPrice": "1499.00",
+          "displayPrice": "1499.99",
           "familyShareable": false,
           "groupNumber": 2,
           "internalID": "6480000003",
@@ -75,13 +75,13 @@
           "productID": "com.sinanalpagut.insaattakip.muteahhit.aylik",
           "recurringSubscriptionPeriod": "P1M",
           "referenceName": "Müteahhit Aylık",
-          "subscriptionGroupID": "21480001",
+          "subscriptionGroupID": "22512945",
           "type": "RecurringSubscription"
         },
         {
           "adHocOffers": [],
           "codeOffers": [],
-          "displayPrice": "14990.00",
+          "displayPrice": "14999.99",
           "familyShareable": false,
           "groupNumber": 2,
           "internalID": "6480000004",
@@ -96,13 +96,13 @@
           "productID": "com.sinanalpagut.insaattakip.muteahhit.yillik",
           "recurringSubscriptionPeriod": "P1Y",
           "referenceName": "Müteahhit Yıllık",
-          "subscriptionGroupID": "21480001",
+          "subscriptionGroupID": "22512945",
           "type": "RecurringSubscription"
         },
         {
           "adHocOffers": [],
           "codeOffers": [],
-          "displayPrice": "4999.00",
+          "displayPrice": "4999.99",
           "familyShareable": false,
           "groupNumber": 1,
           "internalID": "6480000005",
@@ -117,13 +117,13 @@
           "productID": "com.sinanalpagut.insaattakip.kurumsal.aylik",
           "recurringSubscriptionPeriod": "P1M",
           "referenceName": "Kurumsal Aylık",
-          "subscriptionGroupID": "21480001",
+          "subscriptionGroupID": "22512945",
           "type": "RecurringSubscription"
         },
         {
           "adHocOffers": [],
           "codeOffers": [],
-          "displayPrice": "49990.00",
+          "displayPrice": "49999.99",
           "familyShareable": false,
           "groupNumber": 1,
           "internalID": "6480000006",
@@ -138,7 +138,7 @@
           "productID": "com.sinanalpagut.insaattakip.kurumsal.yillik",
           "recurringSubscriptionPeriod": "P1Y",
           "referenceName": "Kurumsal Yıllık",
-          "subscriptionGroupID": "21480001",
+          "subscriptionGroupID": "22512945",
           "type": "RecurringSubscription"
         }
       ]

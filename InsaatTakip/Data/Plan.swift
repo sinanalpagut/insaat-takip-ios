@@ -82,13 +82,18 @@ enum Plan: String, Codable, CaseIterable, Identifiable {
     var monthlyPrice: Kurus? {
         switch self {
         case .ucretsiz:  return nil
-        case .santiye:   return .lira(749)
-        case .muteahhit: return .lira(1_499)
-        case .kurumsal:  return .lira(4_999)
+        case .santiye:   return .lira(749, 99)
+        case .muteahhit: return .lira(1_499, 99)
+        case .kurumsal:  return .lira(4_999, 99)
         }
     }
 
-    /// Yıllık ücret = ON AYIN fiyatı (iki ay bedava).
+    /// Yıllık ücret ≈ ON AYIN fiyatı (iki ay bedava).
+    ///
+    /// APPLE BASAMAKLARI (25 Eki 2026): Türk lirası basamakları ",99" ile
+    /// bitiyor; 749,99 × 10 = 7.499,90 bir basamak değil, en yakını 7.499,99.
+    /// Kural bu yüzden "tam on ay" değil "on aydan en fazla 1 ₺ fazla".
+    /// Ekrandaki tasarruf oranı zaten mağaza fiyatlarından hesaplanıyor.
     ///
     /// RAKAM BURADA AÇIKÇA YAZILI, hesaplanmıyor: `Kurus`ta çarpma operatörü
     /// bilerek yok (madde 1) ve fiyat etiketi okunduğu gibi olmalı. Kuralın
@@ -100,9 +105,9 @@ enum Plan: String, Codable, CaseIterable, Identifiable {
     var yearlyPrice: Kurus? {
         switch self {
         case .ucretsiz:  return nil
-        case .santiye:   return .lira(7_490)
-        case .muteahhit: return .lira(14_990)
-        case .kurumsal:  return .lira(49_990)
+        case .santiye:   return .lira(7_499, 99)
+        case .muteahhit: return .lira(14_999, 99)
+        case .kurumsal:  return .lira(49_999, 99)
         }
     }
 

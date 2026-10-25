@@ -54,14 +54,14 @@ birden ödeme yapabilirdi.
 Her biri: **Create → Reference Name + Product ID** → süre → fiyat →
 yerelleştirme → inceleme bilgisi.
 
-| Reference Name | Product ID | Süre | Düzey (Level) | Hedef fiyat |
+| Reference Name | Product ID | Süre | Düzey (Level) | Seçilen fiyat (Türkiye) |
 |---|---|---|---|---|
-| Kurumsal Aylık | `com.sinanalpagut.insaattakip.kurumsal.aylik` | 1 Month | 1 | 4.999 ₺ |
-| Kurumsal Yıllık | `com.sinanalpagut.insaattakip.kurumsal.yillik` | 1 Year | 1 | 49.990 ₺ |
-| Müteahhit Aylık | `com.sinanalpagut.insaattakip.muteahhit.aylik` | 1 Month | 2 | 1.499 ₺ |
-| Müteahhit Yıllık | `com.sinanalpagut.insaattakip.muteahhit.yillik` | 1 Year | 2 | 14.990 ₺ |
-| Şantiye Aylık | `com.sinanalpagut.insaattakip.santiye.aylik` | 1 Month | 3 | 749 ₺ |
-| Şantiye Yıllık | `com.sinanalpagut.insaattakip.santiye.yillik` | 1 Year | 3 | 7.490 ₺ |
+| Kurumsal Aylık | `com.sinanalpagut.insaattakip.kurumsal.aylik` | 1 Month | 1 | 4.999,99 ₺ |
+| Kurumsal Yıllık | `com.sinanalpagut.insaattakip.kurumsal.yillik` | 1 Year | 1 | 49.999,99 ₺ |
+| Müteahhit Aylık | `com.sinanalpagut.insaattakip.muteahhit.aylik` | 1 Month | 2 | 1.499,99 ₺ |
+| Müteahhit Yıllık | `com.sinanalpagut.insaattakip.muteahhit.yillik` | 1 Year | 2 | 14.999,99 ₺ |
+| Şantiye Aylık | `com.sinanalpagut.insaattakip.santiye.aylik` | 1 Month | 3 | 749,99 ₺ |
+| Şantiye Yıllık | `com.sinanalpagut.insaattakip.santiye.yillik` | 1 Year | 3 | 7.499,99 ₺ |
 
 **Product ID'yi kopyala-yapıştır.** Tek harf farkı satın almanın sessizce
 çalışmaması demek (StoreKit tanımadığı kimliği hata vermeden atlıyor) ve
@@ -100,6 +100,15 @@ okuyup yalnızca uygun kişiye gösteriyor.
 Notes: `Hesap → Paket ya da panodaki paket satırı → Paketler ekranı.`
 
 ---
+
+**25 Eki 2026 — KURULDU.** Grup kimliği `22512945`. Fiyatlar Türkiye temel
+ülke, diğer 174 ülke Apple'ın otomatik hesabı. Yüksek basamaklar (7.499,99 ₺
+ve üstü, 749,99 ₺) "See Additional Prices" altında. Yıllıklarda yalnızca
+**1 Year Upfront** kuruldu; "Monthly with a 12-Month Commitment" BİLEREK
+kurulmadı (paket ekranı yıllığı tek seferlik tutar olarak gösteriyor ve
+taksitli taahhüt denenmedi). **Multiseat KAPALI, yalnızca App Store** — Apple
+Business / School Manager toplu lisans yolu kodda yok; sonradan açılabilir,
+App Store ise onaydan sonra listeden çıkarılamıyor.
 
 ## 3 · Ödeme ek süresi (Billing Grace Period)
 

@@ -404,11 +404,27 @@ final class DemoSubscriptionStore: SubscriptionStore {
                 guard let id = plan.productId(period),
                       let fiyat = period == .monthly ? plan.monthlyPrice : plan.yearlyPrice
                 else { return nil }
+                let tutar = Decimal(fiyat.raw) / 100
                 return StoreOffer(id: id, plan: plan, period: period,
-                                  displayPrice: Fmt.money(fiyat),
-                                  price: Decimal(fiyat.raw) / 100, introOffer: nil)
+                                  displayPrice: Self.appleBicimi(tutar),
+                                  price: tutar, introOffer: nil)
             }
         }
+    }
+
+    /// StoreKit'in Türkiye mağazasındaki `displayPrice` biçimi ("₺749,99").
+    ///
+    /// `Fmt.money` DEĞİL: o kuruşu yuvarlıyor ve 749,99 ₺'yi "750 ₺" yazıyordu
+    /// — App Review'a giden abonelik görseli bu ekrandan çekiliyor ve hakeme
+    /// tahsil edilmeyecek bir tutar göstermiş olurduk (25 Eki'de görüldü).
+    private static func appleBicimi(_ tutar: Decimal) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.locale = Locale(identifier: "tr_TR")
+        f.currencyCode = "TRY"
+        f.minimumFractionDigits = 2
+        f.maximumFractionDigits = 2
+        return f.string(from: tutar as NSDecimalNumber) ?? "\(tutar)"
     }
 
     func currentRecords() async -> [EntitlementRecord] {

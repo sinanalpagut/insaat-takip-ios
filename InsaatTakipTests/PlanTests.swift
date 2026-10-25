@@ -13,26 +13,35 @@ import XCTest
 /// sayının ilişkisi olarak değil, bu testin iddiası olarak yaşıyor.
 final class PlanTests: XCTestCase {
 
-    /// YILLIK = ON AYIN FİYATI. "İki ay bedava" sözü buradan geliyor.
+    /// YILLIK ≈ ON AYIN FİYATI. "İki ay bedava" sözü buradan geliyor.
+    ///
+    /// Apple'ın Türk lirası basamakları ",99" ile bittiği için tam on kat
+    /// mümkün değil (749,99 × 10 = 7.499,90 basamak değil). Kural: yıllık on
+    /// aydan AZ olamaz (fazla indirim söz verilmiş olur) ve en fazla 1 ₺ fazla
+    /// olabilir (iki ay bedava sözü hâlâ doğru).
     func testYearlyIsTenMonths() {
         for plan in Plan.purchasable {
             guard let aylik = plan.monthlyPrice, let yillik = plan.yearlyPrice else {
                 return XCTFail("\(plan.rawValue): satın alınabilir pakette fiyat yok")
             }
-            XCTAssertEqual(yillik.raw, aylik.raw * 10,
-                           "\(plan.rawValue) yıllığı on ayı tutmuyor — "
-                           + "aylık \(Fmt.money(aylik)), yıllık \(Fmt.money(yillik))")
+            let fark = yillik.raw - aylik.raw * 10
+            XCTAssertTrue((0...100).contains(fark),
+                          "\(plan.rawValue) yıllığı on ayı tutmuyor — "
+                          + "aylık \(Fmt.money(aylik)), yıllık \(Fmt.money(yillik))")
         }
     }
 
-    /// Onaylanan fiyatlar (15 Eki 2026). Rakamlar testte YAZILI: katalogdaki
-    /// bir değişiklik buraya da dokunmayı gerektirsin, sessizce geçmesin.
+    /// App Store Connect'te seçilen basamaklar (25 Eki 2026; onaylanan hedef
+    /// 15 Eki: 749 / 1.499 / 4.999 ₺, yıllık on ay). Rakamlar testte YAZILI:
+    /// katalog konsoldan ayrışırsa buraya da dokunmak gereksin.
     func testApprovedPrices() {
         XCTAssertNil(Plan.ucretsiz.monthlyPrice)
-        XCTAssertEqual(Plan.santiye.monthlyPrice, Kurus.lira(749))
-        XCTAssertEqual(Plan.muteahhit.monthlyPrice, Kurus.lira(1_499))
-        XCTAssertEqual(Plan.kurumsal.monthlyPrice, Kurus.lira(4_999))
-        XCTAssertEqual(Plan.kurumsal.yearlyPrice, Kurus.lira(49_990))
+        XCTAssertEqual(Plan.santiye.monthlyPrice, Kurus.lira(749, 99))
+        XCTAssertEqual(Plan.santiye.yearlyPrice, Kurus.lira(7_499, 99))
+        XCTAssertEqual(Plan.muteahhit.monthlyPrice, Kurus.lira(1_499, 99))
+        XCTAssertEqual(Plan.muteahhit.yearlyPrice, Kurus.lira(14_999, 99))
+        XCTAssertEqual(Plan.kurumsal.monthlyPrice, Kurus.lira(4_999, 99))
+        XCTAssertEqual(Plan.kurumsal.yearlyPrice, Kurus.lira(49_999, 99))
     }
 
     /// PAKET BÜYÜDÜKÇE SINIR DA BÜYÜMELİ.
