@@ -122,14 +122,32 @@ yenilenen müteahhidin projeleri o gün salt okunur olur.
 
 ---
 
-## 4 · Sürüm sayfası
+## 4 · Sürüm sayfası ve gönderim — GERÇEKTE İŞLEYEN AKIŞ (26 Ekim 2026)
 
-1. **1.0 → Build:** 169'u kaldır, yeni derlemeyi seç (StoreKit içeren ilk derleme).
-2. **In-App Purchases and Subscriptions** bölümü → altı ürünü ekle.
-   **İlk abonelikler ancak bir sürümle birlikte incelemeye gidebiliyor**;
-   bu bölüm boş kalırsa ret tekrar eder.
-3. **Açıklama** — son bölümü değiştir (aşağıda).
-4. **App Review Information → Notes** — aşağıdaki not.
+**Eski talimat yanlıştı:** sürüm sayfasında "In-App Purchases and
+Subscriptions" bölümü ARTIK YOK. Abonelikler kendi sayfalarındaki **Add for
+Review** ile bir TASLAK başvuruya ekleniyor; sürüm, grup ve abonelikler aynı
+taslakta olmalı (Apple yardım: "Submit an In-App Purchase").
+
+**Reddedilmiş başvuru tuzağı:** 1.0, "Unresolved Issues" durumundaki eski
+başvurunun içindeydi ve Apple'a göre o duruma YENİ ÖĞE EKLENEMİYOR. "Update
+Review"/"Resubmit" yalnızca sürümü aboneliksiz yeniden gönderir → aynı ret
+(Apple forumu 841193'teki deneyim). İşleyen sıra:
+
+1. Sürüm sayfası → Build → yeni derlemeyi seç → Save.
+2. Paketler grubu → **Add for Review** → yeni taslak (uyarı: "add an app
+   version" — normal).
+3. Her abonelik → **Add for Review → Draft Submission (aynı taslak)**.
+   Taslak: grup + 6 abonelik = 7 öğe.
+4. App Review → eski başvuru → **iOS App 1.0 satırına gel → kırmızı eksi**
+   → sürüm başvurudan çıkar ("Removed"). Ret mesajı eski başvuruda kalır.
+5. Sürüm taslağa KENDİLİĞİNDEN GELMEDİ: sürüm sayfası → **Add for Review →
+   Draft Submission**. Taslak: 8 öğe, "reviewed together with iOS version
+   1.0".
+6. **Submit for Review** → 8 öğe "Waiting for Review" (26 Eki ~10:20).
+
+Yayın: kullanıcı **otomatik yayın**ı seçti (26 Eki) — onay gelince uygulama
+kendiliğinden yayına çıkar.
 
 ### Açıklamanın yeni son bölümü
 
