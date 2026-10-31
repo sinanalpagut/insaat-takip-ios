@@ -219,3 +219,50 @@ from Account → Paketler.
 - [ ] Koşullar sayfası yayında (abonelik maddeleri, 25 Eki güncellemesi)
 - [ ] Açıklama + inceleme notu güncel
 - [ ] Ürünler sürüme eklendi
+
+---
+
+## 6 · İnceleme sonucu ve yayın (27–31 Ekim 2026)
+
+1.0 (252) ve altı abonelik **31 Ekim 2026'da yayına çıktı** (App Store
+`currentVersionReleaseDate` 17:26 UTC). Mağaza sayfasında altı ürün doğru
+Türkiye fiyatlarıyla görünüyor (Şantiye ₺749,99 / ₺7.499,99, Müteahhit
+₺1.499,99 / ₺14.999,99, Kurumsal ₺4.999,99 / ₺49.999,99).
+
+Arada bir bekletme yaşandı:
+
+- **27 Eki 09:50:** otomatik mesaj, "3.0.0 Business: Preamble". Apple
+  Kurumsal'ın ABD fiyatlarının ($99.99/ay, $999.99/yıl) kasıtlı olup
+  olmadığını sordu. Sürüm "Rejected", başvuru "Unresolved Issues" göründü ve
+  "Resubmit to App Review" griydi.
+- **Aynı gün yanıt** (yalnız *Reply to App Review*): fiyatlar kasıtlı. Temel
+  fiyat Türkiye'de belirlendi, USD rakamları App Store Connect'in otomatik
+  karşılığı. Hiçbir öğe düzenlenmedi, yeniden gönderilmedi.
+- **31 Eki 20:19 (TSİ):** Apple "incelemeye devam ediyoruz" dedi ve sürüm
+  "Waiting for Review"a döndü. Yaklaşık 7 dakika sonra onaylandı ve otomatik
+  yayınla mağazaya çıktı.
+
+### Ders: fiyat doğrulama sorusu gelirse
+
+- **Bu bir ret değil.** "Rejected" etiketi, onay gelene kadar durdurulmuş
+  incelemenin gösteriliş biçimi. Asıl bir ret gelseydi sorun bir yönerge
+  maddesiyle birlikte anlatılırdı.
+- **Yalnız yanıt yaz; Edit / Update Review / Resubmit YAPMA.** Gerekçeler:
+  - Apple'ın yardım sayfasına göre, bilgi istendiğinde yeniden gönderme
+    gerekmiyor. Yeniden gönderim yeni bir inceleme başlatıyor ve önceki mesaja
+    artık yanıt verilemiyor.
+  - Forumda yeniden gönderen bir geliştirici 12 gün bekledi ve aynı fiyat
+    sorusunu yeniden aldı (Ekim 2026).
+  - "Resubmit" düğmesinin gri olması tasarım gereği. Düğme ancak reddedilen
+    öğe düzenlenince açılıyor, ve her öğe yeniden gönderimden önce yalnız bir
+    kez düzenlenebiliyor. O hakkı yedekte tutmak gerekiyor.
+- **Fiyatları değiştirme.** Soru fiyatın kendisiyle ilgili; değiştirmek yeni
+  bir doğrulama turu açar.
+- **Bekleme süresi:** bu vakada yanıttan dönüşe 4 gün geçti. Hazırda tutulan
+  ama kullanılmayan yedek plan şuydu:
+  1. ~5 iş günü sonra aynı mesaj zincirine kısa bir hatırlatma yazmak ve
+     App Review iletişim formundan durum sormak.
+  2. ~7 iş günü sonra App Review Information → Notes alanına fiyat onayını
+     yazmak (yeni görevli görsün), ardından sırayla Update Review, Resubmit ve
+     "Waiting for Review" görününce hızlandırma talebi göndermek.
+  "Unresolved Issues" durumundayken hızlandırma talebi gönderilemiyor.
