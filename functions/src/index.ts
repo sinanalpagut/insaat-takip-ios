@@ -620,14 +620,44 @@ export const deleteAccount = onCall<unknown, Promise<DeleteResult>>(
       usedByUid: FieldValue.delete(),
     })));
 
-    // ---- 3) Profil belgesi ------------------------------------------------
+    // ---- 3) Profil belgesi ve davet deneme sayacı --------------------------
     await db.collection("users").doc(uid).delete();
+    // `rateLimits/{uid}` (S1, 31 Eki): yanlış davet kodu sayacı. Onu yalnızca
+    // BAŞARILI katılım siliyordu; silinen hesabın uid'ine bağlı belge süresiz
+    // kalıyordu. Yayındaki hesap silme sayfası bunu "silmeyle kaldırılmayan
+    // veriler" arasında dürüstçe yazıyor — bu satır o maddenin karşılığı.
+    await db.collection("rateLimits").doc(uid).delete();
 
     // ---- 4) Auth kaydı — EN SON ------------------------------------------
     // Buraya kadar her şey silindi; bundan sonra uid'in bir daha üretilme
     // ihtimali yok ve olması da gerekmiyor.
-    await getAuth().deleteUser(uid);
+    await deleteAuthUser(uid);
 
     return { deletedProjects: owned.size, leftProjects: left };
   },
 );
+
+/// Auth kaydını siler; kayıt ZATEN YOKSA başarı sayar (S2, 31 Eki).
+///
+/// YANIT YOLDA KAYBOLURSA: işlev her şeyi silip bitiriyor ama cevap istemciye
+/// ulaşmıyor (uygulama arka plana alındı, şantiyede şebeke koptu). Kullanıcı
+/// "Tekrar dene"ye basıyor. Üretimde onCall jetonu `checkRevoked` OLMADAN
+/// doğruluyor, yani silinmiş kullanıcının hâlâ geçerli jetonu (en çok bir saat)
+/// buraya kadar geliyor; yukarıdaki adımların hepsi zaten eşgüçlü (boş sorgu,
+/// olmayan belgeyi silmek). Tek patlayan bu satırdı: `auth/user-not-found` →
+/// onCall onu `internal` diye sarıyor → istemci "sunucu hatası, tekrar dene"
+/// diyor. Sonuç bitmeyen bir döngü ve 15 dakika sonra yanlış hata mesajlarıyla
+/// çıkmaz: veri silinmiş ama kullanıcıya hep "başarısız" deniyor ve cihazdaki
+/// yerel kopya temizlenmiyor.
+///
+/// Kayıt yoksa iş bitmiş demektir: bu işlev Auth kaydını EN SON siliyor.
+/// Başka her hata (izin, ağ) aynen fırlıyor — sessizce yutulursa kullanıcı
+/// hesabının silindiğini sanır.
+export async function deleteAuthUser(uid: string): Promise<void> {
+  try {
+    await getAuth().deleteUser(uid);
+  } catch (error) {
+    if ((error as { code?: string }).code === "auth/user-not-found") return;
+    throw error;
+  }
+}

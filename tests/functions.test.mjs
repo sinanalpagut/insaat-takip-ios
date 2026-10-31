@@ -714,6 +714,61 @@ describe('deleteAccount — hesap silme', () => {
     assert.equal(status, 200);
     assert.equal(await getFields(`users/${u.uid}`), null);
   });
+
+  it('S1 — davet deneme sayacı (rateLimits) da siliniyor', async () => {
+    // Yalnızca BAŞARILI katılım siliyordu; yanlış kod deneyip hesabını silen
+    // kişinin uid'ine bağlı belge süresiz kalıyordu.
+    const u = await newUser();
+    await putDoc(`rateLimits/${u.uid}`, {
+      failedAttempts: { integerValue: '3' }, windowStart: ts(new Date()),
+    });
+    const { status } = await deleteAccount(u.idToken);
+    assert.equal(status, 200);
+    assert.equal(await getFields(`rateLimits/${u.uid}`), null);
+  });
+});
+
+// ── S2 — Auth silmesi eşgüçlü (31 Eki) ──
+//
+// SENARYO ÜRETİMDE, EMÜLATÖRDE DEĞİL: silme bitti, yanıt yolda kayboldu,
+// kullanıcı "Tekrar dene"ye bastı. Üretimde onCall jetonu `checkRevoked`
+// olmadan doğruluyor, yani silinmiş kullanıcının jetonu işleve ulaşıyor ve
+// tek patlayan satır `deleteUser` oluyordu. EMÜLATÖR ise jetonu doğrularken
+// kullanıcının var olduğuna da bakıyor (firebase-admin `isEmulator` dalı) —
+// ikinci çağrı orada 401 alır ve bu yolu HİÇ göremez. Bu yüzden düzeltmenin
+// kendisi (`deleteAuthUser`) doğrudan, gerçek Auth emülatörüne karşı
+// sınanıyor. İlk test sorunun var olduğunu, ikincisi kapandığını gösteriyor.
+describe('S2 — Auth kaydı zaten yoksa silme başarı sayılıyor', () => {
+  let fonksiyonlar;
+  let adminAuth;
+
+  before(async () => {
+    fonksiyonlar = await import('../functions/lib/index.js');
+    const { getAuth } = await import('../functions/node_modules/firebase-admin/lib/auth/index.js');
+    adminAuth = getAuth();
+  });
+
+  it('kanıt: firebase-admin olmayan kullanıcıda auth/user-not-found fırlatıyor', async () => {
+    await assert.rejects(adminAuth.deleteUser('hic-var-olmamis-uid'),
+      (e) => e.code === 'auth/user-not-found');
+  });
+
+  it('deleteAuthUser olmayan kullanıcıda başarıyla dönüyor', async () => {
+    await fonksiyonlar.deleteAuthUser('hic-var-olmamis-uid');
+  });
+
+  it('deleteAuthUser var olan kullanıcıyı gerçekten siliyor', async () => {
+    const u = await newUser();
+    await fonksiyonlar.deleteAuthUser(u.uid);
+    assert.equal(await authUserExists(u.uid), false);
+  });
+
+  it('başka hatalar YUTULMUYOR (geçersiz uid)', async () => {
+    // Boş uid firebase-admin'de `auth/invalid-uid`. Yutulsaydı kullanıcı
+    // hesabının silindiğini sanırdı.
+    await assert.rejects(fonksiyonlar.deleteAuthUser(''),
+      (e) => e.code === 'auth/invalid-uid');
+  });
 });
 
 // ── App Check zorlaması (madde 71) ──
