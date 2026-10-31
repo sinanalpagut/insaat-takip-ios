@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """İnşaat Takip hukuki metinlerini benav.com.tr için HTML'e çevirir.
 
-    python3 scripts/hukuki-sayfalar.py [hedef-dizin]
+    python3 scripts/hukuki-sayfalar.py [--uzerine-yaz] [hedef-dizin]
 
 Varsayılan hedef: ../benav_com/public/privacy
 
@@ -10,23 +10,38 @@ hakkında bir iddia. O iddianın kanıtı `InsaatTakip/PrivacyInfo.xcprivacy` ve
 kodun kendisi — ikisi ayrı depolarda dursaydı, veri toplama değiştiğinde metni
 güncellemeyi hatırlatan hiçbir şey olmazdı. Burada yan yana duruyorlar.
 
+CANLI SAYFA ELLE DÜZENLENİRSE (31 Ekim 2026'da oldu): metin artık iki
+platformu anlatıyor ve Android oturumu bu depoya yazamadığı için 31 Ekim
+düzeltmesi doğrudan benav_com'a işlendi. Betik o hâliyle çalışsaydı ÜÇ
+sayfayı da geri alırdı — koşullardaki 25 Ekim abonelik maddeleri dahil.
+Gövdeler o yüzden canlı sayfalardan bayt bayt geri taşındı ve betik artık
+hedefteki sayfa kendisininkinden yeni ya da aynı tarihli ama farklıysa
+YAZMIYOR (`--uzerine-yaz` ile geçilir). Hesap silme ve destek sayfaları bu
+betikte değil; benav_com'da elle tutuluyor.
+
 METİN KODLA DOĞRULANARAK YAZILDI, şablondan değil:
   · Bağlı Firebase ürünleri: AppCheck, Auth, Core, Firestore, Functions,
     Storage. Analytics ve Crashlytics BAĞLI DEĞİL (madde 30'da bilinçli
-    olarak ertelenmişti) — yani "analitik toplamıyoruz" cümlesi doğru.
+    olarak ertelenmişti). Android'de fiş okuyan ML Kit Google'a ölçüm
+    gönderiyor; metin bu yüzden "kendi analitik aracımız yok" diyor.
   · `PrivacyInfo.xcprivacy`: NSPrivacyTracking = false, toplanan türler
     telefon / ad / fotoğraf / kullanıcı içeriği, hepsi "AppFunctionality".
-  · Sunucu bölgesi europe-west1 (functions/src/index.ts ve Storage kovası).
+  · Veritabanı `eur3` (AB çoklu bölgesi: Belçika + Hollanda); Functions ve
+    Storage europe-west1. Telefonla giriş (Firebase Authentication) ABD'de
+    işleniyor. Bölge 31 Ekim'de komut satırıyla ölçüldü — önceki
+    "europe-west1 (Belçika)" ifadesi veritabanı için yanlıştı.
   · Hesap silme uygulama içinde var (madde 28) ve sunucu tarafı siliyor.
 
 HUKUKİ UYARI: bu metinler avukat tarafından yazılmadı. Özellikle veri
 sorumlusu / veri işleyen ayrımı (alıcı adlarını müteahhit giriyor) yayından
 önce bir KVKK avukatına okutulmalı.
 """
+from __future__ import annotations  # macOS'un python3'ü 3.9: `X | None` için
+
+import re
 import sys
 from pathlib import Path
 
-GUNCELLEME = "15 Ekim 2026"
 EPOSTA = "info@benav.com.tr"
 GELISTIRICI = "benav"
 
@@ -99,24 +114,24 @@ ISKELET = """<!DOCTYPE html>
 </html>
 """
 
-GIZLILIK = """
-        <p>İnşaat Takip, müteahhitlerin şantiye kayıtlarını (daire satışları, tahsilatlar, malzeme ve giderler) tutmaları ve bu kayıtları iş ortaklarıyla paylaşmaları için geliştirilmiş bir iOS uygulamasıdır. Bu politika, uygulamayı kullanırken hangi verilerin toplandığını, ne için kullanıldığını, kimlerle paylaşıldığını ve nasıl silineceğini açıklar.</p>
+GIZLILIK = """        <p>İnşaat Takip, müteahhitlerin şantiye kayıtlarını (daire satışları, tahsilatlar, malzeme ve giderler) tutmaları ve bu kayıtları iş ortaklarıyla paylaşmaları için geliştirilmiş bir iPhone ve Android uygulamasıdır. Bu politika, uygulamayı kullanırken hangi verilerin toplandığını, ne için kullanıldığını, kimlerle paylaşıldığını ve nasıl silineceğini açıklar. İki sürüm aynı hesabı ve aynı verileri kullanır; platforma göre farklı olan noktalar ayrıca belirtilmiştir.</p>
 
         <p><strong>Kısaca:</strong></p>
         <ul>
-          <li>Uygulama <strong>reklam göstermez</strong>, <strong>sizi izlemez</strong>, <strong>analitik veri toplamaz</strong> ve <strong>konumunuzu almaz</strong>.</li>
-          <li>Hesap açmak için <strong>telefon numarası</strong> gerekir; numaranız yalnızca kimlik doğrulama ve ortak davetleri için kullanılır.</li>
-          <li>Girdiğiniz iş kayıtları ve fotoğraflar, hesabınıza bağlı olarak <strong>Avrupa Birliği içindeki</strong> (Belçika) sunucularda saklanır.</li>
+          <li>Uygulama <strong>reklam göstermez</strong>, <strong>sizi izlemez</strong> ve <strong>konumunuzu okumaz</strong>. <strong>Kendi analitik aracımız yoktur</strong>; ancak Android'de fiş okumayı yapan Google ML Kit kütüphanesi, Google'a tanılama ve kullanım ölçümleri gönderir (bkz. 1-e).</li>
+          <li>Hesap açmak için <strong>telefon numarası</strong> gerekir; numaranızı yalnızca giriş ve hesap güvenliği için kullanırız, <strong>ortaklarınıza gösterilmez</strong>. Girişi sağlayan Google, numarayı <strong>ABD'de</strong> işler ve kötüye kullanımı önlemek için kendisi de saklar (bkz. 1-a ve 4).</li>
+          <li>Girdiğiniz iş kayıtları ve fotoğraflar, hesabınıza bağlı olarak <strong>Avrupa Birliği içindeki</strong> sunucularda saklanır.</li>
           <li>Bir projeye <strong>ortak davet ederseniz</strong>, o projenin kayıtları davet ettiğiniz kişiyle paylaşılır. <strong>Daire alıcılarının adları ortaklara gösterilmez.</strong></li>
-          <li>Hesabınızı ve tüm verilerinizi <strong>uygulamanın içinden</strong> istediğiniz an silebilirsiniz.</li>
+          <li>Hesabınızı ve sunucudaki verilerinizi <strong>uygulamanın içinden</strong> istediğiniz an silebilirsiniz; bazı teknik kayıtların kendiliğinden silinme süreleri 6. bölümde yazılıdır.</li>
         </ul>
 
         <h2>1. Toplanan veriler</h2>
 
         <h3>a) Hesap bilgileri</h3>
         <ul>
-          <li><strong>Telefon numarası:</strong> Hesap açmak ve giriş yapmak için gereklidir. Doğrulama SMS'i gönderilir. Numaranız, davet ettiğiniz projelerde sizi tanımlamak için kullanılır.</li>
+          <li><strong>Telefon numarası:</strong> Hesap açmak ve giriş yapmak için gereklidir. Numaranız giriş yapmanız ve hesabınızın güvenliği için kullanılır; ortaklarınıza gösterilmez, ortak listesinde adınız görünür. Giriş, Google'ın Firebase Authentication hizmetiyle yapılır ve genellikle doğrulama SMS'i gönderilir. Android'de Google Play hizmetleri bazı cihazlarda numaranızı SMS göndermeden doğrulayabilir; uygulama SMS okuma izni almaz. Google, doğrulama için girilen telefon numaralarını kendi hizmetlerinde istenmeyen ileti ve kötüye kullanımı önlemek amacıyla da saklar.</li>
           <li><strong>Ad:</strong> İlk girişte sorduğumuz görünen adınız. Ortaklarınız bu adı görür; kayıtlarınızın kim tarafından girildiği bu adla yazılır.</li>
+          <li><strong>Hesap kimliği:</strong> Girişte Firebase'in hesabınıza verdiği benzersiz kimlik. Sunucuda kayıtların sahibini ve kimin girdiğini bu kimlik belirler.</li>
         </ul>
 
         <h3>b) Girdiğiniz iş kayıtları</h3>
@@ -145,52 +160,66 @@ GIZLILIK = """
           <li>Fiş, dekont, şantiye ve daire fotoğrafları (kamerayla çektikleriniz veya galeriden seçtikleriniz)</li>
           <li>Yüklediğiniz belgeler</li>
         </ul>
-        <p>Fotoğraflar yüklenmeden önce cihazınızda küçültülür. Fotoğraflarınızın tamamına erişmeyiz; yalnızca seçtiğiniz kareler uygulamaya girer.</p>
+        <p>Kamera ve galeriden eklenen fotoğraflar yüklenmeden önce cihazınızda küçültülür; konum dahil fotoğraf üst verileri bu sırada silinir. Fotoğraflarınızın tamamına erişmeyiz; yalnızca seçtiğiniz kareler uygulamaya girer. Android'de kamera izni istenmez: fotoğraf, cihazın kendi kamera uygulamasıyla çekilir; galeriden seçim için Android'in fotoğraf seçicisi kullanılır. Belgeler bölümüne yüklediğiniz dosyalar ise değiştirilmeden yüklenir; bir fotoğraf dosyasını belge olarak yüklerseniz içindeki konum gibi üst veriler de onunla birlikte saklanabilir.</p>
 
         <h3>e) Otomatik toplanan teknik veriler</h3>
         <ul>
-          <li><strong>Cihaz doğrulaması (App Check / App Attest):</strong> İsteğin gerçekten bu uygulamadan geldiğini doğrulamak için Apple tarafından üretilen bir doğrulama jetonu kullanılır. Bu jeton sizi değil cihazın uygulamayı çalıştırdığını doğrular ve kimliğinizle ilişkilendirilmez.</li>
-          <li><strong>Destek e-postası:</strong> Uygulamadan bize e-posta gönderirseniz, sorunu teşhis edebilmek için uygulama sürümü, iOS sürümü ve cihaz modeli e-postanın içine önceden yazılır. Bu bilgiyi göndermeden önce görür ve silebilirsiniz.</li>
+          <li><strong>Cihaz doğrulaması (App Check):</strong> Sunucuya giden isteklerin gerçekten bu uygulamadan geldiği doğrulanır. iPhone'da Apple'ın App Attest hizmeti kullanılır: cihazın güvenli donanımında bu kuruluma özgü bir anahtar oluşturulur, Apple'ın onayladığı doğrulama bilgisi Firebase'e gönderilir ve Firebase bunu doğrulayıp kısa ömürlü bir jeton verir. Android'de Google'ın Play Integrity hizmeti kullanılır: uygulamanın paket adı, sürümü ve imza sertifikası, cihazdaki Google hesapları için Google Play lisans durumu ve Google Play hizmetlerinin ürettiği cihaz doğrulama bilgisi Google'a gönderilir. Bu bilgiler sizi tanımak için değil, uygulamanın değiştirilmemiş olduğunu ve gerçek bir cihazda çalıştığını doğrulamak için kullanılır; biz bunları kimliğinizle eşleştirmeyiz.</li>
+          <li><strong>Telefonla giriş doğrulaması:</strong> Telefonla girişte Google, isteğin gerçek uygulamadan geldiğini ayrıca doğrular: Android'de Google Play Integrity ile, iPhone'da cihazın Apple anlık bildirim (APNs) jetonuyla gönderilen sessiz bir bildirimle. Bu yapılamazsa doğrulama, tarayıcıda açılan bir Google reCAPTCHA sayfasıyla tamamlanır; reCAPTCHA bu sırada tarayıcı ve cihaz bilgilerini Google'ın kurallarına göre işler.</li>
+          <li><strong>Altyapının işlediği teknik bilgiler:</strong> Firebase isteklerde IP adresinizi işler (girişte güvenlik ve kötüye kullanımın önlenmesi için, sunucu işlevlerinde isteği çalıştırmak için). İsteklerle birlikte uygulamanın kullandığı Firebase sürümleri, cihaz modeli ve işletim sistemi sürümü gibi teknik bilgiler de gider; Android'de buna uygulamanın yüklendiği mağaza da dahildir. Android'de ayrıca sunucu işlevleri çağrıldığında (davet koduyla katılma, hesap silme) bir Firebase kurulum kimliği ve ona bağlı bir Firebase Cloud Messaging jetonu oluşturulup Google'a gönderilir; uygulama bu jetonu bildirim göndermek için kullanmaz.</li>
+          <li><strong>Fiş okuma:</strong> Fişteki yazı cihazınızda okunur; metin tanıma için fotoğraf ya da okunan metin hiçbir yere gönderilmez. Fişi kayda eklerseniz fotoğraf, diğer görseller gibi 1-d ve 4. bölümde anlatıldığı şekilde saklanır. iPhone'da okuma Apple'ın cihaz üstü metin tanıma özelliğiyle yapılır. Android'de okumayı yapan Google ML Kit kütüphanesi Google'a tanılama ve kullanım ölçümleri gönderir; bunlar arasında cihaz üreticisi ve modeli, işletim sistemi sürümü, kullanılabilen donanım hızlandırıcıları, uygulamanın paket adı ve sürümü, kuruluma özgü bir tanımlayıcı, işlem süresi, görüntü biçimi ve çözünürlüğü, özellik sürümü, olay türü ve hata kodları vardır. Google bu ölçümleri ML Kit'in işleyişini ölçmek, hataları gidermek ve ürünü iyileştirmek için kullanır; biz bu ölçümleri görmeyiz.</li>
+          <li><strong>Destek e-postası:</strong> Uygulamadan bize e-posta gönderirseniz, sorunu teşhis edebilmek için uygulama sürümü, işletim sistemi sürümü ve cihaz modeli (Android'de üretici ve model) e-postanın içine önceden yazılır. Bu bilgiyi göndermeden önce görür ve silebilirsiniz. E-posta adresiniz ve yazdığınız mesaj da bize ulaşır.</li>
         </ul>
+
+        <h3>f) Hatırlatma bildirimleri</h3>
+        <p>Taksit vadesi hatırlatmaları cihazınızda planlanır ve gösterilir; bunun için sunucuya veri gönderilmez.</p>
 
         <h2>2. Toplamadığımız veriler</h2>
-        <p>Aşağıdakiler uygulamada <strong>yoktur</strong>:</p>
+        <p>Uygulamada şunlar <strong>yoktur</strong>:</p>
         <ul>
           <li>Reklam ve reklam kimliği</li>
-          <li>Kullanıcı izleme (tracking) — uygulamanın gizlilik bildirimi de bunu beyan eder</li>
-          <li>Analitik ve kullanım ölçümü</li>
-          <li>Çökme raporu toplama</li>
-          <li>Konum bilgisi</li>
-          <li>Rehberiniz, kişileriniz veya takviminiz</li>
+          <li>Kullanıcı izleme (tracking) — App Store gizlilik bildirimi de bunu beyan eder</li>
+          <li>Kendi analitik veya kullanım ölçümü aracımız (Android'de ML Kit'in Google'a gönderdiği ölçümler için bkz. 1-e)</li>
+          <li>Çökme raporu toplayan bir araç</li>
+          <li>Konumunuzu okuma (Belgeler bölümüne yüklenen fotoğraf dosyalarındaki üst veri için bkz. 1-d)</li>
+          <li>Rehberinize, kişilerinize veya takviminize erişim</li>
         </ul>
+        <p>Android'de sizden onay istenen tek izin bildirim iznidir (vade hatırlatmaları için, Android 13 ve sonrasında). Kamera, konum, rehber, SMS veya depolama izni istenmez. Kurulumda kendiliğinden verilen ve onay gerektirmeyen diğer izinler internet ve ağ durumuna erişim, cihaz yeniden başladığında hatırlatmaları yeniden kurma ve uygulama kilidi için biyometrik donanımı kullanmadır. Bunlara ek olarak kullandığımız Google kütüphaneleri şu izinleri ekler: cihazı kısa süre uyanık tutma, Google bulut mesajlaşması, Google hizmet yapılandırmasını okuma.</p>
 
         <h2>3. Verilerin kullanım amacı</h2>
-        <p>Toplanan veriler yalnızca <strong>uygulamanın çalışması</strong> için kullanılır: kayıtlarınızı saklamak, rakamları hesaplamak, ortaklarınıza göstermek, rapor ve dışa aktarma dosyalarını üretmek ve hesabınızı korumak. Verileriniz pazarlama için kullanılmaz, satılmaz ve üçüncü kişilere pazarlama amacıyla aktarılmaz.</p>
+        <p>Topladığımız verileri yalnızca <strong>uygulamanın çalışması</strong> için kullanırız: kayıtlarınızı saklamak, rakamları hesaplamak, ortaklarınıza göstermek, rapor ve dışa aktarma dosyalarını üretmek ve hesabınızı korumak. Verilerinizi pazarlama için kullanmayız, satmayız ve üçüncü kişilere pazarlama amacıyla aktarmayız. Uygulamada kullanılan Google hizmetlerinin kendi amaçlarıyla yaptığı işlemeler (telefon numaralarının kötüye kullanımı önlemek için saklanması, Android'de ML Kit ölçümleri) 1-a ve 1-e'de ayrıca açıklanmıştır.</p>
 
         <h2>4. Verilerin saklandığı yer</h2>
-        <p>Veriler Google'ın Firebase altyapısında (Cloud Firestore, Cloud Storage, Firebase Authentication, Cloud Functions) saklanır. Veritabanı ve dosya sunucularının bölgesi <strong>europe-west1 (Belçika, Avrupa Birliği)</strong> olarak seçilmiştir; iş kayıtlarınız ve fotoğraflarınız bu bölgede tutulur.</p>
-        <p>Cihazınızda da bir kopya bulunur: uygulama internet olmadığında da çalışsın diye kayıtlar ve görseller cihazda önbelleğe alınır. Hesabınızı sildiğinizde bu yerel kopya da temizlenir.</p>
+        <p>Veriler Google'ın Firebase altyapısında saklanır:</p>
+        <ul>
+          <li><strong>Veritabanı (Cloud Firestore):</strong> Avrupa Birliği içinde, eur3 bölgesinde. Veriler Belçika ve Hollanda'daki veri merkezlerinde tutulur; çoğaltmaya Finlandiya'daki bir yardımcı bölge de katılır. İş kayıtlarınız ile profilinizdeki ad ve telefon numarası burada tutulur.</li>
+          <li><strong>Fotoğraf ve belgeler (Cloud Storage) ile sunucu işlevleri (Cloud Functions):</strong> Belçika (europe-west1, Avrupa Birliği).</li>
+          <li><strong>Giriş kaydınız (Firebase Authentication):</strong> telefon numaranız, hesap kimliğiniz ve girişte işlenen IP adresi. Google bu hizmeti yalnızca <strong>Amerika Birleşik Devletleri</strong>'ndeki veri merkezlerinden çalıştırır. İş kayıtlarınız ve fotoğraflarınız bu hizmete gitmez.</li>
+          <li><strong>Cihaz doğrulaması ile Android'de Firebase kurulum kimliği ve ML Kit ölçümleri:</strong> Google'ın küresel altyapısında işlenir; belirli bir ülkeyle sınırlı değildir.</li>
+        </ul>
+        <p>Cihazınızda da bir kopya bulunur: uygulama internet olmadığında da çalışsın diye kayıtlar ve görseller cihazda önbelleğe alınır. Android'de bu yerel veriler Google Drive yedeklerine ve cihazdan cihaza taşımaya dahil edilmez; yeni cihazda giriş yaptığınızda sunucudan yeniden yüklenir. iPhone'da fotoğraf ve belge önbellekleri ile profil bilgileriniz, iCloud ya da bilgisayar yedeklemesi açıksa cihaz yedeğine dahil olabilir; bu yedek sizin Apple hesabınızda ya da bilgisayarınızdadır, biz erişemeyiz. Çevrimdışı veritabanı önbelleği iki platformda da yedeğe alınmaz.</p>
 
         <h2>5. Paylaşım</h2>
         <ul>
           <li><strong>Davet ettiğiniz ortaklar:</strong> Bir projeye ortak davet ettiğinizde, o projenin kayıtlarını (daireler, giderler, tahsilatlar, ortak cari hesabı, raporlar) görebilirler. Ortaklar <strong>salt okurdur</strong>: hiçbir kaydı değiştiremez, silemez veya ekleyemezler. Alıcı adlarını göremezler. Bir ortağı projeden çıkardığınızda erişimi kesilir.</li>
-          <li><strong>Google (Firebase):</strong> Verileri bizim adımıza barındıran altyapı sağlayıcısıdır.</li>
-          <li><strong>Apple:</strong> Abonelik satın alırsanız ödeme Apple tarafından işlenir; kart bilgilerinizi biz görmeyiz, saklamayız.</li>
+          <li><strong>Google (Firebase):</strong> Verileri bizim adımıza barındıran ve işleyen altyapı sağlayıcısıdır. Google bazı verileri kendi amaçlarıyla da işler: telefonla giriş için girilen numaraları kötüye kullanımı önlemek için saklar; Android'de ML Kit ölçümlerini ürününü ölçüp iyileştirmek için kullanır ve bu ölçümleri üçüncü taraflara aktarmadığını belirtir (bkz. 1-a, 1-e).</li>
+          <li><strong>Apple:</strong> iPhone'da abonelik satın alırsanız ödeme Apple tarafından işlenir; kart bilgilerinizi biz görmeyiz, saklamayız. Android sürümünde şimdilik uygulama içi satın alma yoktur.</li>
           <li><strong>Yasal zorunluluk:</strong> Yetkili makamların hukuka uygun talebi hâlinde gerekli veriler paylaşılabilir.</li>
         </ul>
         <p>Bunların dışında verileriniz kimseyle paylaşılmaz.</p>
 
         <h2>6. Saklama süresi ve silme</h2>
         <p>Verileriniz, siz silene kadar saklanır.</p>
-        <p><strong>Hesabınızı uygulamanın içinden silebilirsiniz:</strong> Hesap ekranı → <em>Hesabı Sil</em>. Silme işleminden önce verilerinizi dışa aktarmanız için bir adım sunulur. Silme işlemi geri alınamaz ve şunları kapsar:</p>
+        <p><strong>Hesabınızı uygulamanın içinden silebilirsiniz:</strong> Hesap ekranı → <em>Hesabı Sil</em>. Silme işleminden önce verilerinizi dışa aktarmanız için bir adım sunulur. Uygulamaya erişemiyorsanız <a class="inl" href="/privacy/insaat-takip-hesap-silme.html">hesap silme sayfasındaki</a> adımları izleyebilirsiniz. Silme işlemi geri alınamaz ve şunları kapsar:</p>
         <ul>
           <li>Sahibi olduğunuz projeler ve içlerindeki tüm kayıtlar</li>
           <li>Yüklediğiniz fotoğraf ve belgeler</li>
           <li>Alıcı kayıtları</li>
-          <li>Profiliniz ve kimlik kaydınız</li>
-          <li>Cihazınızdaki yerel kopyalar</li>
+          <li>Profiliniz ve giriş kaydınız</li>
+          <li>Cihazınızdaki yerel kopyalar: fotoğraf ve belge önbellekleri hemen, çevrimdışı veritabanı önbelleği uygulama bir sonraki açılışında silinir. Android'de uygulama yeniden açılmadan aynı cihazda başka bir hesapla (aynı numarayla açılan yeni hesap dahil) giriş yapılırsa bu önbellek, uygulamadan erişilemez biçimde uygulama kaldırılana kadar cihazda kalabilir. Android'de uygulamanın kendi alanındaki dışa aktarma ve belge önizleme kopyaları da hemen silinir. iPhone'da dışa aktarma dosyaları, dönem raporu PDF'leri ve açtığınız belgelerin önizleme kopyaları uygulamanın geçici klasöründe kalır; iOS bu klasörü zamanla kendisi boşaltabilir, ama ne zaman yapacağı belli değildir. Cihaza kaydettiğiniz ya da paylaştığınız dosyalar silinmez.</li>
         </ul>
         <p>Ortak olarak katıldığınız projelerden yalnızca siz çıkarılırsınız; o projeler sahibine ait olduğu için silinmez.</p>
+        <p>Silinen verilerin (giriş kaydı, proje kayıtları, fotoğraf ve belgeler) Google'ın iç yedekleme sistemlerinden de tamamen kalkması 180 güne kadar sürebilir; sunucu istek kayıtları (IP adresi) yaklaşık 30 gün içinde kendiliğinden silinir. Google'ın kötüye kullanımı önlemek için sakladığı telefon numarası kaydı, Android'de ML Kit'in gönderdiği ölçümler ile Firebase kurulum kimliği hesap silmeyle kaldırılmaz; bunlar Google'ın kendi saklama kurallarına tabidir. Silmeyle kaldırılmayan diğer veriler hesap silme sayfasında listelenmiştir.</p>
 
         <h2>7. Güvenlik</h2>
         <ul>
@@ -198,7 +227,7 @@ GIZLILIK = """
           <li>Hangi verinin kim tarafından okunabileceği ve yazılabileceği sunucu tarafındaki güvenlik kurallarıyla belirlenir; bu kısıtlar uygulamadan bağımsızdır.</li>
           <li>İsteklerin gerçekten uygulamadan geldiği cihaz doğrulamasıyla kontrol edilir.</li>
           <li>Doğrulama SMS'leri yalnızca Türkiye numaralarına gönderilecek şekilde sınırlandırılmıştır.</li>
-          <li>Dilerseniz uygulamayı cihazınızın kimlik doğrulamasıyla (Face ID / Touch ID / parola) kilitleyebilirsiniz.</li>
+          <li>Dilerseniz uygulamayı cihazınızın kimlik doğrulamasıyla kilitleyebilirsiniz (iPhone'da Face ID / Touch ID / parola, Android'de parmak izi, yüz tanıma ya da ekran kilidi). Biyometrik doğrulamayı işletim sistemi yapar; uygulama parmak izi ya da yüz verinize erişmez. Uygulama kilidini etkinleştirdiğinizde Android'de uygulamanın ekran görüntüsü ve ekran kaydı alınamaz, son uygulamalar ekranında içerik gizlenir.</li>
         </ul>
 
         <h2>8. Çocukların gizliliği</h2>
@@ -208,7 +237,7 @@ GIZLILIK = """
         <p>Kişisel verilerinize ilişkin haklarınız ve bunları nasıl kullanacağınız <a class="inl" href="/privacy/insaat-takip-kvkk.html">KVKK Aydınlatma Metni</a>'nde açıklanmıştır.</p>
 
         <h2>10. Değişiklikler</h2>
-        <p>Bu politika değişirse sayfanın başındaki "Son güncelleme" tarihi yenilenir. Önemli bir değişiklik olduğunda uygulama içinde de bilgilendirme yapılır.</p>
+        <p>Bu politika değişirse sayfanın başındaki "Son güncelleme" tarihi yenilenir. Önemli değişiklikleri uygulama güncellemesinin notlarında da belirtiriz.</p>
 
         <h2>11. İletişim</h2>
         <ul>
@@ -217,8 +246,7 @@ GIZLILIK = """
         </ul>
 """
 
-KVKK = """
-        <p>6698 sayılı Kişisel Verilerin Korunması Kanunu'nun ("KVKK") 10. maddesi uyarınca, İnşaat Takip uygulamasını kullanırken kişisel verilerinizin nasıl işlendiği hakkında sizi bilgilendiriyoruz.</p>
+KVKK = """        <p>6698 sayılı Kişisel Verilerin Korunması Kanunu'nun ("KVKK") 10. maddesi uyarınca, İnşaat Takip uygulamasını (iPhone ve Android) kullanırken kişisel verilerinizin nasıl işlendiği hakkında sizi bilgilendiriyoruz.</p>
 
         <h2>1. Veri sorumlusu</h2>
         <p>Hesap verileriniz (telefon numaranız ve adınız) bakımından veri sorumlusu <strong>{veri_sorumlusu}</strong>. İletişim: <a class="inl" href="mailto:{eposta}">{eposta}</a></p>
@@ -230,15 +258,19 @@ KVKK = """
           <li><strong>Uygulamaya girdiğiniz iş verileri</strong> — özellikle <strong>daire alıcılarının adları</strong> ve ortaklarınıza ait bilgiler — bakımından <strong>veri sorumlusu sizsiniz</strong>; biz yalnızca <strong>veri işleyen</strong> sıfatıyla bu verileri sizin adınıza barındırırız.</li>
         </ul>
         <p>Bunun pratik anlamı: alıcınızın adını uygulamaya girdiğinizde, o kişiye karşı aydınlatma yükümlülüğü ve işlemenin hukuki sebebini belirleme sorumluluğu <strong>size</strong> aittir. Biz o veriyi sizin talimatınız dışında kullanmayız, başkasına aktarmayız ve yalnızca hizmeti sunmak için saklarız.</p>
+        <p>Teknik ve güvenlik verileri (IP adresi, cihaz doğrulama bilgileri, kurulum kimliği) bakımından da veri sorumlusu biziz. Google'ın kendi amaçlarıyla işlediği veriler (telefon numaralarının kötüye kullanımı önlemek için saklanması, Android'de ML Kit ölçümleri) Google'ın kendi gizlilik kurallarına tabidir.</p>
 
         <h2>3. İşlenen kişisel veriler</h2>
         <ul>
-          <li><strong>Kimlik:</strong> Ad (uygulamaya girdiğiniz görünen ad)</li>
+          <li><strong>Kimlik:</strong> Ad (uygulamaya girdiğiniz görünen ad), Firebase'in hesabınıza verdiği hesap kimliği</li>
           <li><strong>İletişim:</strong> Telefon numarası</li>
           <li><strong>Müşteri işlem:</strong> Girdiğiniz proje, daire, satış, tahsilat, gider, malzeme ve ortaklık kayıtları</li>
           <li><strong>Görsel kayıt:</strong> Fiş, dekont, şantiye ve daire fotoğrafları</li>
           <li><strong>Üçüncü kişilere ait kimlik verisi:</strong> Girdiğiniz daire alıcılarının adları (bkz. 2. madde)</li>
-          <li><strong>İşlem güvenliği:</strong> Cihaz doğrulama jetonu, değişiklik kayıtları (hangi kaydı kim ne zaman değiştirdi)</li>
+          <li><strong>İşlem güvenliği:</strong> Cihaz ve uygulama doğrulama bilgileri (iPhone'da App Attest ve telefonla girişte Apple bildirim jetonu, Android'de Google Play Integrity; gerektiğinde Google reCAPTCHA), IP adresi, değişiklik kayıtları (hangi kaydı kim ne zaman değiştirdi)</li>
+          <li><strong>Teknik bilgiler (iki platform):</strong> İsteklerle Firebase'e giden cihaz modeli, işletim sistemi, uygulama ve Firebase sürümleri</li>
+          <li><strong>Teknik tanılama (yalnızca Android):</strong> Firebase kurulum kimliği, sunucu işlevleri çağrılırken gönderilen Firebase Cloud Messaging jetonu ve fiş okuma kütüphanesi Google ML Kit'in Google'a gönderdiği tanılama ve kullanım ölçümleri</li>
+          <li><strong>Talep ve şikâyet:</strong> Destek e-postasındaki e-posta adresiniz, mesajınız ve e-postaya önceden yazılan uygulama sürümü, işletim sistemi sürümü ve cihaz modeli</li>
         </ul>
 
         <h2>4. İşleme amaçları</h2>
@@ -247,6 +279,7 @@ KVKK = """
           <li>Hizmetin sunulması: kayıtların saklanması, hesaplanması, raporlanması ve dışa aktarılması</li>
           <li>Projeye davet edilen ortaklarla paylaşımın sağlanması</li>
           <li>Bilgi güvenliğinin sağlanması, kötüye kullanımın ve sahteciliğin önlenmesi</li>
+          <li>Uygulamanın teknik olarak çalışmasının sağlanması ve sorunların teşhisi</li>
           <li>Talep ve şikâyetlerin karşılanması</li>
           <li>Abonelik ilişkisinin yürütülmesi</li>
         </ul>
@@ -255,19 +288,26 @@ KVKK = """
         <ul>
           <li><strong>Sözleşmenin kurulması veya ifası için gerekli olması</strong> (KVKK m.5/2-c): hesap verileri ve girdiğiniz iş kayıtlarının saklanması</li>
           <li><strong>Hukuki yükümlülüğün yerine getirilmesi</strong> (m.5/2-ç): yasal talepler ve saklama yükümlülükleri</li>
-          <li><strong>Meşru menfaat</strong> (m.5/2-f): bilgi güvenliği, kötüye kullanımın önlenmesi</li>
+          <li><strong>Meşru menfaat</strong> (m.5/2-f): bilgi güvenliği, kötüye kullanımın önlenmesi, uygulamanın teknik olarak çalışması ve sorunların teşhisi</li>
         </ul>
 
         <h2>6. Toplama yöntemi</h2>
-        <p>Veriler, uygulamayı kullanırken doğrudan sizin tarafınızdan girilerek ve otomatik yollarla (cihaz doğrulaması, değişiklik kayıtları) elektronik ortamda toplanır.</p>
+        <p>Veriler, uygulamayı kullanırken doğrudan sizin tarafınızdan girilerek ve otomatik yollarla (cihaz doğrulaması, değişiklik kayıtları, uygulamada kullanılan Google hizmetlerinin teknik ölçümleri) elektronik ortamda toplanır.</p>
 
         <h2>7. Aktarım</h2>
-        <p>Verileriniz, hizmetin sunulabilmesi için Google Ireland Limited tarafından işletilen Firebase altyapısında barındırılır. Sunucu bölgesi <strong>europe-west1 (Belçika, Avrupa Birliği)</strong> olarak seçilmiştir.</p>
-        <p><strong>Bu barındırma, verilerinizin Türkiye dışında tutulduğu anlamına gelir.</strong> Sunucular Avrupa Birliği içindedir ve altyapıyı işleten Google Ireland Limited bir yurt dışı hizmet sağlayıcısıdır.</p>
-        <p>Projelerinize davet ettiğiniz ortaklar, o projenin kayıtlarını görebilir; <strong>alıcı adları ortaklara aktarılmaz</strong>. Abonelik satın alınması hâlinde ödeme işlemi Apple tarafından yürütülür. Yasal olarak yetkili makamların usulüne uygun talebi hâlinde veriler paylaşılabilir. <strong>Bunların dışında</strong> verileriniz başka üçüncü kişilere aktarılmaz; reklam, pazarlama veya analiz amacıyla hiçbir tarafla paylaşılmaz.</p>
+        <p>Verileriniz, hizmetin sunulabilmesi için Google Ireland Limited tarafından işletilen Firebase altyapısında barındırılır:</p>
+        <ul>
+          <li><strong>Veritabanı (iş kayıtları ve profilinizdeki ad ile telefon numarası):</strong> Avrupa Birliği — eur3 bölgesi (Belçika ve Hollanda; çoğaltmaya Finlandiya'daki bir yardımcı bölge katılır)</li>
+          <li><strong>Fotoğraf, belge ve sunucu işlevleri:</strong> Avrupa Birliği — Belçika (europe-west1)</li>
+          <li><strong>Giriş kaydı (Firebase Authentication: telefon numarası, hesap kimliği, girişte işlenen IP adresi):</strong> Amerika Birleşik Devletleri. Google bu hizmeti yalnızca ABD'deki veri merkezlerinden sunar.</li>
+          <li><strong>Cihaz doğrulaması, Firebase kurulum kimliği ve Android'de ML Kit ölçümleri:</strong> Google'ın ABD dahil küresel altyapısında işlenir; belirli bir ülkeyle sınırlı değildir.</li>
+        </ul>
+        <p><strong>Bu barındırma, verilerinizin Türkiye dışında tutulduğu anlamına gelir.</strong> İş kayıtlarınız ve fotoğraflarınız Avrupa Birliği içindedir; giriş için telefon numaranız ve giriş kaydınız ayrıca ABD'de işlenir. Altyapıyı işleten Google bir yurt dışı hizmet sağlayıcısıdır.</p>
+        <p>Google, telefonla giriş için girilen numaraları kendi hizmetlerinde istenmeyen ileti ve kötüye kullanımı önlemek amacıyla da saklar. Android'de fiş okuma kütüphanesi Google ML Kit, kendi ürününü ölçüp iyileştirmek için Google'a tanılama ve kullanım ölçümleri gönderir; ML Kit fiş fotoğrafını ve okuduğu metni Google'a göndermez.</p>
+        <p>Projelerinize davet ettiğiniz ortaklar, o projenin kayıtlarını görebilir; <strong>alıcı adları ortaklara aktarılmaz</strong>. iPhone'da abonelik satın alınması hâlinde ödeme işlemi Apple tarafından yürütülür. Yasal olarak yetkili makamların usulüne uygun talebi hâlinde veriler paylaşılabilir. <strong>Bunların dışında</strong> verileriniz başka üçüncü kişilere aktarılmaz; verilerinizi reklam veya pazarlama amacıyla kimseyle paylaşmayız. Analiz amaçlı tek aktarım, yukarıda açıklanan ML Kit ölçümleridir.</p>
 
         <h2>8. Saklama süresi</h2>
-        <p>Veriler, hesabınız silinene kadar saklanır. Hesabınızı uygulama içinden sildiğinizde verileriniz sunuculardan ve cihazınızdan silinir. Mevzuatın saklamayı zorunlu kıldığı hâller saklıdır.</p>
+        <p>Veriler, hesabınız silinene kadar saklanır. Hesabınızı uygulama içinden sildiğinizde verileriniz sunuculardan hemen silinir; cihazdaki çevrimdışı veritabanı önbelleği uygulama bir sonraki açılışta temizlenir (istisnaları hesap silme sayfasında yazılıdır). Silinen verilerin Google'ın iç yedekleme sistemlerinden tamamen kalkması 180 güne, sunucu istek kayıtlarının (IP adresi) silinmesi yaklaşık 30 güne kadar sürebilir. Google'ın kötüye kullanımı önlemek için sakladığı telefon numarası kaydı ve Android'de ML Kit ölçümleri Google'ın kendi saklama kurallarına tabidir. Ayrıntılar <a class="inl" href="/privacy/insaat-takip-hesap-silme.html">hesap silme sayfasındadır</a>. Mevzuatın saklamayı zorunlu kıldığı hâller saklıdır.</p>
 
         <h2>9. KVKK m.11 kapsamındaki haklarınız</h2>
         <p>Veri sorumlusuna başvurarak şu haklarınızı kullanabilirsiniz:</p>
@@ -321,17 +361,18 @@ KOSULLAR = """
         <ul>
           <li><strong>Ücretsiz katman:</strong> 1 aktif proje ve 2 davet edilmiş ortak. Süre sınırı yoktur.</li>
           <li><strong>Ücretli paketler:</strong> Aktif proje sayısına göre belirlenir; ücretli paketlerde davet edilebilecek ortak sayısı sınırsızdır.</li>
-          <li><strong>Arşivlenen projeler aktif sayılmaz.</strong> Biten bir projeyi arşivlediğinizde kayıtları durur, kontenjanınız boşalır.</li>
-          <li>Güncel paket ve fiyatlar uygulama içinde gösterilir.</li>
+          <li><strong>Arşivlenen projeler aktif sayılmaz.</strong> Biten bir projeyi arşivlediğinizde kayıtları durur, kontenjanınız boşalır. Arşivdeki proje <strong>salt okunurdur</strong>: görüntülenebilir ve dışa aktarılabilir; yeni kayıt girmek için arşivden çıkarılması gerekir, bu da aktif proje sınırına tabidir.</li>
+          <li>Güncel paket ve fiyatlar uygulama içinde ve App Store'da gösterilir. Tahsil edilen tutar, satın alma onayında App Store'un gösterdiği tutardır.</li>
         </ul>
 
         <h2>6. Abonelik, yenileme ve iptal</h2>
         <ul>
-          <li>Abonelikler App Store üzerinden satın alınır; ödeme Apple Kimliğinize tanımlı yöntemle alınır.</li>
-          <li>Abonelik, dönem bitiminden en az 24 saat önce iptal edilmezse <strong>otomatik yenilenir</strong>.</li>
+          <li>Abonelikler App Store üzerinden aylık veya yıllık olarak satın alınır; ödeme, satın almayı onayladığınızda Apple Kimliğinize tanımlı yöntemle alınır.</li>
+          <li>Abonelik, dönem bitiminden en az 24 saat önce iptal edilmezse aynı süre ve ücretle <strong>otomatik yenilenir</strong>; yenileme ücreti dönem bitiminden önceki 24 saat içinde alınır.</li>
           <li>İptal işlemi cihazınızın <em>Ayarlar → Apple Kimliği → Abonelikler</em> bölümünden yapılır. Aboneliği iptal ettiğinizde dönem sonuna kadar kullanmaya devam edersiniz.</li>
           <li>İade talepleri Apple'ın iade politikasına tabidir.</li>
-          <li>Abonelik sona erdiğinde <strong>verileriniz silinmez</strong>; yalnızca ücretsiz katmanın sınırları geçerli olur ve kayıtlarınızı görmeye ve dışa aktarmaya devam edebilirsiniz.</li>
+          <li>Abonelik sona erdiğinde <strong>verileriniz silinmez</strong> ve kayıtlarınızı görmeye ve dışa aktarmaya devam edebilirsiniz. Geçerli paketinizin aktif proje sınırı kadar proje (en önce açılanlar) düzenlenebilir kalır; sınırı aşan projeler salt okunur olur. Hangi projede çalışacağınızı diğerlerini arşivleyerek seçebilirsiniz.</li>
+          <li><strong>Hesabınızı silmek aboneliğinizi iptal etmez.</strong> Ödeme Apple üzerinden sürer; hesabınızı silmeden önce aboneliğinizi iptal etmeniz gerekir.</li>
         </ul>
 
         <h2>7. Yedekleme</h2>
@@ -365,29 +406,63 @@ KOSULLAR = """
         </ul>
 """
 
+# Tarih SAYFA BAŞINA: sayfalar ayrı günlerde değişiyor. Tek bir tarih,
+# değişmeyen sayfayı da "güncellendi" gösterirdi ya da değişeni eskitirdi.
 SAYFALAR = [
-    ("insaat-takip.html", "Gizlilik Politikası", "gizlilik politikası", GIZLILIK),
-    ("insaat-takip-kvkk.html", "KVKK Aydınlatma Metni", "KVKK aydınlatma metni", KVKK),
-    ("insaat-takip-kosullar.html", "Kullanım Koşulları", "kullanım koşulları", KOSULLAR),
+    ("insaat-takip.html", "Gizlilik Politikası", "gizlilik politikası", "31 Ekim 2026", GIZLILIK),
+    ("insaat-takip-kvkk.html", "KVKK Aydınlatma Metni", "KVKK aydınlatma metni", "31 Ekim 2026", KVKK),
+    ("insaat-takip-kosullar.html", "Kullanım Koşulları", "kullanım koşulları", "25 Ekim 2026", KOSULLAR),
 ]
+
+AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz",
+         "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+
+
+def tarih(metin: str) -> tuple[int, int, int] | None:
+    """"31 Ekim 2026" → (2026, 10, 31); okunamazsa None."""
+    m = re.fullmatch(r"(\d{1,2}) (\w+) (\d{4})", metin.strip())
+    if not m or m.group(2) not in AYLAR:
+        return None
+    return int(m.group(3)), AYLAR.index(m.group(2)) + 1, int(m.group(1))
+
+
+def hedefteki_tarih(html: str) -> tuple[int, int, int] | None:
+    m = re.search(r"Son güncelleme: ([^<·]+)", html)
+    return tarih(m.group(1)) if m else None
 
 
 def main() -> int:
-    hedef = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parents[2] / "benav_com" / "public" / "privacy"
+    argumanlar = [a for a in sys.argv[1:] if a != "--uzerine-yaz"]
+    uzerine_yaz = len(argumanlar) != len(sys.argv) - 1
+    hedef = Path(argumanlar[0]) if argumanlar else Path(__file__).resolve().parents[2] / "benav_com" / "public" / "privacy"
     if not hedef.is_dir():
         print(f"hedef dizin yok: {hedef}", file=sys.stderr)
         return 1
-    for dosya, baslik, baslik_kucuk, govde in SAYFALAR:
+    sonuc = 0
+    for dosya, baslik, baslik_kucuk, guncelleme, govde in SAYFALAR:
         html = ISKELET.format(
             baslik=baslik,
             baslik_kucuk=baslik_kucuk,
-            guncelleme=GUNCELLEME,
+            guncelleme=guncelleme,
             govde=govde.format(eposta=EPOSTA, gelistirici=GELISTIRICI,
                                veri_sorumlusu=VERI_SORUMLUSU).rstrip(),
         )
-        (hedef / dosya).write_text(html, encoding="utf-8")
-        print(f"yazıldı: {hedef / dosya}")
-    return 0
+        yol = hedef / dosya
+        # Hedefteki metin bu betikten yeniyse ya da aynı tarihli ama farklıysa
+        # biri onu elle düzenlemiş demektir: üzerine yazmak o emeği SESSİZCE
+        # geri alırdı. Önce gövdeyi buraya taşı (tarih de gelir), sonra koş.
+        if yol.exists() and not uzerine_yaz:
+            mevcut = yol.read_text(encoding="utf-8")
+            eski, yeni = hedefteki_tarih(mevcut), tarih(guncelleme)
+            if mevcut != html and (eski is None or yeni is None or eski >= yeni):
+                print(f"YAZILMADI: {yol} — hedefteki sayfa betiktekinden yeni ya da "
+                      f"aynı tarihli ama farklı. Önce canlı gövdeyi betiğe taşı "
+                      f"(ya da --uzerine-yaz).", file=sys.stderr)
+                sonuc = 2
+                continue
+        yol.write_text(html, encoding="utf-8")
+        print(f"yazıldı: {yol}")
+    return sonuc
 
 
 if __name__ == "__main__":
